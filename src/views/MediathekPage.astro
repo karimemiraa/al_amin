@@ -1,0 +1,210 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import VideoEmbed from '../components/VideoEmbed.astro';
+import FilterChips from '../components/FilterChips.astro';
+import Icon from '../components/Icon.astro';
+import site from '../content/settings/site.json';
+import { localizePath, formatDate, pick, useTranslations, type Lang } from '../i18n/ui';
+import friday from '../assets/photos/gemeinde-freitag.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+
+const c = ar
+  ? {
+      title: 'المكتبة المرئية – خطب ودروس',
+      description: 'خطب الجمعة ودروس مسجد محمد الأمين في هانوفر بالفيديو: السيرة النبوية والعقيدة والتزكية والقرآن – بالعربية والألمانية.',
+      eyebrow: 'خطب ودروس',
+      h1: 'المكتبة المرئية',
+      intro: 'خطب الجمعة والدروس من مسجدنا – للمشاهدة في أي وقت ومن أي مكان.',
+      featured: 'مختارات',
+      latest: 'أحدث تسجيل',
+      speaker: 'المتحدث',
+      allEyebrow: 'الأرشيف',
+      allTitle: 'جميع الفيديوهات',
+      filterLabel: 'تصفية حسب السلسلة',
+      filterAll: 'الكل',
+      empty: 'لا توجد فيديوهات في هذه السلسلة بعد.',
+      privacyTitle: 'خصوصيتك محفوظة',
+      privacyText: 'لا يُحمَّل أي محتوى من يوتيوب قبل أن تضغط على الفيديو. عندها فقط تُنقل بيانات إلى يوتيوب (Google).',
+      liveTitle: 'البث المباشر',
+      liveText: 'خطبة الجمعة والدروس مباشرة.',
+      telegramTitle: 'قناتنا على تيليغرام',
+      telegramText: 'نبث الدروس حالياً مباشرة على تيليغرام، وننشر فيها التسجيلات والإعلانات.',
+      telegramCta: 'فتح تيليغرام',
+      youtubeCta: 'اشترك في قناة يوتيوب',
+      series: { khutbah: 'خطب الجمعة', sirah: 'السيرة النبوية', aqidah: 'العقيدة', tazkiyah: 'التزكية', quran: 'القرآن الكريم', campaign: 'حملة المسجد الجديد', other: 'متفرقات' } as Record<string, string>,
+    }
+  : {
+      title: 'Mediathek – Predigten & Vorträge',
+      description: 'Freitagspredigten und Vorträge der Mohammad Al-Amien Moschee Hannover im Video: Sirah, Glaubenslehre, Tazkiyah und Koran – auf Arabisch und Deutsch.',
+      eyebrow: 'Predigten & Vorträge',
+      h1: 'Mediathek',
+      intro: 'Freitagspredigten und Unterricht aus unserer Moschee – jederzeit und überall zum Nachschauen.',
+      featured: 'Empfohlen',
+      latest: 'Neueste Aufnahme',
+      speaker: 'Sprecher',
+      allEyebrow: 'Archiv',
+      allTitle: 'Alle Videos',
+      filterLabel: 'Nach Reihe filtern',
+      filterAll: 'Alle',
+      empty: 'In dieser Reihe gibt es noch keine Videos.',
+      privacyTitle: 'Ihre Privatsphäre bleibt geschützt',
+      privacyText: 'Inhalte von YouTube werden erst geladen, wenn Sie ein Video anklicken. Erst dann werden Daten an YouTube (Google) übertragen.',
+      liveTitle: 'Live',
+      liveText: 'Freitagspredigt und Unterricht live verfolgen.',
+      telegramTitle: 'Unser Telegram-Kanal',
+      telegramText: 'Unterrichte übertragen wir derzeit live auf Telegram – dort finden Sie auch Aufnahmen und Ankündigungen.',
+      telegramCta: 'Telegram öffnen',
+      youtubeCta: 'YouTube-Kanal abonnieren',
+      series: { khutbah: 'Freitagspredigt', sirah: 'Sirah', aqidah: 'Aqida', tazkiyah: 'Tazkiyah', quran: 'Quran', campaign: 'Kampagne', other: 'Sonstiges' } as Record<string, string>,
+    };
+
+const videos = (await getCollection('videos')).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+const featured = videos.find((v) => v.data.featured) ?? videos[0];
+const seriesOrder = ['khutbah', 'sirah', 'aqidah', 'tazkiyah', 'quran', 'campaign', 'other'];
+const present = seriesOrder.filter((s) => videos.some((v) => v.data.series === s));
+const filters = [{ key: 'all', label: c.filterAll }, ...present.map((s) => ({ key: s, label: c.series[s] }))];
+const langLabel = (l: string) => t(`common.lang.${l}` as 'common.lang.de');
+const dateShort = (d: Date) => formatDate(d, lang, { day: 'numeric', month: 'long', year: 'numeric' });
+
+const schema = videos.map((v) => ({
+  '@context': 'https://schema.org',
+  '@type': 'VideoObject',
+  name: pick(v.data, 'title', lang),
+  description: pick(v.data, 'title', lang),
+  uploadDate: v.data.date.toISOString().slice(0, 10),
+  thumbnailUrl: `https://i.ytimg.com/vi/${v.data.youtubeId}/hqdefault.jpg`,
+  embedUrl: `https://www.youtube-nocookie.com/embed/${v.data.youtubeId}`,
+  inLanguage: v.data.language === 'de-ar' ? ['de', 'ar'] : v.data.language,
+}));
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={friday} schema={schema}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={friday} imageAlt={ar ? 'المصلون في صلاة الجمعة' : 'Gemeinde beim Freitagsgebet'} />
+
+  {featured && (
+    <section class="container-x relative z-20 -mt-6 md:-mt-10">
+      <div class="card grid overflow-hidden lg:grid-cols-[1.55fr_1fr]">
+        <VideoEmbed lang={lang} id={featured.data.youtubeId} title={pick(featured.data, 'title', lang)} subtitle={featured.data.speaker} class="video-featured !rounded-none !shadow-none lg:!aspect-auto lg:h-full lg:min-h-80" />
+        <div class="flex flex-col p-6 md:p-8">
+          <p class="eyebrow">{featured.data.featured ? c.featured : c.latest}</p>
+          <h2 class="mt-3 text-2xl font-semibold leading-snug md:text-[1.75rem]" dir="auto">{pick(featured.data, 'title', lang)}</h2>
+          <p class="mt-4 flex flex-wrap gap-2">
+            <span class="pill">{c.series[featured.data.series]}</span>
+            <span class="pill"><Icon name="globe" size={13} /> {langLabel(featured.data.language)}</span>
+          </p>
+          <dl class="mt-5 space-y-2 text-[0.95rem] text-ink-soft">
+            {featured.data.speaker && (
+              <div class="flex items-center gap-2"><dt class="inline-flex"><Icon name="users" size={17} class="text-gold" /><span class="sr-only">{c.speaker}</span></dt><dd dir="auto">{featured.data.speaker}</dd></div>
+            )}
+            <div class="flex items-center gap-2"><dt class="inline-flex"><Icon name="calendar" size={17} class="text-gold" /><span class="sr-only">{ar ? 'التاريخ' : 'Datum'}</span></dt><dd><time datetime={featured.data.date.toISOString().slice(0, 10)}>{dateShort(featured.data.date)}</time></dd></div>
+          </dl>
+          <p class="mt-auto flex gap-2 border-t border-line pt-5 text-sm text-ink-mute">
+            <Icon name="shield" size={18} class="shrink-0 text-sage" />
+            <span>{c.privacyText}</span>
+          </p>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ALL VIDEOS -->
+  <section class="container-x mt-20 md:mt-24" data-media>
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <SectionHeading eyebrow={c.allEyebrow} title={c.allTitle} />
+      {present.length > 0 && <FilterChips items={filters} label={c.filterLabel} id={`media-filter-${lang}`} />}
+    </div>
+    <p class="sr-only" aria-live="polite" data-media-status></p>
+
+    <ul class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {videos.map((v) => (
+        <li class="card flex flex-col overflow-hidden" data-series={v.data.series}>
+          <VideoEmbed lang={lang} id={v.data.youtubeId} title={pick(v.data, 'title', lang)} class="video-compact !rounded-none !shadow-none" />
+          <div class="flex flex-1 flex-col p-5">
+            <p class="flex flex-wrap gap-2 text-sm">
+              <span class="pill">{c.series[v.data.series]}</span>
+              <span class="pill !bg-paper-2"><Icon name="globe" size={13} /> {langLabel(v.data.language)}</span>
+            </p>
+            <h3 class="mt-3 font-display text-lg font-semibold leading-snug" dir="auto">{pick(v.data, 'title', lang)}</h3>
+            <p class="mt-auto flex flex-wrap gap-x-1.5 pt-3 text-sm text-ink-mute">
+              <time datetime={v.data.date.toISOString().slice(0, 10)}>{dateShort(v.data.date)}</time>
+              {v.data.speaker && <><span aria-hidden="true">·</span><span dir="auto">{v.data.speaker}</span></>}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ul>
+    <p class="card mt-6 hidden p-6 text-center text-ink-soft" data-media-empty>{c.empty}</p>
+  </section>
+
+  <!-- LIVE + TELEGRAM -->
+  <section class="container-x mb-24 mt-20 grid gap-6 md:mb-28 lg:grid-cols-[1fr_1.4fr]">
+    <a href={L('/live')} class="card group flex items-center gap-5 p-6 transition hover:-translate-y-0.5 hover:shadow-lift md:p-8">
+      <span class="relative grid size-14 shrink-0 place-items-center rounded-full bg-wine text-white">
+        <Icon name="live" size={26} />
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block font-display text-2xl font-semibold">{c.liveTitle}</span>
+        <span class="mt-1 block text-ink-soft">{c.liveText}</span>
+      </span>
+      <Icon name="arrow" size={22} class="shrink-0 text-wine transition group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
+    </a>
+    <div class="bg-wine-pattern flex flex-col gap-6 rounded-[var(--radius-card)] p-6 text-white shadow-lift sm:flex-row sm:items-center md:p-8">
+      <span class="grid size-14 shrink-0 place-items-center rounded-full bg-white/10 text-gold-soft ring-1 ring-white/20"><Icon name="telegram" size={26} /></span>
+      <div class="min-w-0 flex-1">
+        <h2 class="text-2xl font-semibold">{c.telegramTitle}</h2>
+        <p class="mt-1 text-white/80">{c.telegramText}</p>
+      </div>
+      <div class="flex flex-col gap-2">
+        <a href={site.social.telegram} target="_blank" rel="noopener" class="btn btn-light"><Icon name="telegram" size={18} class="text-wine" /> {c.telegramCta}</a>
+        {site.social.youtubeUrl && (
+          <a href={site.social.youtubeUrl} target="_blank" rel="noopener" class="btn btn-ghost-light"><Icon name="play" size={16} /> {c.youtubeCta}</a>
+        )}
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  /* Calmer consent overlay inside grid cards: the title is shown below the player (kept for screen readers). */
+  .video-compact [data-video-play] > span:first-child, .video-featured [data-video-play] > span:first-child { flex-shrink: 0; }
+  .video-compact [data-video-play] { gap: 0.75rem; padding: 1rem 1.25rem 2.75rem; }
+  .video-compact [data-video-play] > span:nth-child(2) {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  @media (max-width: 1023px) {
+    .video-featured [data-video-play] { gap: 0.75rem; padding: 1rem 1.25rem 2.75rem; }
+    .video-featured [data-video-play] > span:nth-child(2), .video-featured [data-video-play] > span:nth-child(3) {
+      position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-media]').forEach((root) => {
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    const items = [...root.querySelectorAll<HTMLElement>('[data-series]')];
+    const empty = root.querySelector<HTMLElement>('[data-media-empty]');
+    const status = root.querySelector<HTMLElement>('[data-media-status]');
+    buttons.forEach((b) =>
+      b.addEventListener('click', () => {
+        const key = b.dataset.filter!;
+        buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        let shown = 0;
+        items.forEach((item) => {
+          const ok = key === 'all' || item.dataset.series === key;
+          item.hidden = !ok;
+          if (ok) shown++;
+        });
+        empty?.classList.toggle('hidden', shown > 0);
+        if (status) status.textContent = `${b.textContent?.trim()}: ${shown}`;
+      }),
+    );
+  });
+</script>

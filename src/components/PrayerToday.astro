@@ -10,7 +10,7 @@ const window = getRange(berlinToday(), 21);
 const today = window[0];
 const rows: PrayerKey[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const inline = Object.fromEntries(window.map((d) => [d.date, [d.times, d.iqama, d.provisional ? 1 : 0]]));
-const labels = Object.fromEntries(rows.map((r) => [r, t(`prayer.${r}`)]));
+const labels = { ...Object.fromEntries(rows.map((r) => [r, t(`prayer.${r}`)])), _h: lang === 'ar' ? 'س' : 'h', _m: lang === 'ar' ? 'د' : 'min' };
 ---
 <div class:list={['card overflow-hidden', variant === 'compact' && 'text-[0.95rem]']} data-prayer-widget data-lang={lang}>
   <div class="bg-wine-pattern relative px-6 py-5 text-white">
@@ -47,7 +47,7 @@ const labels = Object.fromEntries(rows.map((r) => [r, t(`prayer.${r}`)]));
     {jumuah.length > 0 && (
       <p class="mx-3 mt-2 flex items-center justify-between gap-3 rounded-xl bg-gold-pale px-4 py-3 text-[0.95rem]">
         <span class="font-semibold text-wine-ink">{t('prayer.jumuah')}</span>
-        <span class="tabular font-semibold">{jumuah.map((j) => j.time).join(' · ')}</span>
+        <span class="tabular font-semibold" dir="ltr">{jumuah.map((j) => j.time).join(' · ')}</span>
       </p>
     )}
     <p class="mx-3 mt-2 hidden text-xs text-ink-mute" data-provisional>{t('prayer.provisional')}</p>
@@ -106,7 +106,7 @@ const labels = Object.fromEntries(rows.map((r) => [r, t(`prayer.${r}`)]));
       widget.querySelector('[data-next-name]')!.textContent = labels[next.key];
       const diff = Math.max(0, next.at - now.secs);
       const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60);
-      widget.querySelector('[data-next-countdown]')!.textContent = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m} min`;
+      widget.querySelector('[data-next-countdown]')!.textContent = h > 0 ? `${h} ${labels._h} ${String(m).padStart(2, '0')} ${labels._m}` : `${m} ${labels._m}`;
     }
   }
 

@@ -1,0 +1,50 @@
+---
+/**
+ * Shell for legal pages (Impressum, Datenschutz). The legal text itself is always German
+ * (legally binding); on Arabic pages an Arabic note explains this and the text block is
+ * marked lang="de" dir="ltr".
+ */
+import Icon from './Icon.astro';
+import Wave from './Wave.astro';
+import { localizePath, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang; eyebrow: string; title: string; arNote?: string; updated?: string }
+const { lang, eyebrow, title, arNote, updated } = Astro.props;
+const ar = lang === 'ar';
+---
+<section class="bg-wine-pattern relative overflow-hidden text-white">
+  <div class="container-x relative pb-16 pt-12 md:pb-24 md:pt-16">
+    <p class="eyebrow !text-gold-soft">{eyebrow}</p>
+    <h1 class="mt-3 max-w-3xl text-4xl font-semibold leading-[1.1] md:text-5xl">{title}</h1>
+    {updated && <p class="mt-4 text-white/70" lang="de">{updated}</p>}
+  </div>
+  <Wave class="absolute inset-x-0 bottom-0" />
+</section>
+
+<div class="container-x mt-10 md:mt-14">
+  <div class="mx-auto max-w-3xl">
+    {ar && arNote && (
+      <div class="mb-8 flex gap-3 rounded-2xl border border-gold-soft/70 bg-gold-pale/60 p-5 text-ink" lang="ar" dir="rtl">
+        <Icon name="info" size={20} class="mt-1 shrink-0 text-gold" />
+        <div>
+          <p>{arNote}</p>
+          <a href={localizePath('/kontakt', 'ar')} class="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-wine underline underline-offset-2">تواصل معنا <Icon name="arrow" size={14} /></a>
+        </div>
+      </div>
+    )}
+    <article class="legal prose-igh card p-6 text-start sm:p-8 md:p-12" lang="de" dir="ltr">
+      <slot />
+    </article>
+  </div>
+</div>
+
+<style>
+  .legal :global(h2) { font-size: 1.45rem; line-height: 1.25; scroll-margin-top: 7rem; font-family: var(--font-display); }
+  .legal :global(h2:first-child) { margin-top: 0; }
+  .legal :global(h3) { font-size: 1.12rem; font-family: var(--font-sans); font-weight: 650; }
+  .legal :global(address) { font-style: normal; }
+  .legal :global(a) { overflow-wrap: anywhere; }
+  /* Legal text is German even on Arabic pages: keep the Latin fonts. */
+  .legal { --font-display: 'Fraunces Variable', Georgia, serif; --font-sans: 'Source Sans 3 Variable', system-ui, sans-serif; font-family: var(--font-sans); line-height: 1.7; }
+  .legal :global(h2), .legal :global(h3) { letter-spacing: -0.01em; font-weight: 600; }
+</style>

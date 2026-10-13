@@ -1,0 +1,274 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import Icon from '../components/Icon.astro';
+import site from '../content/settings/site.json';
+import { localizePath, type Lang } from '../i18n/ui';
+import heroImg from '../assets/photos/brunnen.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const ar = lang === 'ar';
+const L = (p: string) => localizePath(p, lang);
+const tel = site.phone.replace(/\s/g, '');
+const telegramHandle = site.social.telegram ? '@' + site.social.telegram.replace(/^https?:\/\/t\.me\//, '') : '';
+
+const c = ar
+  ? {
+      title: 'تواصل معنا',
+      description: 'تواصلوا مع مسجد محمد الأمين في هانوفر: نموذج التواصل، الهاتف، البريد الإلكتروني، العنوان وقناة تليغرام – للأسئلة العامة والتبرعات والجولات في المسجد والصحافة.',
+      eyebrow: 'تواصل معنا',
+      h1: 'يسعدنا أن نسمع منكم',
+      intro: 'سؤال عن المسجد أو التبرعات أو زيارة مع مجموعة؟ اكتبوا لنا عبر النموذج أو تواصلوا معنا مباشرة.',
+      formTitle: 'أرسلوا لنا رسالة',
+      formIntro: 'الحقول المعلَّمة بـ * مطلوبة.',
+      name: 'الاسم',
+      email: 'البريد الإلكتروني',
+      subject: 'الموضوع',
+      subjects: [
+        { value: 'allgemein', label: 'استفسار عام' },
+        { value: 'spende', label: 'التبرع وإيصال التبرع' },
+        { value: 'fuehrung', label: 'جولة في المسجد' },
+        { value: 'presse', label: 'الصحافة' },
+        { value: 'sonstiges', label: 'أخرى' },
+      ],
+      message: 'رسالتكم',
+      messageHint: 'للجولات: يُرجى ذكر التاريخ المرغوب وعدد المشاركين.',
+      privacyBefore: 'قرأتُ ',
+      privacyLink: 'سياسة الخصوصية',
+      privacyAfter: ' وأوافق على معالجة بياناتي للرد على استفساري.',
+      honeypot: 'يُرجى ترك هذا الحقل فارغاً',
+      submit: 'إرسال الرسالة',
+      successTitle: 'شكراً لكم! تم إرسال رسالتكم.',
+      successText: 'سنردّ عليكم في أقرب وقت ممكن.',
+      errorTitle: 'تعذّر إرسال الرسالة.',
+      errorText: 'نعتذر عن ذلك. يُرجى المحاولة لاحقاً أو التواصل معنا مباشرة:',
+      inputTitle: 'يُرجى التحقق من بياناتكم.',
+      inputText: 'يُرجى ملء جميع الحقول المطلوبة بشكل صحيح والموافقة على سياسة الخصوصية.',
+      direct: 'مباشرةً',
+      phone: 'الهاتف',
+      phoneNote: 'جهة الاتصال',
+      emailLabel: 'البريد الإلكتروني',
+      address: 'العنوان',
+      route: 'الاتجاهات',
+      visitInfo: 'معلومات الزيارة',
+      telegram: 'تليغرام',
+      telegramNote: 'الأخبار والدروس والبث المباشر',
+      hintsTitle: 'معلومات مفيدة',
+      hints: [
+        { icon: 'users', text: 'جولات للمدارس والمجموعات: يُرجى التسجيل مسبقاً.', href: '/besuch#fuehrungen', link: 'الجولات' },
+        { icon: 'receipt', text: 'لإيصالات التبرع: يُرجى ذكر الاسم الكامل والعنوان.', href: '/spenden', link: 'التبرع' },
+      ],
+    }
+  : {
+      title: 'Kontakt',
+      description: 'Kontakt zur Mohammad Al-Amien Moschee in Hannover: Kontaktformular, Telefon, E-Mail, Adresse und Telegram – für allgemeine Fragen, Spenden und Zuwendungsbestätigungen, Moscheeführungen und Presse.',
+      eyebrow: 'Kontakt',
+      h1: 'Wir freuen uns<br/>auf Ihre Nachricht',
+      intro: 'Eine Frage zur Moschee, zu Spenden oder ein Besuch mit Ihrer Gruppe? Schreiben Sie uns über das Formular oder melden Sie sich direkt.',
+      formTitle: 'Schreiben Sie uns',
+      formIntro: 'Mit * gekennzeichnete Felder sind Pflichtfelder.',
+      name: 'Name',
+      email: 'E-Mail',
+      subject: 'Betreff',
+      subjects: [
+        { value: 'allgemein', label: 'Allgemein' },
+        { value: 'spende', label: 'Spende & Zuwendungsbestätigung' },
+        { value: 'fuehrung', label: 'Moscheeführung' },
+        { value: 'presse', label: 'Presse' },
+        { value: 'sonstiges', label: 'Sonstiges' },
+      ],
+      message: 'Ihre Nachricht',
+      messageHint: 'Für Führungen: bitte Wunschtermin und Gruppengröße angeben.',
+      privacyBefore: 'Ich habe die ',
+      privacyLink: 'Datenschutzerklärung',
+      privacyAfter: ' gelesen und bin einverstanden, dass meine Angaben zur Beantwortung meiner Anfrage verarbeitet werden.',
+      honeypot: 'Dieses Feld bitte leer lassen',
+      submit: 'Nachricht senden',
+      successTitle: 'Vielen Dank! Ihre Nachricht wurde gesendet.',
+      successText: 'Wir melden uns so bald wie möglich bei Ihnen.',
+      errorTitle: 'Ihre Nachricht konnte leider nicht gesendet werden.',
+      errorText: 'Bitte versuchen Sie es später erneut oder erreichen Sie uns direkt:',
+      inputTitle: 'Bitte prüfen Sie Ihre Angaben.',
+      inputText: 'Bitte füllen Sie alle Pflichtfelder korrekt aus und stimmen Sie der Datenschutzerklärung zu.',
+      direct: 'Direkt',
+      phone: 'Telefon',
+      phoneNote: 'Ansprechpartner',
+      emailLabel: 'E-Mail',
+      address: 'Adresse',
+      route: 'Route planen',
+      visitInfo: 'Infos zum Besuch',
+      telegram: 'Telegram',
+      telegramNote: 'Neuigkeiten, Unterricht und Live-Übertragungen',
+      hintsTitle: 'Gut zu wissen',
+      hints: [
+        { icon: 'users', text: 'Führungen für Schulklassen und Gruppen bitte vorab anmelden.', href: '/besuch#fuehrungen', link: 'Zu den Führungen' },
+        { icon: 'receipt', text: 'Für Zuwendungsbestätigungen bitte vollständigen Namen und Anschrift angeben.', href: '/spenden', link: 'Zu den Spenden' },
+      ],
+    };
+
+const field = 'mt-2 block w-full rounded-xl border-[1.5px] border-line bg-card px-4 text-ink outline-none transition placeholder:text-ink-mute hover:border-gold-soft focus:border-wine';
+const label = 'block font-semibold text-ink';
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={heroImg}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={heroImg} imageAlt="" />
+
+  <section class="container-x relative z-20 -mt-6 grid gap-8 md:-mt-10 lg:grid-cols-[1.25fr_0.75fr] lg:gap-10">
+    <!-- FORM -->
+    <div id="formular" class="card scroll-mt-28 p-6 sm:p-8 md:p-10">
+      <h2 class="text-2xl font-semibold md:text-3xl">{c.formTitle}</h2>
+      <p class="mt-1 text-sm text-ink-mute">{c.formIntro}</p>
+
+      <div data-contact-status="success" role="status" tabindex="-1" hidden class="mt-6 flex gap-3 rounded-2xl border border-sage/40 bg-sage/10 p-5 text-ink outline-none">
+        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-sage text-white"><Icon name="check" size={18} /></span>
+        <span><strong class="block">{c.successTitle}</strong>{c.successText}</span>
+      </div>
+      <div data-contact-status="error" role="alert" tabindex="-1" hidden class="mt-6 flex gap-3 rounded-2xl border border-rose/40 bg-rose-soft p-5 text-ink outline-none">
+        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="info" size={18} /></span>
+        <span>
+          <strong class="block text-wine-ink">{c.errorTitle}</strong>
+          {c.errorText}
+          <span class="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+            <a href={`tel:${tel}`} class="inline-flex items-center gap-1.5 font-semibold text-wine underline underline-offset-2"><Icon name="phone" size={16} /><span dir="ltr">{site.phone}</span></a>
+            <a href={`mailto:${site.email}`} class="inline-flex items-center gap-1.5 font-semibold text-wine underline underline-offset-2"><Icon name="mail" size={16} /><span dir="ltr">{site.email}</span></a>
+          </span>
+        </span>
+      </div>
+      <div data-contact-status="input" role="alert" tabindex="-1" hidden class="mt-6 flex gap-3 rounded-2xl border border-rose/40 bg-rose-soft p-5 text-ink outline-none">
+        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="info" size={18} /></span>
+        <span><strong class="block text-wine-ink">{c.inputTitle}</strong>{c.inputText}</span>
+      </div>
+
+      <form action="/api/contact" method="post" class="mt-7 grid gap-5" data-contact-form>
+        <input type="hidden" name="lang" value={lang} />
+        <input type="hidden" name="ts" value="" data-ts />
+        <!-- Honeypot: invisible for people, tempting for bots. -->
+        <div class="sr-only" aria-hidden="true">
+          <label for="kontakt-website">{c.honeypot}</label>
+          <input type="text" id="kontakt-website" name="website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label for="kontakt-name" class={label}>{c.name} <span class="text-wine" aria-hidden="true">*</span></label>
+            <input id="kontakt-name" name="name" type="text" required maxlength="120" autocomplete="name" class:list={[field, 'h-12']} />
+          </div>
+          <div>
+            <label for="kontakt-email" class={label}>{c.email} <span class="text-wine" aria-hidden="true">*</span></label>
+            <input id="kontakt-email" name="email" type="email" required maxlength="200" autocomplete="email" inputmode="email" dir="ltr" class:list={[field, 'h-12', ar && 'text-end']} />
+          </div>
+        </div>
+
+        <div>
+          <label for="kontakt-betreff" class={label}>{c.subject} <span class="text-wine" aria-hidden="true">*</span></label>
+          <div class="relative">
+            <select id="kontakt-betreff" name="betreff" required class:list={[field, 'h-12 cursor-pointer appearance-none pe-11']} data-subject>
+              {c.subjects.map((s) => <option value={s.value}>{s.label}</option>)}
+            </select>
+            <Icon name="chevron" size={18} class="pointer-events-none absolute end-4 top-1/2 mt-1 -translate-y-1/2 rotate-90 text-ink-mute" />
+          </div>
+        </div>
+
+        <div>
+          <label for="kontakt-nachricht" class={label}>{c.message} <span class="text-wine" aria-hidden="true">*</span></label>
+          <textarea id="kontakt-nachricht" name="nachricht" required minlength="2" maxlength="5000" rows="7" aria-describedby="kontakt-nachricht-hinweis" class:list={[field, 'min-h-40 resize-y py-3 leading-relaxed']}></textarea>
+          <p id="kontakt-nachricht-hinweis" class="mt-1.5 text-sm text-ink-mute">{c.messageHint}</p>
+        </div>
+
+        <div class="flex gap-3">
+          <input id="kontakt-datenschutz" name="datenschutz" type="checkbox" value="1" required class="mt-1 size-5 shrink-0 cursor-pointer accent-wine" />
+          <label for="kontakt-datenschutz" class="text-[0.95rem] text-ink-soft">
+            {c.privacyBefore}<a href={L('/datenschutz')} class="font-semibold text-wine underline underline-offset-2" target="_blank">{c.privacyLink}</a>{c.privacyAfter} <span class="text-wine" aria-hidden="true">*</span>
+          </label>
+        </div>
+
+        <div>
+          <button type="submit" class="btn btn-primary w-full sm:w-auto" data-cta="contact-submit">
+            <Icon name="mail" size={18} /> {c.submit}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- CONTACT CARDS -->
+    <aside class="flex flex-col gap-4 lg:pt-0">
+      <a href={`tel:${tel}`} class="card group flex gap-4 p-5 transition hover:border-gold-soft hover:shadow-lift">
+        <span class="grid size-11 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="phone" size={20} /></span>
+        <span class="min-w-0">
+          <span class="block text-xs font-semibold uppercase tracking-wider text-ink-mute">{c.phone}</span>
+          <span class="block text-lg font-semibold text-ink group-hover:text-wine" dir="ltr" style={ar ? 'text-align:right' : undefined}>{site.phone}</span>
+          {site.phoneContactName && <span class="block text-sm text-ink-soft">{c.phoneNote}: <span dir="ltr">{site.phoneContactName}</span></span>}
+        </span>
+      </a>
+      <a href={`mailto:${site.email}`} class="card group flex gap-4 p-5 transition hover:border-gold-soft hover:shadow-lift">
+        <span class="grid size-11 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="mail" size={20} /></span>
+        <span class="min-w-0">
+          <span class="block text-xs font-semibold uppercase tracking-wider text-ink-mute">{c.emailLabel}</span>
+          <span class="block break-all text-lg font-semibold text-ink group-hover:text-wine" dir="ltr" style={ar ? 'text-align:right' : undefined}>{site.email}</span>
+        </span>
+      </a>
+      <div class="card flex gap-4 p-5">
+        <span class="grid size-11 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="pin" size={20} /></span>
+        <span class="min-w-0">
+          <span class="block text-xs font-semibold uppercase tracking-wider text-ink-mute">{c.address}</span>
+          <span class="block font-semibold text-ink">{site.mosqueName}</span>
+          <span class="block text-ink-soft" dir="ltr" style={ar ? 'text-align:right' : undefined}>{site.street}, {site.zip} {site.city}</span>
+          <span class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
+            <a href={site.mapsUrl} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-wine hover:underline">{c.route} <Icon name="external" size={14} /></a>
+            <a href={L('/besuch#anfahrt')} class="inline-flex items-center gap-1 text-wine hover:underline">{c.visitInfo} <Icon name="arrow" size={14} /></a>
+          </span>
+        </span>
+      </div>
+      {site.social.telegram && (
+        <a href={site.social.telegram} target="_blank" rel="noopener" class="card group flex gap-4 p-5 transition hover:border-gold-soft hover:shadow-lift">
+          <span class="grid size-11 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="telegram" size={20} /></span>
+          <span class="min-w-0">
+            <span class="block text-xs font-semibold uppercase tracking-wider text-ink-mute">{c.telegram}</span>
+            <span class="block break-all font-semibold text-ink group-hover:text-wine" dir="ltr" style={ar ? 'text-align:right' : undefined}>{telegramHandle}</span>
+            <span class="block text-sm text-ink-soft">{c.telegramNote}</span>
+          </span>
+        </a>
+      )}
+      <div class="rounded-[var(--radius-card)] border border-gold-soft/70 bg-gold-pale/50 p-5">
+        <p class="text-sm font-semibold uppercase tracking-wider text-gold">{c.hintsTitle}</p>
+        <ul class="mt-3 space-y-3">
+          {c.hints.map((h) => (
+            <li class="flex gap-3 text-[0.95rem] text-ink-soft">
+              <Icon name={h.icon as 'users'} size={18} class="mt-1 shrink-0 text-wine" />
+              <span>{h.text} <a href={L(h.href)} class="font-semibold text-wine underline underline-offset-2">{h.link}</a></span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </aside>
+  </section>
+</BaseLayout>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const form = document.querySelector<HTMLFormElement>('[data-contact-form]');
+  const ts = form?.querySelector<HTMLInputElement>('[data-ts]');
+  if (ts) ts.value = String(Date.now());
+
+  // Pre-select the subject, e.g. /kontakt?betreff=fuehrung
+  const subject = params.get('betreff');
+  const select = form?.querySelector<HTMLSelectElement>('[data-subject]');
+  if (subject && select && [...select.options].some((o) => o.value === subject)) select.value = subject;
+
+  // Show the result of a submission (the API redirects back with ?gesendet=1 or ?fehler=…).
+  const state = params.get('gesendet') === '1' ? 'success' : params.get('fehler') === 'eingabe' ? 'input' : params.has('fehler') ? 'error' : null;
+  if (state) {
+    const box = document.querySelector<HTMLElement>(`[data-contact-status="${state}"]`);
+    if (box) {
+      box.hidden = false;
+      box.scrollIntoView({ block: 'center' });
+      box.focus({ preventScroll: true });
+    }
+    if (state === 'success') form?.reset();
+    // Clean the URL so a reload doesn't show the message again.
+    params.delete('gesendet');
+    params.delete('fehler');
+    const q = params.toString();
+    history.replaceState(null, '', location.pathname + (q ? `?${q}` : '') + location.hash);
+  }
+</script>

@@ -1,0 +1,352 @@
+---
+import { Picture } from 'astro:assets';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import Icon from '../components/Icon.astro';
+import Faq from '../components/Faq.astro';
+import Ornament from '../components/Ornament.astro';
+import Wave from '../components/Wave.astro';
+import site from '../content/settings/site.json';
+import prayer from '../content/settings/prayer.json';
+import { localizePath, type Lang } from '../i18n/ui';
+import heroImg from '../assets/photos/gebetsraum-2.jpg';
+import gate from '../assets/photos/eingang-tor.jpg';
+import courtyard from '../assets/photos/innenhof.jpg';
+import lecture from '../assets/photos/gemeinde-vortrag.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const ar = lang === 'ar';
+const L = (p: string) => localizePath(p, lang);
+
+const address = `${site.street}, ${site.zip} ${site.city}`;
+const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(site.mosqueName)}&address=${encodeURIComponent(address)}`;
+const jumuah = prayer.jumuah[0]?.time;
+const tel = site.phone.replace(/\s/g, '');
+const wifi = 'IGH-Hannover';
+const tourHref = `${L('/kontakt')}?betreff=fuehrung#formular`;
+
+const c = ar
+  ? {
+      title: 'زيارة المسجد',
+      description: 'زوروا مسجد محمد الأمين في هانوفر: مفتوح يومياً في أوقات الصلاة، جولات تعريفية للمجموعات والمدارس، كيفية الوصول (Grabbestraße 3b، محطة Vahrenwalder Platz)، آداب الزيارة والترجمة الفورية لخطبة الجمعة.',
+      eyebrow: 'زيارة المسجد',
+      h1: 'أهلاً وسهلاً<br/>في مسجدنا',
+      intro: 'سواء جئتم للصلاة أو بدافع الفضول أو مع مدرسة أو مجموعة – يسعدنا استقبالكم. هنا تجدون كل ما تحتاجون معرفته قبل زيارتكم.',
+      quick: [
+        { icon: 'clock', title: 'أوقات الفتح', text: 'مفتوح يومياً في أوقات الصلاة', href: '/gebetszeiten', link: 'مواقيت الصلاة' },
+        { icon: 'star', title: 'صلاة الجمعة', text: jumuah ? `الساعة ${jumuah} – الخطبة بالعربية مع ترجمة فورية` : 'الخطبة بالعربية مع ترجمة فورية', href: '#uebersetzung', link: 'الترجمة الفورية' },
+        { icon: 'pin', title: 'العنوان', text: address, href: '#anfahrt', link: 'كيفية الوصول', ltr: true },
+        { icon: 'users', title: 'المجموعات', text: 'جولات تعريفية بعد التسجيل المسبق', href: '#fuehrungen', link: 'الجولات' },
+      ],
+      toursEyebrow: 'جولات في المسجد',
+      toursTitle: 'تعرّفوا على المسجد<br/>– وتحدّثوا معنا',
+      toursIntro: 'نستقبل بكل سرور المدارس والكنائس والجمعيات والمجموعات المهتمة. تتضمن الجولة عادةً:',
+      tourPoints: [
+        'جولة في المسجد: قاعة الصلاة، مكان الوضوء، المحراب والمنبر',
+        'تعريف بأسس الإسلام وبالحياة اليومية في مجتمعنا',
+        'وقت للأسئلة والحوار المفتوح – لا يوجد سؤال غير مناسب',
+      ],
+      toursNote: 'يُرجى تسجيل المجموعات مسبقاً، مع ذكر التاريخ المرغوب وعدد المشاركين وأعمارهم تقريباً.',
+      toursCta: 'سجّلوا جولة',
+      toursCall: 'أو اتصلوا بنا',
+      routeEyebrow: 'كيفية الوصول',
+      routeTitle: 'الطريق إلينا',
+      routeIntro: site.directionsAr,
+      routeSteps: [
+        { icon: 'tram', title: 'بالترام', text: 'محطة Vahrenwalder Platz – الخطوط 1 و2 و8' },
+        { icon: 'route', title: 'بالحافلة', text: 'الخط 131' },
+        { icon: 'pin', title: 'المدخل', text: 'ادخلوا إلى الفناء الخلفي للعنوان Grabbestraße 3b – البوابة الخضراء التي تحمل الرقم «3b».' },
+      ],
+      gateCaption: 'هذه البوابة في الفناء الخلفي هي مدخل المسجد.',
+      mapTitle: 'العنوان',
+      openGoogle: 'فتح في خرائط Google',
+      openApple: 'فتح في خرائط Apple',
+      mapNote: 'تُفتح الخرائط في نافذة جديدة لدى الجهة المزوّدة.',
+      etiquetteEyebrow: 'آداب الزيارة',
+      etiquetteTitle: 'نصائح صغيرة لزيارة موفّقة',
+      etiquetteIntro: 'لا تحتاجون إلى معرفة مسبقة – هذه بعض الإرشادات البسيطة، ونحن نساعدكم بكل سرور في المكان.',
+      etiquette: [
+        { icon: 'layers', title: 'خلع الأحذية', text: 'تُخلع الأحذية قبل الدخول إلى قاعة الصلاة. توجد رفوف للأحذية في الممر.' },
+        { icon: 'users', title: 'لباس محتشم', text: 'يُرجى ارتداء ملابس لائقة ومحتشمة.' },
+        { icon: 'moon', title: 'أثناء الصلاة', text: 'يُرجى عدم المرور أمام المصلّين، والبقاء بهدوء في الخلف.' },
+        { icon: 'info', title: 'التصوير', text: 'التصوير مسموح فقط بعد الاستئذان – احتراماً للمصلّين.' },
+        { icon: 'phone', title: 'الهاتف', text: 'يُرجى وضع الهاتف على الوضع الصامت.' },
+        { icon: 'hands', title: 'الأسئلة', text: 'أسئلتكم مرحّب بها دائماً – لا تتردّدوا في التوجّه إلينا.' },
+      ],
+      transEyebrow: 'الترجمة الفورية',
+      transTitle: 'خطبة الجمعة بالألمانية – على هاتفك',
+      transIntro: 'تُلقى خطبة الجمعة بالعربية، وتُترجَم في الوقت نفسه إلى الألمانية. يمكنكم الاستماع إلى الترجمة داخل المسجد عبر هاتفكم:',
+      transSteps: [
+        { title: 'أوقفوا بيانات الهاتف', text: 'أوقفوا بيانات الجوال مؤقتاً، حتى يفتح الهاتف صفحة الترجمة المحلية عبر شبكة المسجد.' },
+        { title: 'اتصلوا بشبكة المسجد', text: `اتصلوا بشبكة الواي فاي «${wifi}» – دون كلمة مرور.` },
+        { title: 'افتحوا صفحة الترجمة', text: 'افتحوا صفحة الترجمة في المتصفح – تعمل فقط داخل المسجد.' },
+        { title: 'استخدموا سمّاعات الأذن', text: 'من فضلكم استخدموا سمّاعات الأذن حتى لا تزعجوا المصلّين من حولكم.' },
+      ],
+      transHint: 'تحتاج إلى مساعدة؟ اسأل أحد الإخوة في المسجد – سيساعدونك بكل سرور.',
+      faqEyebrow: 'أسئلة شائعة',
+      faqTitle: 'زيارتكم الأولى؟',
+      faq: [
+        { q: 'هل يمكنني زيارة المسجد إن لم أكن مسلماً؟', a: '<p>نعم، بكل تأكيد. الجميع مرحّب بهم – بغض النظر عن الدين أو الأصل.</p>' },
+        { q: 'هل يجب أن أسجّل زيارتي مسبقاً؟', a: `<p>الأفراد يمكنهم الحضور في أوقات الصلاة دون تسجيل. أما المجموعات والصفوف المدرسية فنرجو أن تسجّل مسبقاً عبر <a href="${tourHref}">نموذج التواصل</a>.</p>` },
+        { q: 'هل الزيارة مجانية؟', a: '<p>نعم، زيارة المسجد مجانية.</p>' },
+        { q: 'هل يمكنني متابعة الصلاة؟', a: '<p>نعم. يُرجى البقاء بهدوء في الخلف وعدم المرور أمام المصلّين.</p>' },
+        { q: 'بأي لغة تكون الخطبة والدروس؟', a: `<p>خطبة الجمعة بالعربية مع ترجمة فورية إلى الألمانية. وتُقام الدروس بالعربية والألمانية – التفاصيل في <a href="${L('/programm')}">البرنامج</a>.</p>` },
+        { q: 'ماذا أرتدي؟', a: '<p>ملابس لائقة ومحتشمة. تُخلع الأحذية قبل قاعة الصلاة.</p>' },
+        { q: 'كيف أصل إلى المسجد؟', a: '<p>ننصح بالمواصلات العامة: محطة الترام Vahrenwalder Platz (الخطوط 1 و2 و8) أو الحافلة 131. المسجد في الفناء الخلفي للعنوان Grabbestraße 3b.</p>' },
+      ],
+      ctaTitle: 'هل لديكم سؤال قبل الزيارة؟',
+      ctaText: 'اكتبوا لنا أو اتصلوا بنا – يسعدنا مساعدتكم.',
+      ctaContact: 'تواصل معنا',
+    }
+  : {
+      title: 'Besuch',
+      description: 'Besuchen Sie die Mohammad Al-Amien Moschee in Hannover: täglich zu den Gebetszeiten geöffnet, Moscheeführungen für Gruppen und Schulklassen, Anfahrt (Grabbestraße 3b, Vahrenwalder Platz), Hinweise für Gäste und Simultanübersetzung der Freitagspredigt.',
+      eyebrow: 'Besuch',
+      h1: 'Herzlich willkommen<br/>in unserer Moschee',
+      intro: 'Ob zum Gebet, aus Neugier oder mit Ihrer Schulklasse – wir freuen uns auf Sie. Hier finden Sie alles, was Sie vor Ihrem Besuch wissen sollten.',
+      quick: [
+        { icon: 'clock', title: 'Öffnungszeiten', text: 'Täglich zu den Gebetszeiten geöffnet', href: '/gebetszeiten', link: 'Gebetszeiten' },
+        { icon: 'star', title: 'Freitagsgebet', text: jumuah ? `${jumuah} Uhr – Predigt auf Arabisch mit Live-Übersetzung` : 'Predigt auf Arabisch mit Live-Übersetzung', href: '#uebersetzung', link: 'Simultanübersetzung' },
+        { icon: 'pin', title: 'Adresse', text: address, href: '#anfahrt', link: 'Anfahrt' },
+        { icon: 'users', title: 'Gruppen', text: 'Moscheeführungen nach Anmeldung', href: '#fuehrungen', link: 'Führungen' },
+      ],
+      toursEyebrow: 'Moscheeführungen',
+      toursTitle: 'Die Moschee kennenlernen<br/>– und ins Gespräch kommen',
+      toursIntro: 'Schulklassen, Kirchengemeinden, Vereine und interessierte Gruppen sind herzlich willkommen. Eine Führung umfasst in der Regel:',
+      tourPoints: [
+        'Rundgang durch die Moschee: Gebetsraum, Waschraum, Gebetsnische und Kanzel',
+        'Einführung in die Grundlagen des Islam und in unser Gemeindeleben',
+        'Zeit für Fragen und offenes Gespräch – es gibt keine falschen Fragen',
+      ],
+      toursNote: 'Bitte melden Sie Gruppen vorab an – mit Wunschtermin, ungefährer Gruppengröße und Alter der Teilnehmenden.',
+      toursCta: 'Führung anfragen',
+      toursCall: 'oder anrufen',
+      routeEyebrow: 'Anfahrt',
+      routeTitle: 'So finden Sie uns',
+      routeIntro: site.directionsDe,
+      routeSteps: [
+        { icon: 'tram', title: 'Mit der Stadtbahn', text: 'Haltestelle Vahrenwalder Platz – Linien 1, 2 und 8' },
+        { icon: 'route', title: 'Mit dem Bus', text: 'Linie 131' },
+        { icon: 'pin', title: 'Eingang', text: 'Gehen Sie in den Hinterhof der Grabbestraße 3b – zum grünen Tor mit der Aufschrift „3b“.' },
+      ],
+      gateCaption: 'Durch dieses Tor im Hinterhof gelangen Sie zur Moschee.',
+      mapTitle: 'Adresse',
+      openGoogle: 'In Google Maps öffnen',
+      openApple: 'In Apple Karten öffnen',
+      mapNote: 'Die Karten öffnen sich in einem neuen Fenster beim jeweiligen Anbieter.',
+      etiquetteEyebrow: 'Hinweise für Gäste',
+      etiquetteTitle: 'Kleine Hinweise für Ihren Besuch',
+      etiquetteIntro: 'Vorwissen brauchen Sie nicht – ein paar einfache Hinweise, und vor Ort helfen wir Ihnen gern weiter.',
+      etiquette: [
+        { icon: 'layers', title: 'Schuhe ausziehen', text: 'Vor dem Gebetsraum werden die Schuhe ausgezogen. Im Flur gibt es Schuhregale.' },
+        { icon: 'users', title: 'Angemessene Kleidung', text: 'Bitte kommen Sie in angemessener, eher bedeckender Kleidung.' },
+        { icon: 'moon', title: 'Während des Gebets', text: 'Bitte gehen Sie nicht vor Betenden vorbei und halten Sie sich ruhig im hinteren Bereich auf.' },
+        { icon: 'info', title: 'Fotos', text: 'Fotografieren bitte nur nach Rücksprache – aus Rücksicht auf die Betenden.' },
+        { icon: 'phone', title: 'Handy', text: 'Bitte schalten Sie Ihr Handy stumm.' },
+        { icon: 'hands', title: 'Fragen', text: 'Fragen sind ausdrücklich erwünscht – sprechen Sie uns einfach an.' },
+      ],
+      transEyebrow: 'Simultanübersetzung',
+      transTitle: 'Die Freitagspredigt auf Deutsch – auf Ihrem Smartphone',
+      transIntro: 'Die Freitagspredigt wird auf Arabisch gehalten und zeitgleich ins Deutsche übersetzt. In der Moschee können Sie die Übersetzung mit Ihrem Smartphone hören:',
+      transSteps: [
+        { title: 'Mobile Daten ausschalten', text: 'Schalten Sie die mobilen Daten kurz aus, damit Ihr Smartphone die lokale Übersetzungsseite über das Moschee-WLAN lädt.' },
+        { title: 'Mit dem WLAN verbinden', text: `Verbinden Sie sich mit dem WLAN „${wifi}“ – ohne Passwort.` },
+        { title: 'Übersetzungsseite öffnen', text: 'Öffnen Sie die Übersetzungsseite im Browser – sie funktioniert nur innerhalb der Moschee.' },
+        { title: 'Kopfhörer verwenden', text: 'Bitte nutzen Sie Kopfhörer, damit die Betenden um Sie herum nicht gestört werden.' },
+      ],
+      transHint: 'Hilfe nötig? Fragen Sie einfach jemanden aus der Gemeinde – wir helfen gern.',
+      faqEyebrow: 'Häufige Fragen',
+      faqTitle: 'Ihr erster Besuch?',
+      faq: [
+        { q: 'Darf ich die Moschee als Nichtmuslim besuchen?', a: '<p>Ja, sehr gern. Alle sind willkommen – unabhängig von Religion und Herkunft.</p>' },
+        { q: 'Muss ich mich anmelden?', a: `<p>Einzelpersonen können zu den Gebetszeiten ohne Anmeldung kommen. Gruppen und Schulklassen melden sich bitte vorab über unser <a href="${tourHref}">Kontaktformular</a> an.</p>` },
+        { q: 'Kostet der Besuch etwas?', a: '<p>Nein, der Besuch der Moschee ist kostenlos.</p>' },
+        { q: 'Darf ich beim Gebet zuschauen?', a: '<p>Ja. Bitte halten Sie sich ruhig im hinteren Bereich auf und gehen Sie nicht vor Betenden vorbei.</p>' },
+        { q: 'In welcher Sprache sind Predigt und Unterricht?', a: `<p>Die Freitagspredigt ist auf Arabisch und wird live ins Deutsche übersetzt. Unterricht findet auf Arabisch und Deutsch statt – Details im <a href="${L('/programm')}">Programm</a>.</p>` },
+        { q: 'Was soll ich anziehen?', a: '<p>Angemessene, eher bedeckende Kleidung. Vor dem Gebetsraum werden die Schuhe ausgezogen.</p>' },
+        { q: 'Wie komme ich am besten hin?', a: '<p>Am besten mit Bus und Bahn: Stadtbahn-Haltestelle Vahrenwalder Platz (Linien 1, 2 und 8) oder Bus 131. Die Moschee liegt im Hinterhof der Grabbestraße 3b.</p>' },
+      ],
+      ctaTitle: 'Noch Fragen vor Ihrem Besuch?',
+      ctaText: 'Schreiben Sie uns oder rufen Sie an – wir helfen gern weiter.',
+      ctaContact: 'Kontakt aufnehmen',
+    };
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={gate}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={heroImg} imageAlt="" />
+
+  <!-- QUICK FACTS -->
+  <section class="container-x relative z-20 -mt-6 md:-mt-10">
+    <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+      {c.quick.map((q) => (
+        <li class="card flex gap-3.5 p-5">
+          <span class="grid size-11 shrink-0 place-items-center rounded-full border border-gold-soft text-gold"><Icon name={q.icon as 'clock'} size={20} /></span>
+          <span class="min-w-0">
+            <span class="block text-xs font-semibold uppercase tracking-wider text-ink-mute">{q.title}</span>
+            <span class="mt-0.5 block font-semibold leading-snug text-ink" dir={(q as { ltr?: boolean }).ltr ? 'ltr' : undefined}>{q.text}</span>
+            <a href={q.href.startsWith('#') ? q.href : L(q.href)} class="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-wine hover:underline">{q.link} <Icon name="arrow" size={14} /></a>
+          </span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- TOURS -->
+  <section id="fuehrungen" class="container-x mt-20 grid scroll-mt-28 gap-10 md:mt-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
+    <div class="relative order-last lg:order-first">
+      <Picture src={lecture} alt={ar ? 'لقاء وحوار في قاعة الصلاة (الوجوه مموّهة)' : 'Gespräch und Vortrag im Gebetsraum (Gesichter unkenntlich gemacht)'} widths={[480, 800, 1200]} sizes="(min-width: 1024px) 45vw, 100vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-[1.5rem] object-cover shadow-lift" />
+    </div>
+    <div>
+      <SectionHeading eyebrow={c.toursEyebrow} title={c.toursTitle} intro={c.toursIntro} />
+      <ul class="mt-6 space-y-3">
+        {c.tourPoints.map((p) => (
+          <li class="flex gap-3 text-ink-soft">
+            <span class="mt-1 grid size-6 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="check" size={14} /></span>
+            <span>{p}</span>
+          </li>
+        ))}
+      </ul>
+      <p class="mt-6 rounded-2xl border border-gold-soft/70 bg-gold-pale/60 px-5 py-4 text-ink"><Icon name="info" size={18} class="me-1.5 inline-block align-[-3px] text-gold" />{c.toursNote}</p>
+      <div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <a href={tourHref} class="btn btn-primary">{c.toursCta} <Icon name="arrow" size={16} /></a>
+        <a href={`tel:${tel}`} class="inline-flex items-center gap-2 font-semibold text-wine hover:underline">
+          <Icon name="phone" size={18} /> <span>{c.toursCall}:</span> <span dir="ltr">{site.phone}</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROUTE -->
+  <section id="anfahrt" class="relative mt-24 scroll-mt-28 bg-paper-2 py-20 md:mt-28 md:py-24">
+    <div class="absolute inset-x-0 -top-px"><Wave fill="var(--color-paper)" flip /></div>
+    <div class="container-x">
+      <SectionHeading eyebrow={c.routeEyebrow} title={c.routeTitle} intro={c.routeIntro} />
+      <div class="mt-10 grid gap-6 lg:grid-cols-[1fr_1.1fr]">
+        <div class="flex flex-col gap-6">
+          <ul class="card divide-y divide-line">
+            {c.routeSteps.map((s) => (
+              <li class="flex gap-4 p-5 md:p-6">
+                <span class="grid size-11 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name={s.icon as 'tram'} size={20} /></span>
+                <span>
+                  <span class="block font-semibold text-ink">{s.title}</span>
+                  <span class="mt-0.5 block text-ink-soft">{s.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <figure class="card overflow-hidden">
+            <Picture src={gate} alt={ar ? 'البوابة الخضراء «3b» في الفناء الخلفي – مدخل المسجد' : 'Grünes Tor „3b“ im Hinterhof – Eingang zur Moschee'} widths={[480, 800]} sizes="(min-width: 1024px) 35vw, 100vw" formats={['avif', 'webp']} class="aspect-[16/9] w-full object-cover" />
+            <figcaption class="flex items-center gap-2 px-5 py-3.5 text-sm text-ink-soft"><Icon name="info" size={16} class="shrink-0 text-gold" />{c.gateCaption}</figcaption>
+          </figure>
+        </div>
+
+        <!-- Static map card: no third-party map is loaded on this page. -->
+        <div class="card flex flex-col overflow-hidden">
+          <div class="relative aspect-[4/3] overflow-hidden bg-paper-3 sm:aspect-[16/10] lg:aspect-auto lg:flex-1" aria-hidden="true">
+            <svg class="absolute inset-0 h-full w-full" viewBox="0 0 600 400" preserveAspectRatio="xMidYMid slice" fill="none">
+              <rect width="600" height="400" fill="#efe7db" />
+              <g stroke="#e2d5c2" stroke-width="1">
+                {Array.from({ length: 16 }, (_, i) => <path d={`M${i * 40} 0V400`} />)}
+                {Array.from({ length: 11 }, (_, i) => <path d={`M0 ${i * 40}H600`} />)}
+              </g>
+              <g fill="#e6dccd">
+                <rect x="40" y="40" width="150" height="90" rx="10" /><rect x="40" y="170" width="120" height="70" rx="10" />
+                <rect x="380" y="40" width="170" height="110" rx="10" /><rect x="420" y="250" width="140" height="110" rx="10" />
+                <rect x="40" y="280" width="190" height="90" rx="10" /><rect x="250" y="40" width="80" height="60" rx="10" />
+              </g>
+              <path d="M-20 215C120 205 210 160 300 200S470 250 620 225" stroke="#fffcf7" stroke-width="22" stroke-linecap="round" />
+              <path d="M330 -20C315 90 290 160 300 200S330 330 315 420" stroke="#fffcf7" stroke-width="16" stroke-linecap="round" />
+              <path d="M-20 340C140 330 200 300 300 200" stroke="#fffcf7" stroke-width="10" stroke-linecap="round" />
+              <path d="M330 -20C315 90 290 160 300 200S330 330 315 420" stroke="#d9c39d" stroke-width="2" stroke-dasharray="2 8" stroke-linecap="round" />
+              <circle cx="300" cy="200" r="70" fill="#8e2c3f" fill-opacity=".06" />
+              <circle cx="300" cy="200" r="40" fill="#8e2c3f" fill-opacity=".1" />
+              <g transform="translate(300 200)">
+                <path d="M0 -6C0 -6 -22 -30 -22 -48A22 22 0 0 1 22 -48C22 -30 0 -6 0 -6Z" fill="#8e2c3f" />
+                <circle cy="-48" r="8" fill="#fffcf7" />
+                <ellipse cy="-2" rx="10" ry="3" fill="#4a1520" fill-opacity=".2" />
+              </g>
+            </svg>
+          </div>
+          <div class="p-6 md:p-7">
+            <p class="text-xs font-semibold uppercase tracking-wider text-ink-mute">{c.mapTitle}</p>
+            <p class="mt-1 font-display text-2xl font-semibold leading-tight text-ink">{site.mosqueName}</p>
+            <p class="mt-1 text-ink-soft" dir="ltr" style={ar ? 'text-align:right' : undefined}>{site.street}, {site.zip} {site.city}</p>
+            <div class="mt-5 flex flex-wrap gap-3">
+              <a href={site.mapsUrl} target="_blank" rel="noopener" class="btn btn-primary"><Icon name="pin" size={18} /> {c.openGoogle}</a>
+              <a href={appleMapsUrl} target="_blank" rel="noopener" class="btn btn-outline">{c.openApple} <Icon name="external" size={16} /></a>
+            </div>
+            <p class="mt-4 text-sm text-ink-mute">{c.mapNote}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ETIQUETTE -->
+  <section class="container-x mt-20 md:mt-24">
+    <SectionHeading eyebrow={c.etiquetteEyebrow} title={c.etiquetteTitle} intro={c.etiquetteIntro} />
+    <ul class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {c.etiquette.map((e) => (
+        <li class="card flex gap-4 p-5 md:p-6">
+          <span class="grid size-11 shrink-0 place-items-center rounded-full bg-gold-pale text-wine"><Icon name={e.icon as 'info'} size={20} /></span>
+          <span>
+            <span class="block text-lg font-semibold text-ink">{e.title}</span>
+            <span class="mt-1 block text-ink-soft">{e.text}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- SIMULTANEOUS TRANSLATION -->
+  <section id="uebersetzung" class="container-x mt-24 scroll-mt-28 md:mt-28">
+    <div class="bg-wine-pattern relative overflow-hidden rounded-[2rem] px-6 py-12 text-white shadow-lift md:px-12 md:py-16">
+      <div class="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-14">
+        <div>
+          <p class="eyebrow !text-gold-soft">{c.transEyebrow}</p>
+          <h2 class="mt-3 text-3xl font-semibold leading-tight md:text-[2.6rem]">{c.transTitle}</h2>
+          <p class="mt-4 text-lg text-white/80">{c.transIntro}</p>
+          <div class="mt-7 inline-flex flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-5 py-4">
+            <Icon name="live" size={24} class="text-gold-soft" />
+            <span>
+              <span class="block text-xs font-semibold uppercase tracking-wider text-white/60">WLAN / Wi-Fi</span>
+              <span class="block font-mono text-xl font-semibold tracking-wide" dir="ltr">{wifi}</span>
+            </span>
+          </div>
+          {jumuah && <p class="mt-4 flex items-center gap-2 text-white/75"><Icon name="clock" size={18} class="text-gold-soft" />{ar ? <>صلاة الجمعة: <span dir="ltr">{jumuah}</span></> : <>Freitagsgebet: {jumuah} Uhr</>}</p>}
+        </div>
+        <ol class="grid gap-3 sm:grid-cols-2">
+          {c.transSteps.map((s, i) => (
+            <li class="rounded-2xl border border-white/15 bg-white/[0.06] p-5">
+              <span class="grid size-9 place-items-center rounded-full bg-gold-soft font-display text-lg font-semibold text-wine-ink">{i + 1}</span>
+              <span class="mt-3 block text-lg font-semibold">{s.title}</span>
+              <span class="mt-1 block text-white/75">{s.text}</span>
+            </li>
+          ))}
+          <li class="flex items-start gap-3 rounded-2xl px-1 pt-1 text-white/75 sm:col-span-2"><Icon name="info" size={18} class="mt-1 shrink-0 text-gold-soft" />{c.transHint}</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="container-x mt-24 grid gap-10 md:mt-28 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+    <div>
+      <SectionHeading eyebrow={c.faqEyebrow} title={c.faqTitle} />
+      <div class="card mt-8 overflow-hidden">
+        <Picture src={courtyard} alt="" widths={[480, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['avif', 'webp']} class="aspect-[16/10] w-full object-cover" />
+        <div class="p-6">
+          <p class="text-lg font-semibold text-ink">{c.ctaTitle}</p>
+          <p class="mt-1 text-ink-soft">{c.ctaText}</p>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <a href={L('/kontakt')} class="btn btn-outline">{c.ctaContact} <Icon name="arrow" size={16} /></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <Faq items={c.faq} class="lg:self-start" />
+  </section>
+
+  <Ornament class="mt-20" />
+</BaseLayout>

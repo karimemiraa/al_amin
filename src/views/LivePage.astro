@@ -1,0 +1,217 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import VideoEmbed from '../components/VideoEmbed.astro';
+import Icon from '../components/Icon.astro';
+import site from '../content/settings/site.json';
+import { getDay, jumuah, publishedYears } from '../lib/prayer';
+import { localizePath, pick, useTranslations, type Lang } from '../i18n/ui';
+import friday from '../assets/photos/gemeinde-freitag.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+const channelId = site.social.youtubeChannelId;
+const telegramHandle = '@' + site.social.telegram.replace(/^https?:\/\/t\.me\//, '').replace(/\/$/, '');
+
+const c = ar
+  ? {
+      title: 'البث المباشر',
+      description: 'تابع خطبة الجمعة والدروس من مسجد محمد الأمين في هانوفر مباشرة – حالياً عبر قناتنا على تيليغرام.',
+      eyebrow: 'مباشر',
+      h1: 'بث مباشر من المسجد',
+      intro: 'خطبة الجمعة والدروس الأسبوعية – تابعها مباشرة أينما كنت.',
+      streamTitle: 'البث المباشر من مسجد محمد الأمين',
+      streamNote: 'إذا لم يكن هناك بث في هذه اللحظة، يعرض يوتيوب موعد البث القادم أو رسالة بأن القناة غير متصلة.',
+      tgEyebrow: 'حالياً على تيليغرام',
+      tgTitle: 'نبث مباشرة عبر قناتنا على تيليغرام',
+      tgText: 'تُبث خطبة الجمعة والدروس حالياً مباشرة في قناتنا على تيليغرام. نعمل على إطلاق قناة خاصة بالمسجد على يوتيوب – وعندها سيظهر البث هنا مباشرة.',
+      tgCta: 'فتح تيليغرام',
+      steps: ['ثبّت تطبيق تيليغرام أو افتحه في المتصفح.', 'افتح قناتنا واضغط على «انضمام».', 'عند بدء البث يظهر شريط «بث مباشر» أعلى القناة.'],
+      stepsTitle: 'كيف أتابع البث؟',
+      jumuahNote: 'يبدأ البث عادةً مع بداية الخطبة.',
+      nextTitle: 'الدروس القادمة',
+      allProgram: 'البرنامج كاملاً',
+      today: 'اليوم',
+      tomorrow: 'غداً',
+      recordingsTitle: 'فاتك البث؟',
+      recordingsText: 'تجد تسجيلات خطب الجمعة والدروس في المكتبة المرئية.',
+      recordingsCta: 'إلى المكتبة المرئية',
+    }
+  : {
+      title: 'Live-Übertragung',
+      description: 'Freitagspredigt und Unterricht der Mohammad Al-Amien Moschee Hannover live verfolgen – derzeit über unseren Telegram-Kanal.',
+      eyebrow: 'Live',
+      h1: 'Live aus der Moschee',
+      intro: 'Freitagspredigt und wöchentlicher Unterricht – live verfolgen, wo immer Sie sind.',
+      streamTitle: 'Livestream der Mohammad Al-Amien Moschee',
+      streamNote: 'Läuft gerade keine Übertragung, zeigt YouTube den nächsten geplanten Termin oder einen Offline-Hinweis.',
+      tgEyebrow: 'Derzeit auf Telegram',
+      tgTitle: 'Wir übertragen live auf Telegram',
+      tgText: 'Freitagspredigt und Unterricht übertragen wir zurzeit live in unserem Telegram-Kanal. Ein eigener YouTube-Kanal der Moschee ist in Vorbereitung – sobald er startet, sehen Sie den Livestream direkt hier.',
+      tgCta: 'Telegram öffnen',
+      steps: ['Telegram-App installieren oder im Browser öffnen.', 'Unseren Kanal öffnen und auf „Beitreten“ tippen.', 'Läuft eine Übertragung, erscheint oben im Kanal der Hinweis „Live“.'],
+      stepsTitle: 'So sind Sie dabei',
+      jumuahNote: 'Die Übertragung beginnt in der Regel mit der Predigt.',
+      nextTitle: 'Nächster Unterricht',
+      allProgram: 'Ganzes Programm',
+      today: 'Heute',
+      tomorrow: 'Morgen',
+      recordingsTitle: 'Live verpasst?',
+      recordingsText: 'Aufnahmen von Freitagspredigten und Vorträgen finden Sie in unserer Mediathek.',
+      recordingsCta: 'Zur Mediathek',
+    };
+
+// Approximate start minute of each prayer per month (mid-month of the latest table),
+// so the browser can tell whether today's lesson is still ahead without loading all times.
+const refYear = publishedYears.at(-1)!;
+const toMin = (hm: string) => { const [h, m] = hm.split(':').map(Number); return h * 60 + m; };
+const keys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
+const monthly = Array.from({ length: 12 }, (_, i) => {
+  const d = getDay(refYear, i + 1, 15);
+  return keys.map((k) => toMin(d.times[k]));
+});
+
+const program = await getCollection('program', (e) => e.data.active);
+const lessons = program
+  .map((e) => ({
+    id: e.id,
+    wd: e.data.weekday,
+    after: e.data.after,
+    time: e.data.time,
+    title: pick(e.data, 'title', lang),
+    timing: e.data.after === 'time' ? (ar ? `الساعة ${e.data.time}` : `${e.data.time} Uhr`) : `${t('common.after')} ${t(`prayer.${e.data.after}` as 'prayer.asr')}`,
+    langLabel: t(`common.lang.${e.data.language}` as 'common.lang.de'),
+  }))
+  .sort((a, b) => ((a.wd + 1) % 7) - ((b.wd + 1) % 7));
+const weekdays = Array.from({ length: 7 }, (_, i) => t(`weekday.${i}` as 'weekday.0'));
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={friday}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={friday} imageAlt={ar ? 'المصلون في صلاة الجمعة' : 'Gemeinde beim Freitagsgebet'} />
+
+  <section class="container-x relative z-20 -mt-6 grid gap-8 md:-mt-10 lg:grid-cols-[1fr_24rem] lg:gap-10">
+    <div>
+      {channelId ? (
+        <div>
+          <VideoEmbed lang={lang} channel={channelId} title={c.streamTitle} class="shadow-lift" />
+          <p class="mt-3 flex gap-2 text-sm text-ink-mute"><Icon name="info" size={16} class="mt-0.5 shrink-0" /> {c.streamNote}</p>
+          <a href={site.social.telegram} target="_blank" rel="noopener" class="mt-4 inline-flex items-center gap-1.5 font-semibold text-wine hover:underline"><Icon name="telegram" size={18} /> {c.tgCta}</a>
+        </div>
+      ) : (
+        <div class="card overflow-hidden">
+          <div class="bg-wine-pattern relative px-6 py-10 text-white md:px-10 md:py-14">
+            <span class="relative grid size-16 place-items-center rounded-full bg-white/10 text-gold-soft ring-1 ring-white/25 md:size-20">
+              <Icon name="telegram" size={34} />
+              <span class="absolute -end-1 -top-1 flex size-4" aria-hidden="true">
+                <span class="absolute inline-flex size-full animate-ping rounded-full bg-rose opacity-70 motion-reduce:hidden"></span>
+                <span class="relative inline-flex size-4 rounded-full border-2 border-wine-deep bg-rose"></span>
+              </span>
+            </span>
+            <p class="eyebrow mt-7 !text-gold-soft">{c.tgEyebrow}</p>
+            <h2 class="mt-3 max-w-xl text-3xl font-semibold leading-tight md:text-[2.6rem]">{c.tgTitle}</h2>
+            <p class="mt-4 max-w-2xl text-lg text-white/80">{c.tgText}</p>
+            <div class="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
+              <a href={site.social.telegram} target="_blank" rel="noopener" class="btn btn-light !min-h-14 !px-8 text-lg"><Icon name="telegram" size={22} class="text-wine" /> {c.tgCta}</a>
+              <span class="font-semibold text-white/75" dir="ltr">{telegramHandle}</span>
+            </div>
+          </div>
+          <div class="p-6 md:p-10">
+            <h3 class="font-sans text-sm font-semibold uppercase tracking-wider text-ink-mute rtl:text-base rtl:normal-case rtl:tracking-normal">{c.stepsTitle}</h3>
+            <ol class="mt-5 grid gap-5 md:grid-cols-3 lg:grid-cols-1 lg:gap-4">
+              {c.steps.map((s, i) => (
+                <li class="flex gap-3">
+                  <span class="grid size-9 shrink-0 place-items-center rounded-full border border-gold-soft font-display text-lg font-semibold text-wine">{i + 1}</span>
+                  <span class="pt-1 text-ink-soft">{s}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      )}
+    </div>
+
+    <aside class="space-y-6 lg:self-start">
+      {jumuah.length > 0 && (
+        <div class="card overflow-hidden">
+          <div class="flex items-center gap-4 bg-gold-pale px-6 py-5">
+            <span class="grid size-12 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="star" size={22} /></span>
+            <div class="min-w-0 flex-1">
+              <h2 class="font-sans text-sm font-semibold uppercase tracking-wider text-wine-ink/80 rtl:text-base rtl:normal-case rtl:tracking-normal">{t('prayer.jumuah')}</h2>
+              <p class="font-display text-3xl font-semibold text-wine tabular"><span dir="ltr">{jumuah.map((j) => j.time).join(' · ')}</span></p>
+            </div>
+          </div>
+          <div class="space-y-2 px-6 py-5 text-[0.95rem] text-ink-soft">
+            {jumuah.map((j) => <p>{ar ? j.noteAr : j.noteDe}</p>)}
+            <p class="flex gap-2 text-ink-mute"><Icon name="live" size={18} class="mt-0.5 shrink-0 text-gold" />{c.jumuahNote}</p>
+          </div>
+        </div>
+      )}
+
+      {lessons.length > 0 && (
+        <div class="card p-6" data-next-lessons data-monthly={JSON.stringify(monthly)} data-today={c.today} data-tomorrow={c.tomorrow} data-weekdays={JSON.stringify(weekdays)}>
+          <h2 class="text-2xl font-semibold">{c.nextTitle}</h2>
+          <ul class="mt-4 divide-y divide-line/70" data-list>
+            {lessons.map((l, i) => (
+              <li class="flex gap-4 py-3.5" data-wd={l.wd} data-after={l.after} data-time={l.time ?? ''} hidden={i >= 3}>
+                <span class="w-[4.75rem] shrink-0 self-start rounded-xl bg-gold-pale px-2 py-2 text-center text-xs font-semibold leading-tight text-wine-ink" data-day>{weekdays[l.wd]}</span>
+                <span class="min-w-0">
+                  <span class="block font-semibold leading-snug" dir="auto">{l.title}</span>
+                  <span class="mt-0.5 block text-sm text-ink-mute">{l.timing} · {l.langLabel}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <a href={L('/programm')} class="mt-3 inline-flex items-center gap-1.5 text-[0.95rem] font-semibold text-wine hover:underline">{c.allProgram} <Icon name="arrow" size={16} /></a>
+        </div>
+      )}
+    </aside>
+  </section>
+
+  <section class="container-x mb-24 mt-16 md:mb-28">
+    <div class="flex flex-col items-start gap-5 rounded-[var(--radius-card)] border border-line bg-paper-2/70 p-6 sm:flex-row sm:items-center md:p-8">
+      <span class="grid size-12 shrink-0 place-items-center rounded-full border border-gold-soft text-gold"><Icon name="play" size={22} /></span>
+      <div class="flex-1">
+        <h2 class="text-2xl font-semibold">{c.recordingsTitle}</h2>
+        <p class="mt-1 text-ink-soft">{c.recordingsText}</p>
+      </div>
+      <a href={L('/mediathek')} class="btn btn-outline">{c.recordingsCta} <Icon name="arrow" size={16} /></a>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  // Re-order the lessons relative to the visitor's current time in Hannover and show the next three.
+  document.querySelectorAll<HTMLElement>('[data-next-lessons]').forEach((box) => {
+    const list = box.querySelector<HTMLElement>('[data-list]')!;
+    const monthly: number[][] = JSON.parse(box.dataset.monthly!);
+    const weekdays: string[] = JSON.parse(box.dataset.weekdays!);
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short', month: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+        .formatToParts(new Date())
+        .map((x) => [x.type, x.value]),
+    );
+    const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(p.weekday);
+    const nowMin = +p.hour * 60 + +p.minute;
+    const slots = monthly[+p.month - 1];
+    const idx: Record<string, number> = { fajr: 0, dhuhr: 1, asr: 2, maghrib: 3, isha: 4 };
+    const startOf = (li: HTMLElement) => {
+      if (li.dataset.after === 'time') { const [h, m] = (li.dataset.time || '0:0').split(':').map(Number); return h * 60 + m; }
+      return slots[idx[li.dataset.after!]] ?? 0;
+    };
+    const items = [...list.querySelectorAll<HTMLElement>('li')].map((li) => {
+      const start = startOf(li);
+      let ahead = (Number(li.dataset.wd) - wd + 7) % 7;
+      if (ahead === 0 && nowMin > start + 75) ahead = 7; // today's lesson is (almost certainly) over
+      return { li, key: ahead * 1440 + start, ahead };
+    });
+    items.sort((a, b) => a.key - b.key).forEach(({ li, ahead }, i) => {
+      list.appendChild(li);
+      li.hidden = i >= 3;
+      const label = li.querySelector('[data-day]');
+      if (label) label.textContent = ahead === 0 ? box.dataset.today! : ahead === 1 ? box.dataset.tomorrow! : weekdays[Number(li.dataset.wd)];
+    });
+  });
+</script>

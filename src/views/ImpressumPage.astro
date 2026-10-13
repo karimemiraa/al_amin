@@ -1,0 +1,106 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalArticle from '../components/LegalArticle.astro';
+import site from '../content/settings/site.json';
+import { formatDate, localizePath, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const ar = lang === 'ar';
+const L = (p: string) => localizePath(p, lang);
+
+const reps = site.representatives.filter((r) => r.trim());
+const responsible = reps[0];
+const hasRegister = Boolean(site.registerNumber?.trim());
+const hasTax = Boolean(site.taxOffice?.trim() || site.taxNumber?.trim() || site.exemptionNoticeDate?.trim());
+const tel = site.phone.replace(/\s/g, '');
+
+const meta = ar
+  ? {
+      title: 'بيانات النشر (Impressum)\u200F',
+      description: 'بيانات النشر القانونية (Impressum) لموقع مسجد محمد الأمين – Islamisches Gemeindehaus Hannover e.V.، هانوفر.',
+      eyebrow: 'معلومات قانونية',
+      arNote: 'بيانات النشر (Impressum) مطلوبة قانونياً في ألمانيا. النص الملزم قانونياً هو النص الألماني أدناه. إذا كان لديكم سؤال، يسعدنا مساعدتكم.',
+    }
+  : {
+      title: 'Impressum',
+      description: 'Impressum der Website der Mohammad Al-Amien Moschee – Islamisches Gemeindehaus Hannover e.V., Grabbestraße 3b, 30165 Hannover.',
+      eyebrow: 'Rechtliches',
+      arNote: undefined,
+    };
+---
+<BaseLayout lang={lang} title={meta.title} description={meta.description}>
+  <LegalArticle lang={lang} eyebrow={meta.eyebrow} title={meta.title} arNote={meta.arNote}>
+    <h2>Angaben gemäß § 5 DDG</h2>
+    <address>
+      <strong>{site.orgName}</strong><br />
+      {site.mosqueName}<br />
+      {site.street}<br />
+      {site.zip} {site.city}<br />
+      Deutschland
+    </address>
+
+    <h3>Vertretungsberechtigter Vorstand</h3>
+    <p>{reps.join(', ')}</p>
+
+    <h3>Kontakt</h3>
+    <p>
+      Telefon: <a href={`tel:${tel}`}>{site.phone}</a><br />
+      E-Mail: <a href={`mailto:${site.email}`}>{site.email}</a>
+    </p>
+
+    {hasRegister && (
+      <>
+        <h3>Registereintrag</h3>
+        <p>
+          Eintragung im Vereinsregister<br />
+          Registergericht: {site.registerCourt}<br />
+          Registernummer: {site.registerNumber}
+        </p>
+      </>
+    )}
+
+    {hasTax && (
+      <>
+        <h3>Steuerliche Angaben</h3>
+        <p>
+          {site.taxOffice && <>Zuständiges Finanzamt: {site.taxOffice}<br /></>}
+          {site.taxNumber && <>Steuernummer: {site.taxNumber}<br /></>}
+          {site.exemptionNoticeDate && <>Freistellungsbescheid vom {formatDate(site.exemptionNoticeDate, 'de', { day: '2-digit', month: '2-digit', year: 'numeric' })}</>}
+        </p>
+      </>
+    )}
+
+    {responsible && (
+      <>
+        <h3>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h3>
+        <p>
+          {responsible}<br />
+          {site.street}, {site.zip} {site.city}
+        </p>
+      </>
+    )}
+
+    <h2>Haftungshinweise</h2>
+    <h3>Haftung für Inhalte</h3>
+    <p>
+      Die Inhalte dieser Website erstellen wir mit größtmöglicher Sorgfalt. Für die Richtigkeit, Vollständigkeit und
+      Aktualität der Inhalte – etwa der Gebetszeiten oder Termine – können wir jedoch keine Gewähr übernehmen. Als
+      Diensteanbieter sind wir für eigene Inhalte nach den allgemeinen Gesetzen verantwortlich, jedoch nicht verpflichtet,
+      übermittelte oder gespeicherte fremde Informationen zu überwachen. Sobald uns eine Rechtsverletzung bekannt wird,
+      entfernen wir die betreffenden Inhalte umgehend.
+    </p>
+    <h3>Haftung für Links</h3>
+    <p>
+      Unsere Website enthält Links zu externen Websites Dritter, auf deren Inhalte wir keinen Einfluss haben. Für diese
+      fremden Inhalte ist stets der jeweilige Anbieter oder Betreiber verantwortlich. Zum Zeitpunkt der Verlinkung waren
+      keine Rechtsverstöße erkennbar. Werden uns Rechtsverletzungen bekannt, entfernen wir die betreffenden Links umgehend.
+    </p>
+
+    <h2>Bildnachweis</h2>
+    <p>Fotos: {site.orgName}</p>
+
+    <h2>Datenschutz</h2>
+    <p>Informationen zur Verarbeitung personenbezogener Daten finden Sie in unserer <a href={L('/datenschutz')}>Datenschutzerklärung</a>.</p>
+  </LegalArticle>
+</BaseLayout>

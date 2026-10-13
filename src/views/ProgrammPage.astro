@@ -4,6 +4,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import SectionHeading from '../components/SectionHeading.astro';
 import Icon from '../components/Icon.astro';
+import FilterChips from '../components/FilterChips.astro';
 import site from '../content/settings/site.json';
 import { jumuah } from '../lib/prayer';
 import { localizePath, pick, useTranslations, type Lang } from '../i18n/ui';
@@ -157,33 +158,25 @@ const filters = [
         </li>
       ))}
     </ul>
-    <p class="mx-auto mt-6 flex max-w-3xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[0.95rem] text-ink-soft">
-      <Icon name="clock" size={18} class="text-gold" />
-      <span>{c.timingNote}</span>
-      <a href={L('/gebetszeiten')} class="inline-flex items-center gap-1 font-semibold text-wine hover:underline">{c.timingLink} <Icon name="arrow" size={15} /></a>
-    </p>
+    <div class="mt-6 flex items-start gap-3 rounded-2xl border border-line bg-paper-2/70 px-5 py-4 text-[0.95rem] text-ink-soft">
+      <Icon name="clock" size={20} class="mt-0.5 shrink-0 text-gold" />
+      <p>{c.timingNote} <a href={L('/gebetszeiten')} class="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-wine hover:underline">{c.timingLink} <Icon name="arrow" size={15} /></a></p>
+    </div>
   </section>
 
   <!-- WEEK -->
   <section class="container-x mt-20 md:mt-24" data-program>
     <div class="flex flex-wrap items-end justify-between gap-6">
       <SectionHeading eyebrow={c.weekEyebrow} title={c.weekTitle} />
-      <div class="flex flex-col items-start gap-2">
-        <p class="text-sm font-semibold text-ink-mute" id={`program-filter-${lang}`}>{c.filterLabel}</p>
-        <div class="flex flex-wrap gap-2" role="group" aria-labelledby={`program-filter-${lang}`}>
-          {filters.map((f, i) => (
-            <button type="button" class="chip" data-filter={f.key} aria-pressed={i === 0 ? 'true' : 'false'}>{f.label}</button>
-          ))}
-        </div>
-      </div>
+      <FilterChips items={filters} label={c.filterLabel} id={`program-filter-${lang}`} />
     </div>
     <p class="sr-only" aria-live="polite" data-program-status></p>
 
     <div class="mt-10 divide-y divide-line border-y border-line">
       {week.map((day) => (
         <section class="grid gap-4 py-7 md:grid-cols-[13rem_1fr] md:gap-8 md:py-9" data-day aria-labelledby={`day-${day.wd}-${lang}`}>
-          <h3 id={`day-${day.wd}-${lang}`} class="flex items-center gap-3 text-2xl font-semibold text-wine-ink md:block md:pt-3">
-            <span class="hidden size-2 rounded-full bg-gold md:mb-3 md:block"></span>
+          <h3 id={`day-${day.wd}-${lang}`} class="flex items-center gap-3 self-start text-2xl font-semibold text-wine-ink md:pt-4">
+            <span class="size-2 shrink-0 rounded-full bg-gold" aria-hidden="true"></span>
             {day.name}
           </h3>
           <ul class="grid gap-4 lg:grid-cols-2">
@@ -192,7 +185,7 @@ const filters = [
                 <p class="flex flex-wrap items-center gap-2 text-sm">
                   <span class="inline-flex items-center gap-1.5 rounded-full bg-wine px-3 py-1 font-semibold text-white">
                     <Icon name={l.jumuah ? 'star' : 'clock'} size={14} />
-                    {l.isTime ? <span dir="ltr">{l.timing}</span> : l.timing}
+                    {l.timing}
                   </span>
                   <span class="pill"><Icon name="globe" size={13} /> {l.langLabel}</span>
                   {l.audience !== 'all' && <span class="pill !bg-rose-soft"><Icon name="users" size={13} /> {c.audience[l.audience]}</span>}
@@ -234,16 +227,6 @@ const filters = [
     </div>
   </section>
 </BaseLayout>
-
-<style is:global>
-  .chip {
-    display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0.45rem 1.1rem; border-radius: 999px;
-    border: 1.5px solid var(--color-line); background: var(--color-card); color: var(--color-ink-soft);
-    font-size: 0.95rem; font-weight: 600; transition: border-color 0.2s, background-color 0.2s, color 0.2s;
-  }
-  .chip:hover { border-color: var(--color-wine); color: var(--color-wine); }
-  .chip[aria-pressed='true'] { background: var(--color-wine); border-color: var(--color-wine); color: #fff; }
-</style>
 
 <script>
   document.querySelectorAll<HTMLElement>('[data-program]').forEach((root) => {

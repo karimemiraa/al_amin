@@ -14,13 +14,13 @@ const src = id
 const watchUrl = id ? `https://www.youtube.com/watch?v=${id}` : `https://www.youtube.com/channel/${channel}/live`;
 ---
 <div class:list={['bg-wine-pattern group relative aspect-video overflow-hidden rounded-[var(--radius-card)] text-white shadow-soft', cls]} data-video data-src={src} data-title={title}>
-  <button type="button" class="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center" data-video-play>
-    <span class="grid size-16 place-items-center rounded-full bg-white/95 text-wine shadow-lift transition group-hover:scale-105 md:size-20">
+  <button type="button" class="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 pb-12 text-center sm:gap-4 sm:p-6 sm:pb-12" data-video-play>
+    <span class="grid size-14 shrink-0 place-items-center rounded-full bg-white/95 text-wine shadow-lift transition group-hover:scale-105 sm:size-16 md:size-20">
       <Icon name="play" size={30} class="translate-x-0.5" />
     </span>
-    <span class="max-w-md font-display text-lg font-semibold leading-snug md:text-xl" dir="auto">{title}</span>
+    <span class="line-clamp-3 max-w-md font-display text-base font-semibold leading-snug sm:text-lg md:text-xl" dir="auto">{title}</span>
     {subtitle && <span class="text-sm text-white/70">{subtitle}</span>}
-    <span class="text-xs text-white/60">{t('video.consent')}</span>
+    <span class="hidden text-xs text-white/60 sm:block">{t('video.consent')}</span>
   </button>
   <a href={watchUrl} target="_blank" rel="noopener" class="absolute bottom-3 end-3 inline-flex items-center gap-1 rounded-full bg-black/25 px-3 py-1 text-xs text-white/85 hover:bg-black/40">{t('video.watchOn')} <Icon name="external" size={12} /></a>
 </div>

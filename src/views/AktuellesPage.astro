@@ -1,0 +1,160 @@
+---
+import { Picture } from 'astro:assets';
+import { getCollection } from 'astro:content';
+import { marked } from 'marked';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import CampaignProgress from '../components/CampaignProgress.astro';
+import Icon from '../components/Icon.astro';
+import site from '../content/settings/site.json';
+import { localizePath, formatDate, pick, useTranslations, type Lang } from '../i18n/ui';
+import courtyard from '../assets/photos/innenhof.jpg';
+import building from '../assets/photos/neues-gebaeude.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+
+const c = ar
+  ? {
+      title: 'الأخبار والإعلانات',
+      description: 'آخر الأخبار والإعلانات من مسجد محمد الأمين في هانوفر: مستجدات مشروع المسجد الجديد، الفعاليات، رمضان والعيد.',
+      eyebrow: 'من المسجد',
+      h1: 'الأخبار والإعلانات',
+      intro: 'مستجدات مشروع المسجد الجديد والفعاليات وكل ما يهم مجتمعنا.',
+      pinned: 'مثبّت',
+      event: 'الموعد',
+      categories: { news: 'خبر', campaign: 'الحملة', event: 'فعالية', ramadan: 'رمضان' } as Record<string, string>,
+      empty: 'لا توجد أخبار حالياً.',
+      campaignEyebrow: 'مشروع الشراء',
+      campaignTitle: 'ساهم في بناء مسجدنا الجديد',
+      telegramTitle: 'لا تفوّتك أي أخبار',
+      telegramText: 'تابع قناتنا على تيليغرام لتصلك الإعلانات أولاً بأول.',
+      telegramCta: 'قناة تيليغرام',
+      buildingAlt: 'المبنى الجديد المراد شراؤه',
+      permalink: 'رابط هذا الخبر',
+      fallbackNote: 'هذا الخبر متاح حالياً باللغة الألمانية فقط.',
+    }
+  : {
+      title: 'Aktuelles & Ankündigungen',
+      description: 'Neuigkeiten und Ankündigungen der Mohammad Al-Amien Moschee Hannover: Kaufprojekt Neue Moschee, Veranstaltungen, Ramadan und Eid.',
+      eyebrow: 'Aus der Gemeinde',
+      h1: 'Aktuelles & Ankündigungen',
+      intro: 'Neuigkeiten zum Kaufprojekt, Veranstaltungen und alles, was unsere Gemeinde bewegt.',
+      pinned: 'Wichtig',
+      event: 'Termin',
+      categories: { news: 'Neuigkeit', campaign: 'Kampagne', event: 'Veranstaltung', ramadan: 'Ramadan' } as Record<string, string>,
+      empty: 'Zurzeit gibt es keine Neuigkeiten.',
+      campaignEyebrow: 'Kaufprojekt',
+      campaignTitle: 'Helfen Sie mit, unsere neue Moschee zu erwerben',
+      telegramTitle: 'Nichts mehr verpassen',
+      telegramText: 'Folgen Sie unserem Telegram-Kanal und erhalten Sie Ankündigungen direkt aufs Handy.',
+      telegramCta: 'Telegram-Kanal',
+      buildingAlt: 'Das neue Gebäude, das wir erwerben möchten',
+      permalink: 'Link zu dieser Meldung',
+      fallbackNote: '',
+    };
+
+const categoryClass: Record<string, string> = {
+  campaign: '!bg-wine !text-white',
+  event: '!bg-sage/15 !text-sage',
+  ramadan: '!bg-gold-soft/60',
+  news: '',
+};
+
+const entries = (await getCollection('announcements', (e) => e.data.published)).sort(
+  (a, b) => Number(b.data.pinned) - Number(a.data.pinned) || b.data.date.getTime() - a.data.date.getTime(),
+);
+
+const formatEvent = (s: string) => {
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}))?/);
+  if (!m) return s;
+  const day = formatDate(new Date(`${m[1]}T12:00:00Z`), lang, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return m[2] ? `${day}, ${ar ? 'الساعة' : ''} ${m[2]}${ar ? '' : ' Uhr'}`.replace(/\s+/g, ' ') : day;
+};
+
+const posts = entries.map((e) => {
+  const d = e.data;
+  const fallback = ar && !d.text_ar?.trim();
+  return {
+    id: e.id,
+    date: d.date,
+    category: d.category,
+    pinned: d.pinned,
+    event: d.eventDate ? formatEvent(d.eventDate) : '',
+    title: pick(d, 'title', lang),
+    titleFallback: ar && !d.title_ar?.trim(),
+    html: marked.parse(pick(d, 'text', lang), { async: false }) as string,
+    fallback,
+    image: d.image,
+  };
+});
+
+const schema = posts.slice(0, 10).map((p) => ({
+  '@context': 'https://schema.org',
+  '@type': 'NewsArticle',
+  headline: p.title,
+  datePublished: p.date.toISOString().slice(0, 10),
+  inLanguage: p.fallback ? 'de' : lang,
+  publisher: { '@type': 'Organization', name: site.orgName },
+}));
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={courtyard} schema={schema}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={courtyard} imageAlt={ar ? 'فناء المسجد' : 'Innenhof der Moschee'} />
+
+  <div class="container-x relative z-20 -mt-6 mb-24 grid gap-10 md:-mt-10 md:mb-28 lg:grid-cols-[1fr_23rem] lg:gap-12">
+    <div class="space-y-6">
+      {posts.length === 0 && <p class="card p-8 text-center text-ink-soft">{c.empty}</p>}
+      {posts.map((p) => (
+        <article id={p.id} class:list={['card overflow-hidden scroll-mt-28', p.pinned && 'ring-1 ring-gold-soft']} aria-labelledby={`${p.id}-title`}>
+          {p.image && <img src={p.image} alt="" loading="lazy" decoding="async" class="aspect-[16/9] w-full object-cover" />}
+          <div class="p-6 md:p-9">
+            <p class="flex flex-wrap items-center gap-2 text-sm text-ink-mute">
+              <span class:list={['pill', categoryClass[p.category]]}>{c.categories[p.category]}</span>
+              {p.pinned && <span class="pill !bg-transparent !px-0 text-gold"><Icon name="star" size={14} /> {c.pinned}</span>}
+              <time datetime={p.date.toISOString().slice(0, 10)} class="ms-auto">{formatDate(p.date, lang)}</time>
+            </p>
+            <h2 id={`${p.id}-title`} class="mt-4 text-2xl font-semibold leading-snug md:text-3xl" lang={p.titleFallback ? 'de' : undefined} dir={p.titleFallback ? 'ltr' : undefined}>
+              <a href={`#${p.id}`} class="hover:text-wine">{p.title}</a>
+            </h2>
+            {p.event && (
+              <p class="mt-3 inline-flex items-center gap-2 rounded-full bg-paper-2 px-4 py-1.5 text-[0.95rem] font-semibold text-wine-ink">
+                <Icon name="calendar" size={16} class="text-gold" /> {c.event}: {p.event}
+              </p>
+            )}
+            {p.fallback && c.fallbackNote && <p class="mt-3 text-sm text-ink-mute">{c.fallbackNote}</p>}
+            <div class="prose-igh mt-4 text-[1.05rem] leading-relaxed" set:html={p.html} lang={p.fallback ? 'de' : undefined} dir={p.fallback ? 'ltr' : undefined} />
+          </div>
+        </article>
+      ))}
+    </div>
+
+    <aside class="news-aside space-y-6 lg:sticky lg:top-28 lg:self-start">
+      <div class="card overflow-hidden">
+        <Picture src={building} alt={c.buildingAlt} widths={[400, 700]} sizes="(min-width: 1024px) 23rem, 100vw" formats={['avif', 'webp']} class="h-40 w-full object-cover" />
+        <div class="p-6">
+          <p class="eyebrow">{c.campaignEyebrow}</p>
+          <h2 class="mt-2 text-xl font-semibold leading-snug">{c.campaignTitle}</h2>
+          <CampaignProgress lang={lang} class="mt-5" />
+          <a href={L('/spenden')} class="btn btn-primary mt-6 w-full" data-cta="news-donate"><Icon name="heart" size={18} /> {t('campaign.cta')}</a>
+          <a href={L('/neue-moschee')} class="mt-3 flex items-center justify-center gap-1.5 text-[0.95rem] font-semibold text-wine hover:underline">{t('campaign.learn')} <Icon name="arrow" size={16} /></a>
+        </div>
+      </div>
+      <div class="rounded-[var(--radius-card)] border border-line bg-paper-2/70 p-6">
+        <h2 class="flex items-center gap-2 font-sans text-base font-semibold text-ink"><Icon name="telegram" size={18} class="text-gold" /> {c.telegramTitle}</h2>
+        <p class="mt-2 text-[0.95rem] text-ink-soft">{c.telegramText}</p>
+        <a href={site.social.telegram} target="_blank" rel="noopener" class="btn btn-outline mt-4 !min-h-11">{c.telegramCta} <Icon name="external" size={15} /></a>
+      </div>
+    </aside>
+  </div>
+</BaseLayout>
+
+<style is:global>
+  /* CampaignProgress is designed for wider boxes; keep its three stats on one line in the narrow sidebar. */
+  @media (min-width: 1024px) {
+    .news-aside [data-campaign-progress] dd { font-size: 1.05rem; }
+    .news-aside [data-campaign-progress] dl { gap: 0.5rem; }
+  }
+</style>

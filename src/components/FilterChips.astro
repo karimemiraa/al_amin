@@ -1,0 +1,28 @@
+---
+/**
+ * Toggle-button group for client-side filters (progressive enhancement).
+ * Renders <button data-filter="key" aria-pressed>; the page script does the filtering.
+ * The first item is pressed by default.
+ */
+interface Props { items: { key: string; label: string }[]; label: string; id: string; class?: string }
+const { items, label, id, class: cls = '' } = Astro.props;
+---
+<div class:list={['flex flex-col items-start gap-2', cls]}>
+  <p class="text-sm font-semibold text-ink-mute" id={id}>{label}</p>
+  <div class="flex flex-wrap gap-2" role="group" aria-labelledby={id}>
+    {items.map((f, i) => (
+      <button type="button" class="filter-chip" data-filter={f.key} aria-pressed={i === 0 ? 'true' : 'false'}>{f.label}</button>
+    ))}
+  </div>
+</div>
+
+<style is:global>
+  .filter-chip {
+    display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0.45rem 1.1rem; border-radius: 999px;
+    border: 1.5px solid var(--color-line); background: var(--color-card); color: var(--color-ink-soft);
+    font-size: 0.95rem; font-weight: 600; line-height: 1.2;
+    transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+  }
+  .filter-chip:hover { border-color: var(--color-wine); color: var(--color-wine); }
+  .filter-chip[aria-pressed='true'] { background: var(--color-wine); border-color: var(--color-wine); color: #fff; }
+</style>

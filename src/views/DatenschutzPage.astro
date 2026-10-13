@@ -1,0 +1,341 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import LegalArticle from '../components/LegalArticle.astro';
+import site from '../content/settings/site.json';
+import { localizePath, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const ar = lang === 'ar';
+const L = (p: string) => localizePath(p, lang);
+const tel = site.phone.replace(/\s/g, '');
+const reps = site.representatives.filter((r) => r.trim());
+const updated = 'Stand: Oktober 2026';
+
+const meta = ar
+  ? {
+      title: 'سياسة الخصوصية',
+      description: 'سياسة الخصوصية لموقع مسجد محمد الأمين في هانوفر: الاستضافة، نموذج التواصل، التبرعات عبر Stripe والتحويل البنكي، إيصالات التبرع، يوتيوب، وحقوقكم وفق اللائحة العامة لحماية البيانات.',
+      eyebrow: 'معلومات قانونية',
+      arNote: 'نأخذ حماية بياناتكم بجدية: لا نستخدم ملفات تعريف الارتباط (الكوكيز) افتراضياً، ولا يُحمَّل أي محتوى من جهات خارجية قبل موافقتكم. النص الملزم قانونياً لسياسة الخصوصية هو النص الألماني أدناه. إذا كان لديكم سؤال حول بياناتكم، تواصلوا معنا.',
+    }
+  : {
+      title: 'Datenschutzerklärung',
+      description: 'Datenschutzerklärung der Mohammad Al-Amien Moschee Hannover: Hosting, Kontaktformular, Spenden über Stripe und Überweisung, Zuwendungsbestätigungen, YouTube, Einwilligung und Ihre Rechte nach der DSGVO.',
+      eyebrow: 'Rechtliches',
+      arNote: undefined,
+    };
+
+const toc = [
+  ['ueberblick', 'Das Wichtigste in Kürze'],
+  ['verantwortlicher', 'Verantwortlicher'],
+  ['hosting', 'Hosting und Server-Logfiles'],
+  ['verschluesselung', 'SSL-/TLS-Verschlüsselung'],
+  ['cookies', 'Cookies und lokale Speicherung'],
+  ['schriften', 'Schriftarten'],
+  ['kontakt', 'Kontaktformular, E-Mail und Telefon'],
+  ['spenden', 'Online-Spenden über Stripe'],
+  ['ueberweisung', 'Spenden per Überweisung'],
+  ['zuwendungsbestaetigung', 'Zuwendungsbestätigungen'],
+  ['youtube', 'YouTube-Videos'],
+  ['telegram', 'Telegram und externe Links'],
+  ['analyse', 'Reichweitenmessung (Plausible)'],
+  ['google-ads', 'Google Ads Conversion-Tracking'],
+  ['besondere-kategorien', 'Besondere Kategorien personenbezogener Daten'],
+  ['rechte', 'Ihre Rechte'],
+  ['beschwerde', 'Beschwerderecht bei der Aufsichtsbehörde'],
+  ['aenderungen', 'Änderungen dieser Datenschutzerklärung'],
+];
+---
+<BaseLayout lang={lang} title={meta.title} description={meta.description}>
+  <LegalArticle lang={lang} eyebrow={meta.eyebrow} title="Datenschutzerklärung" arNote={meta.arNote} updated={updated}>
+    <p>
+      Wir freuen uns über Ihr Interesse an unserer Moschee. Der Schutz Ihrer personenbezogenen Daten ist uns ein
+      wichtiges Anliegen – gerade weil schon der Kontakt zu einer Moschee Rückschlüsse auf religiöse Überzeugungen
+      zulassen kann. Im Folgenden erklären wir, welche Daten wir beim Besuch dieser Website verarbeiten, wofür und auf
+      welcher Rechtsgrundlage.
+    </p>
+
+    <nav aria-label="Inhalt der Datenschutzerklärung" class="rounded-2xl border border-line bg-paper/60 p-5">
+      <p class="!mt-0 font-semibold text-ink">Inhalt</p>
+      <ol class="mt-2 grid gap-x-8 gap-y-1.5 sm:grid-cols-2 [&>li]:!mt-0">
+        {toc.map(([id, label]) => <li><a href={`#${id}`}>{label}</a></li>)}
+      </ol>
+    </nav>
+
+    <h2 id="ueberblick">1. Das Wichtigste in Kürze</h2>
+    <ul>
+      <li>Diese Website setzt <strong>standardmäßig keine Cookies</strong> und bindet keine Tracking-Dienste ohne Ihre Einwilligung ein.</li>
+      <li>Schriftarten liegen auf unserem eigenen Server; beim Seitenaufruf werden <strong>keine Daten an Google Fonts</strong> oder andere Schriftanbieter übertragen.</li>
+      <li>YouTube-Videos werden <strong>erst nach Ihrem Klick</strong> geladen; Karten werden nicht eingebettet, sondern nur verlinkt.</li>
+      <li>Online-Spenden wickelt der Zahlungsdienstleister <strong>Stripe</strong> ab; Ihre Zahlungsdaten erhalten wir nicht.</li>
+      <li>Sie haben jederzeit das Recht auf Auskunft, Berichtigung, Löschung und Widerspruch (siehe <a href="#rechte">Ihre Rechte</a>).</li>
+    </ul>
+
+    <h2 id="verantwortlicher">2. Verantwortlicher</h2>
+    <p>Verantwortlich für die Datenverarbeitung auf dieser Website im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:</p>
+    <address>
+      <strong>{site.orgName}</strong><br />
+      {site.street}<br />
+      {site.zip} {site.city}<br />
+      {reps.length > 0 && <>Vertreten durch den Vorstand: {reps.join(', ')}<br /></>}
+      Telefon: <a href={`tel:${tel}`}>{site.phone}</a><br />
+      E-Mail: <a href={`mailto:${site.email}`}>{site.email}</a>
+    </address>
+    <p>Bei Fragen zum Datenschutz erreichen Sie uns jederzeit unter den oben genannten Kontaktdaten.</p>
+
+    <h2 id="hosting">3. Hosting und Server-Logfiles</h2>
+    <p>
+      Diese Website wird auf einem eigenen virtuellen Server (VPS) bei einem Hosting-Dienstleister mit Rechenzentrum in
+      der Europäischen Union betrieben. Der Dienstleister verarbeitet die Daten ausschließlich in unserem Auftrag und nach
+      unseren Weisungen (Auftragsverarbeitung nach Art. 28 DSGVO).
+    </p>
+    <p>Bei jedem Aufruf unserer Website erfasst der Server automatisch Informationen, die Ihr Browser übermittelt (Server-Logfiles):</p>
+    <ul>
+      <li>IP-Adresse des anfragenden Geräts</li>
+      <li>Datum und Uhrzeit des Zugriffs</li>
+      <li>aufgerufene Seite bzw. Datei (URL) und HTTP-Statuscode</li>
+      <li>übertragene Datenmenge</li>
+      <li>Browsertyp und -version sowie Betriebssystem (User-Agent)</li>
+      <li>gegebenenfalls die zuvor besuchte Seite (Referrer)</li>
+    </ul>
+    <p>
+      Diese Daten benötigen wir, um die Website auszuliefern, ihre Stabilität und Sicherheit zu gewährleisten und Angriffe
+      abzuwehren. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; unser berechtigtes Interesse liegt im sicheren und
+      fehlerfreien Betrieb der Website. Die Logfiles werden <strong>nach spätestens 14 Tagen gelöscht</strong>, sofern
+      sie nicht ausnahmsweise zur Aufklärung eines konkreten Sicherheitsvorfalls länger benötigt werden. Eine
+      Zusammenführung mit anderen Datenquellen findet nicht statt.
+    </p>
+
+    <h2 id="verschluesselung">4. SSL-/TLS-Verschlüsselung</h2>
+    <p>
+      Diese Website nutzt aus Sicherheitsgründen eine SSL- bzw. TLS-Verschlüsselung. Eine verschlüsselte Verbindung
+      erkennen Sie an „https://“ in der Adresszeile Ihres Browsers und am Schloss-Symbol. Daten, die Sie an uns
+      übermitteln – etwa über das Kontaktformular –, können so nicht von Dritten mitgelesen werden.
+    </p>
+
+    <h2 id="cookies">5. Cookies und lokale Speicherung</h2>
+    <p>
+      Beim normalen Besuch unserer Website werden <strong>keine Cookies</strong> gesetzt. Nur in folgenden Fällen werden
+      Informationen auf Ihrem Gerät gespeichert oder ausgelesen:
+    </p>
+    <ul>
+      <li>
+        <strong>Ihre Einwilligungsentscheidung:</strong> Wenn wir Sie um Einwilligung bitten (siehe <a href="#google-ads">Google Ads</a>), speichern wir Ihre Entscheidung im lokalen Speicher Ihres Browsers
+        („localStorage“), damit wir Sie nicht bei jedem Seitenaufruf erneut fragen. Diese Speicherung ist technisch
+        erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG, Art. 6 Abs. 1 lit. f DSGVO). Sie können den Eintrag jederzeit über die
+        Einstellungen Ihres Browsers löschen.
+      </li>
+      <li>
+        <strong>Nach Ihrer Einwilligung</strong> können Drittanbieter wie Google (Google Ads) oder YouTube Cookies oder
+        ähnliche Technologien einsetzen. Einzelheiten finden Sie in den jeweiligen Abschnitten.
+      </li>
+    </ul>
+
+    <h2 id="schriften">6. Schriftarten</h2>
+    <p>
+      Wir verwenden Schriftarten (u. a. Fraunces, Source Sans 3, Amiri und IBM Plex Sans Arabic), die direkt von unserem
+      eigenen Server ausgeliefert werden. Eine Verbindung zu Servern von Google Fonts oder anderen Schriftanbietern wird
+      dabei nicht aufgebaut.
+    </p>
+
+    <h2 id="kontakt">7. Kontaktformular, E-Mail und Telefon</h2>
+    <p>
+      Wenn Sie uns über das <a href={L('/kontakt')}>Kontaktformular</a>, per E-Mail oder telefonisch kontaktieren,
+      verarbeiten wir die Angaben, die Sie uns mitteilen – beim Kontaktformular Ihren Namen, Ihre E-Mail-Adresse, den
+      gewählten Betreff und Ihre Nachricht sowie den Zeitpunkt der Übermittlung.
+    </p>
+    <p>
+      Die Formulardaten werden über eine verschlüsselte Verbindung an unseren Server übertragen und von dort per E-Mail
+      an unser Vereinspostfach weitergeleitet; in einer Datenbank speichern wir sie nicht. Für den E-Mail-Versand nutzen
+      wir den E-Mail-Dienst unseres Anbieters, der die Daten in unserem Auftrag verarbeitet. Zum Schutz vor
+      automatisiertem Spam enthält das Formular ein für Menschen unsichtbares Feld und prüft, wie schnell es abgeschickt
+      wurde; diese technischen Angaben werden nicht gespeichert. Wir verzichten bewusst auf Dienste wie Google reCAPTCHA.
+    </p>
+    <p>
+      Wir verwenden Ihre Angaben ausschließlich, um Ihre Anfrage zu bearbeiten und zu beantworten. Rechtsgrundlage ist
+      Art. 6 Abs. 1 lit. b DSGVO, soweit Ihre Anfrage mit der Durchführung oder Anbahnung einer Vereinbarung
+      zusammenhängt (z. B. Anmeldung einer Moscheeführung), im Übrigen Art. 6 Abs. 1 lit. f DSGVO – unser berechtigtes
+      Interesse an der Beantwortung von Anfragen.
+    </p>
+    <p>
+      Wir löschen Ihre Anfrage, sobald sie abschließend bearbeitet ist und keine weitere Kommunikation zu erwarten ist –
+      es sei denn, gesetzliche Aufbewahrungspflichten stehen dem entgegen (etwa bei Schriftverkehr zu Spenden, siehe <a href="#zuwendungsbestaetigung">Zuwendungsbestätigungen</a>).
+    </p>
+
+    <h2 id="spenden">8. Online-Spenden über Stripe</h2>
+    <p>
+      Für Online-Spenden nutzen wir den Zahlungsdienstleister <strong>Stripe Payments Europe, Ltd.</strong>, 1 Grand
+      Canal Street Lower, Grand Canal Dock, Dublin, D02 H210, Irland („Stripe“). Wenn Sie auf unserer <a href={L('/spenden')}>Spendenseite</a> eine Spende abschicken, übermitteln wir Betrag, Spendenzweck, Rhythmus
+      (einmalig oder monatlich), eine von Ihnen eingegebene Widmung sowie die Angabe, ob Sie eine
+      Zuwendungsbestätigung wünschen, an Stripe und leiten Sie zur Bezahlseite von Stripe (Stripe Checkout) weiter.
+      Auf unserer eigenen Website werden dabei keine Skripte von Stripe geladen.
+    </p>
+    <p>
+      Auf der Bezahlseite geben Sie Ihre Zahlungsdaten direkt bei Stripe ein. Je nach gewählter Zahlungsart verarbeitet
+      Stripe insbesondere Name, E-Mail-Adresse, gegebenenfalls Rechnungsanschrift, Karten- bzw. Kontodaten (IBAN bei
+      SEPA-Lastschrift), Betrag, Datum sowie technische Daten wie IP-Adresse und Geräteinformationen zur
+      Betrugsprävention. Angeboten werden – je nach Verfügbarkeit – Kredit- und Debitkarten, SEPA-Lastschrift, Apple Pay,
+      Google Pay und PayPal. Bei Apple Pay, Google Pay und PayPal werden Daten zusätzlich an den jeweiligen Anbieter
+      übermittelt (Apple Distribution International Ltd., Irland; Google Ireland Limited, Irland; PayPal (Europe)
+      S.à r.l. et Cie, S.C.A., Luxemburg), der hierfür eigenverantwortlich handelt.
+    </p>
+    <p>
+      Wir erhalten von Stripe die Informationen, die wir zur Verbuchung Ihrer Spende und gegebenenfalls zur Ausstellung
+      einer Zuwendungsbestätigung benötigen (z. B. Name, E-Mail-Adresse, Anschrift, Betrag, Datum, Zahlungsart) –
+      vollständige Karten- oder Kontodaten erhalten wir nicht. Bitte geben Sie im Feld „Widmung“ keine sensiblen
+      Angaben ein.
+    </p>
+    <p>
+      Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Abwicklung Ihrer Spende) sowie Art. 6 Abs. 1 lit. c DSGVO
+      (steuer- und handelsrechtliche Pflichten); die Betrugsprävention durch Stripe beruht auf Art. 6 Abs. 1 lit. f DSGVO.
+      Stripe verarbeitet die Daten teils als unser Auftragsverarbeiter und teils – etwa zur Betrugsprävention und zur
+      Erfüllung eigener regulatorischer Pflichten – als eigenständig Verantwortlicher. Dabei kann es zu einer Übermittlung
+      an die Stripe, Inc. in den USA kommen; diese ist unter dem EU-US Data Privacy Framework zertifiziert, ergänzend
+      setzt Stripe EU-Standardvertragsklauseln ein. Weitere Informationen finden Sie in der <a href="https://stripe.com/de/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Stripe</a>.
+    </p>
+
+    <h2 id="ueberweisung">9. Spenden per Überweisung</h2>
+    <p>
+      Wenn Sie per Überweisung (auch über den GiroCode auf unserer Spendenseite) spenden, erhalten wir von unserer Bank
+      die Angaben aus dem Überweisungsauftrag: Name und IBAN des Kontoinhabers, Betrag, Datum und Verwendungszweck. Wir
+      nutzen diese Daten zur Verbuchung der Spende, für die Buchführung des Vereins und gegebenenfalls zur Ausstellung
+      einer Zuwendungsbestätigung. Der GiroCode wird auf unserem Server erzeugt; Ihre Banking-App liest ihn lokal aus,
+      ohne dass Daten an uns übertragen werden. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b und lit. c DSGVO. Die Unterlagen
+      bewahren wir nach den gesetzlichen Fristen auf (in der Regel zehn Jahre, § 147 Abgabenordnung).
+    </p>
+
+    <h2 id="zuwendungsbestaetigung">10. Zuwendungsbestätigungen</h2>
+    <p>
+      Wenn Sie eine Zuwendungsbestätigung (Spendenquittung) wünschen, verarbeiten wir Ihren Namen, Ihre Anschrift sowie
+      Betrag und Datum Ihrer Spende(n), um die Bestätigung auszustellen und Ihnen zuzusenden. Wir sind gesetzlich
+      verpflichtet, eine Kopie der Zuwendungsbestätigung und die zugehörigen Buchungsunterlagen aufzubewahren.
+      Rechtsgrundlage ist Art. 6 Abs. 1 lit. c DSGVO in Verbindung mit den steuerrechtlichen Vorschriften
+      (insbesondere § 50 EStDV und § 147 AO). Die Daten werden nach Ablauf der gesetzlichen Aufbewahrungsfrist von
+      zehn Jahren gelöscht.
+    </p>
+
+    <h2 id="youtube">11. YouTube-Videos</h2>
+    <p>
+      Auf einigen Seiten zeigen wir Videos der Plattform YouTube, betrieben von Google Ireland Limited, Gordon House,
+      Barrow Street, Dublin 4, Irland („Google“). Die Videos sind im <strong>erweiterten Datenschutzmodus</strong> (youtube-nocookie.com) eingebunden und werden <strong>erst geladen, wenn Sie auf das Vorschaubild klicken</strong>.
+      Vorher wird keine Verbindung zu YouTube aufgebaut.
+    </p>
+    <p>
+      Nach Ihrem Klick werden Daten wie Ihre IP-Adresse, die aufgerufene Seite und technische Informationen über Ihren
+      Browser an Google übertragen; YouTube kann ab dem Abspielen Cookies oder ähnliche Technologien einsetzen. Sind Sie
+      bei einem Google-Konto angemeldet, kann Google den Aufruf Ihrem Konto zuordnen. Rechtsgrundlage ist Ihre
+      Einwilligung durch den Klick (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Google kann Daten auch in die USA
+      übermitteln; Google LLC ist unter dem EU-US Data Privacy Framework zertifiziert. Weitere Informationen: <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Google</a>.
+    </p>
+
+    <h2 id="telegram">12. Telegram und externe Links</h2>
+    <p>
+      Auf unseren Telegram-Kanal und auf Kartendienste (Google Maps, Apple Karten) verweisen wir nur mit einfachen Links.
+      Erst wenn Sie einen solchen Link anklicken, werden Sie zum jeweiligen Anbieter weitergeleitet, der dann
+      eigenverantwortlich Daten verarbeitet. Telegram wird von Telegram FZ-LLC mit Sitz in Dubai (Vereinigte Arabische
+      Emirate) betrieben, also außerhalb der EU in einem Land ohne Angemessenheitsbeschluss der EU-Kommission. Bitte
+      beachten Sie die Datenschutzhinweise der jeweiligen Anbieter. Für unsere Live-Übertragungen und Ankündigungen auf
+      Telegram gelten die Bedingungen von Telegram.
+    </p>
+
+    <h2 id="analyse">13. Reichweitenmessung mit Plausible Analytics (falls aktiviert)</h2>
+    <p>
+      Sofern aktiviert, nutzen wir zur statistischen Auswertung der Besucherzahlen den datenschutzfreundlichen Dienst
+      Plausible Analytics (Plausible Insights OÜ, Estland) mit Servern in der EU. Plausible setzt <strong>keine
+      Cookies</strong>, speichert keine IP-Adressen und erstellt <strong>keine personenbezogenen Profile</strong>.
+      Aus IP-Adresse und User-Agent wird lediglich eine täglich wechselnde, nicht rückrechenbare Kennung gebildet, um
+      Besuche zählen zu können. Ausgewertet werden ausschließlich zusammengefasste Angaben, etwa aufgerufene Seiten,
+      Herkunftsseite, Land sowie Geräte- und Browsertyp. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; unser
+      berechtigtes Interesse liegt darin, unser Angebot bedarfsgerecht zu verbessern.
+    </p>
+
+    <h2 id="google-ads">14. Google Ads Conversion-Tracking (nur mit Einwilligung)</h2>
+    <p>
+      Um zu messen, ob unsere Anzeigen bei Google zu Spenden oder Kontaktanfragen führen, können wir das
+      Conversion-Tracking von Google Ads (Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland)
+      einsetzen. Das geschieht <strong>ausschließlich mit Ihrer ausdrücklichen Einwilligung</strong>: Ohne Ihre
+      Zustimmung wird das Google-Tag gar nicht erst geladen.
+    </p>
+    <p>
+      Nach Ihrer Einwilligung setzt Google Cookies oder ähnliche Technologien auf Ihrem Gerät und erhält Informationen
+      wie Ihre IP-Adresse, Browser- und Geräteinformationen, die Herkunft über eine Google-Anzeige sowie bestimmte
+      Ereignisse auf unserer Website (z. B. „Spende abgeschlossen“). Wir erhalten nur zusammengefasste Statistiken und
+      können Sie nicht persönlich identifizieren. Personalisierte Werbung auf Grundlage dieser Daten schalten wir nicht.
+      Google kann Daten auch in die USA übermitteln; Google LLC ist unter dem EU-US Data Privacy Framework zertifiziert.
+    </p>
+    <p>
+      Rechtsgrundlage ist Ihre Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Sie können Ihre Einwilligung
+      jederzeit mit Wirkung für die Zukunft widerrufen:
+    </p>
+    <p>
+      <button type="button" data-consent-open class="btn btn-outline">Cookie-Einstellungen ändern</button>
+    </p>
+    <p data-consent-inactive hidden class="text-ink-mute">
+      Hinweis: Google Ads Conversion-Tracking ist auf dieser Website derzeit nicht aktiv. Es werden daher keine
+      Einwilligungen abgefragt und keine Google-Dienste geladen.
+    </p>
+    <p>
+      Weitere Informationen: <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Google</a> und <a href="https://business.safety.google/privacy/" target="_blank" rel="noopener">Datenschutzinformationen für Google-Werbeprodukte</a>.
+    </p>
+
+    <h2 id="besondere-kategorien">15. Besondere Kategorien personenbezogener Daten</h2>
+    <p>
+      Schon die Kontaktaufnahme mit einer Moschee, eine Spende oder die Anmeldung zu einem Unterricht kann Rückschlüsse
+      auf Ihre religiöse Überzeugung zulassen. Solche Angaben gehören zu den besonders geschützten Daten nach Art. 9 DSGVO.
+      Wir behandeln sie <strong>streng vertraulich</strong>, geben sie nicht ohne Ihre Einwilligung an Dritte weiter und
+      verarbeiten sie nur, soweit dies für Ihr Anliegen erforderlich ist. Rechtsgrundlage ist Art. 9 Abs. 2 lit. d DSGVO
+      (Verarbeitung durch eine Organisation ohne Gewinnerzielungsabsicht mit religiöser Ausrichtung im Rahmen ihrer
+      rechtmäßigen Tätigkeit) bzw. Ihre ausdrückliche Einwilligung nach Art. 9 Abs. 2 lit. a DSGVO.
+    </p>
+
+    <h2 id="rechte">16. Ihre Rechte</h2>
+    <p>Sie haben uns gegenüber hinsichtlich der Sie betreffenden personenbezogenen Daten folgende Rechte:</p>
+    <ul>
+      <li><strong>Auskunft</strong> über die von uns verarbeiteten Daten (Art. 15 DSGVO)</li>
+      <li><strong>Berichtigung</strong> unrichtiger oder Vervollständigung unvollständiger Daten (Art. 16 DSGVO)</li>
+      <li><strong>Löschung</strong> Ihrer Daten, soweit keine Aufbewahrungspflicht entgegensteht (Art. 17 DSGVO)</li>
+      <li><strong>Einschränkung der Verarbeitung</strong> (Art. 18 DSGVO)</li>
+      <li><strong>Datenübertragbarkeit</strong> in einem gängigen, maschinenlesbaren Format (Art. 20 DSGVO)</li>
+      <li><strong>Widerruf</strong> einer erteilten Einwilligung jederzeit mit Wirkung für die Zukunft (Art. 7 Abs. 3 DSGVO)</li>
+    </ul>
+    <p>
+      <strong>Widerspruchsrecht (Art. 21 DSGVO):</strong> Verarbeiten wir Ihre Daten auf Grundlage eines berechtigten
+      Interesses (Art. 6 Abs. 1 lit. f DSGVO), können Sie aus Gründen, die sich aus Ihrer besonderen Situation ergeben,
+      jederzeit Widerspruch gegen die Verarbeitung einlegen. Wir verarbeiten Ihre Daten dann nicht mehr, es sei denn, wir
+      können zwingende schutzwürdige Gründe nachweisen.
+    </p>
+    <p>
+      Um Ihre Rechte auszuüben, genügt eine formlose Nachricht an <a href={`mailto:${site.email}`}>{site.email}</a> oder
+      an unsere Postanschrift. Eine automatisierte Entscheidungsfindung einschließlich Profiling findet nicht statt.
+    </p>
+
+    <h2 id="beschwerde">17. Beschwerderecht bei der Aufsichtsbehörde</h2>
+    <p>
+      Sie haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren, wenn Sie der Ansicht sind, dass die
+      Verarbeitung Ihrer Daten gegen die DSGVO verstößt (Art. 77 DSGVO). Für uns zuständig ist:
+    </p>
+    <address>
+      Die Landesbeauftragte für den Datenschutz Niedersachsen<br />
+      Prinzenstraße 5<br />
+      30159 Hannover<br />
+      <a href="https://www.lfd.niedersachsen.de" target="_blank" rel="noopener">www.lfd.niedersachsen.de</a>
+    </address>
+    <p>Gern können Sie sich mit Ihrem Anliegen aber auch zuerst direkt an uns wenden.</p>
+
+    <h2 id="aenderungen">18. Änderungen dieser Datenschutzerklärung</h2>
+    <p>
+      Wir passen diese Datenschutzerklärung an, sobald sich unsere Website oder die Rechtslage ändert. Es gilt jeweils
+      die hier veröffentlichte aktuelle Fassung.
+    </p>
+    <p class="text-ink-mute">{updated}</p>
+  </LegalArticle>
+</BaseLayout>
+
+<script>
+  // The consent banner only exists when Google Ads is configured; otherwise explain instead of showing a dead button.
+  if (!document.querySelector('[data-consent]')) {
+    document.querySelectorAll<HTMLElement>('[data-consent-open]').forEach((btn) => btn.closest('p')?.setAttribute('hidden', ''));
+    document.querySelectorAll<HTMLElement>('[data-consent-inactive]').forEach((el) => (el.hidden = false));
+  }
+</script>
