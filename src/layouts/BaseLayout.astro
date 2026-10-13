@@ -32,6 +32,14 @@ const plausibleDomain = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 const plausibleSrc = import.meta.env.PUBLIC_PLAUSIBLE_SRC || 'https://plausible.io/js/script.js';
 const googleAdsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID;
 const demo = import.meta.env.PUBLIC_DEMO === '1';
+const theme = import.meta.env.PUBLIC_THEME === 'green' ? 'green' : 'wine';
+// Test builds only: links to the same page in both colour variants on GitHub Pages.
+const demoRoot = import.meta.env.PUBLIC_DEMO_ROOT || '';
+const relPath = localizePath(path, lang).slice(import.meta.env.BASE_URL.replace(/\/$/, '').length) || '/';
+const variants = [
+  { id: 'wine', label: lang === 'ar' ? 'خمري (الملصق)' : 'Weinrot (Flyer)', href: demoRoot + relPath },
+  { id: 'green', label: lang === 'ar' ? 'أخضر (الشعار)' : 'Grün (Logo)', href: demoRoot + '/gruen' + relPath },
+];
 
 const orgSchema = {
   '@context': 'https://schema.org',
@@ -49,7 +57,7 @@ const orgSchema = {
 };
 ---
 <!doctype html>
-<html lang={lang} dir={dir(lang)}>
+<html lang={lang} dir={dir(lang)} data-theme={theme}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -60,8 +68,8 @@ const orgSchema = {
     <link rel="alternate" hreflang="ar" href={altAr} />
     <link rel="alternate" hreflang="x-default" href={altDe} />
     {(noindex || demo) && <meta name="robots" content="noindex, nofollow" />}
-    <meta name="theme-color" content="#6b1f2f" />
-    <link rel="icon" href={withBase('/favicon.svg')} type="image/svg+xml" />
+    <meta name="theme-color" content={theme === 'green' ? '#23622f' : '#6b1f2f'} />
+    <link rel="icon" href={withBase(theme === 'green' ? '/favicon-green.svg' : '/favicon.svg')} type="image/svg+xml" />
     <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
     <link rel="sitemap" href={withBase('/sitemap-index.xml')} />
 
@@ -83,8 +91,18 @@ const orgSchema = {
   <body class="min-h-dvh">
     <a href="#main" class="sr-only z-[60] rounded-full bg-wine px-4 py-2 text-white focus:not-sr-only focus:fixed focus:start-4 focus:top-4">{t('nav.skip')}</a>
     {demo && (
-      <div class="bg-gold-soft px-4 py-2 text-center text-sm font-semibold text-wine-ink" role="note">
-        {lang === 'ar' ? 'نسخة تجريبية – المحتوى أولي والدفع الإلكتروني ونموذج التواصل غير مفعّلين.' : 'Testversion – Inhalte vorläufig, Online-Zahlung und Kontaktformular sind deaktiviert.'}
+      <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 bg-gold-soft px-4 py-2 text-center text-sm font-semibold text-wine-ink" role="note">
+        <span>{lang === 'ar' ? 'نسخة تجريبية – المحتوى أولي والدفع الإلكتروني ونموذج التواصل غير مفعّلين.' : 'Testversion – Inhalte vorläufig, Online-Zahlung und Kontaktformular sind deaktiviert.'}</span>
+        {demoRoot && (
+          <span class="inline-flex items-center gap-1.5">
+            {lang === 'ar' ? 'اللون:' : 'Farbe:'}
+            {variants.map((v) => (
+              <a href={v.href} aria-current={v.id === theme ? 'true' : undefined} class="inline-flex items-center gap-1.5 rounded-full border border-wine-ink/25 bg-white/50 px-3 py-0.5 hover:bg-white aria-[current=true]:border-wine-ink aria-[current=true]:bg-wine-ink aria-[current=true]:text-white">
+                <span class="size-2.5 rounded-full" style={`background:${v.id === 'green' ? '#69b86b' : '#8e2c3f'}`}></span>{v.label}
+              </a>
+            ))}
+          </span>
+        )}
       </div>
     )}
     <Header lang={lang} />

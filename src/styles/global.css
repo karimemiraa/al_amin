@@ -154,3 +154,26 @@
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/*
+ * Colour variant "green": the original logo green (#69B86B) as the brand colour.
+ * Built with PUBLIC_THEME=green. Darker shades of the same hue keep text and
+ * white-on-green buttons above WCAG AA contrast.
+ */
+html[data-theme='green'] {
+  --color-wine: #2f7d3e;
+  --color-wine-deep: #23622f;
+  --color-wine-ink: #15391c;
+  --color-rose: #3b8441;
+  --color-rose-soft: #e4f1e3;
+  --shadow-soft: 0 1px 2px rgb(21 57 28 / 0.04), 0 8px 24px -8px rgb(21 57 28 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(21 57 28 / 0.06), 0 24px 48px -16px rgb(21 57 28 / 0.22);
+}
+html[data-theme='green'] .btn-primary { box-shadow: 0 6px 18px -6px rgb(47 125 62 / 0.5); }
+html[data-theme='green'] .btn-primary:hover { box-shadow: 0 10px 24px -8px rgb(47 125 62 / 0.55); }
+html[data-theme='green'] .bg-wine-pattern {
+  background-image:
+    radial-gradient(120% 80% at 100% 0%, rgb(105 184 107 / 0.35), transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23d9c39d' stroke-opacity='.13' stroke-width='1'%3E%3Cpath d='M40 4l10.6 25.4L76 40 50.6 50.6 40 76 29.4 50.6 4 40l25.4-10.6z'/%3E%3Ccircle cx='40' cy='40' r='13'/%3E%3C/g%3E%3C/svg%3E");
+}
+html[data-theme='green'] .logo-mark { color: #69b86b; }
