@@ -1,0 +1,324 @@
+---
+import { Picture } from 'astro:assets';
+import { getCollection } from 'astro:content';
+import { marked } from 'marked';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CampaignProgress from '../components/CampaignProgress.astro';
+import PrayerToday from '../components/PrayerToday.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import QuoteCard from '../components/QuoteCard.astro';
+import Ornament from '../components/Ornament.astro';
+import Wave from '../components/Wave.astro';
+import Icon from '../components/Icon.astro';
+import VideoEmbed from '../components/VideoEmbed.astro';
+import campaign from '../content/settings/campaign.json';
+import site from '../content/settings/site.json';
+import { localizePath, formatEuro, formatNumber, formatDate, pick, useTranslations, type Lang } from '../i18n/ui';
+import building from '../assets/photos/neues-gebaeude.jpg';
+import hall from '../assets/photos/gebetsraum.jpg';
+import courtyard from '../assets/photos/brunnen.jpg';
+import community from '../assets/photos/gemeinde-vortrag.jpg';
+import gate from '../assets/photos/eingang-tor.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+
+const news = (await getCollection('announcements', (e) => e.data.published))
+  .sort((a, b) => Number(b.data.pinned) - Number(a.data.pinned) || b.data.date.getTime() - a.data.date.getTime())
+  .slice(0, 3);
+const videos = (await getCollection('videos')).sort((a, b) => Number(b.data.featured) - Number(a.data.featured) || b.data.date.getTime() - a.data.date.getTime());
+const video = videos[0];
+const program = (await getCollection('program', (e) => e.data.active)).sort((a, b) => ((a.data.weekday + 1) % 7) - ((b.data.weekday + 1) % 7));
+const afterLabel = (after: string) => (after === 'time' ? '' : `${t('common.after')} ${t(`prayer.${after}` as 'prayer.asr')}`);
+
+const c = ar
+  ? {
+      title: 'مسجد محمد الأمين – هانوفر',
+      description: 'مسجد محمد الأمين في هانوفر: مواقيت الصلاة، الدروس، الأخبار – وحملة شراء مسجدنا الجديد بمساحة 3 طوابق و1600 م² ساحة خارجية. تبرّع الآن.',
+      eyebrow: 'مشروع الشراء 2026/2027',
+      h1: 'بيتٌ لله<br/>ولأجيالنا القادمة',
+      lead: `فرصة تاريخية لمجتمعنا: نشتري مبنىً من ثلاثة طوابق بمساحة ${campaign.sqmPerFloor} م² لكل طابق و${formatNumber(campaign.outdoorSqm)} م² ساحة خارجية – على بعد كيلومتر واحد فقط من مسجدنا الحالي.`,
+      ctaProject: 'تعرّف على المشروع',
+      facts: [
+        { icon: 'bank', label: 'سعر الشراء', value: '1.3 مليون €' },
+        { icon: 'layers', label: '3 طوابق', value: `${campaign.sqmPerFloor} م² لكل طابق` },
+        { icon: 'tree', label: 'الساحة الخارجية', value: `${formatNumber(campaign.outdoorSqm)} م²` },
+        { icon: 'calendar', label: 'آخر موعد للتبرع', value: formatDate(campaign.deadline, 'de', { day: '2-digit', month: '2-digit', year: 'numeric' }) },
+      ],
+      location: [`${campaign.minutesToTransit} دقائق من الترام / المحطة`, `${campaign.distanceToCurrentKm} كم من المسجد الحالي`],
+      todayEyebrow: 'كل يوم',
+      todayTitle: 'الصلاة والعلم<br/>في قلب فارينفالد',
+      todayIntro: 'مسجدنا مفتوح يومياً للصلوات الخمس وصلاة الجمعة. وتُقام الدروس أسبوعياً بالعربية والألمانية – دون تسجيل مسبق، والجميع مرحّب بهم.',
+      weekProgram: 'دروس الأسبوع',
+      allProgram: 'البرنامج كاملاً',
+      visionEyebrow: 'لماذا مسجد جديد؟',
+      visionTitle: 'ما الذي سيتيحه<br/>المسجد الجديد',
+      visionIntro: 'مسجدنا الحالي في الفناء الخلفي أصبح ضيقاً منذ سنوات. في أيام الجمعة والعيدين ورمضان يصلي الناس في الممرات والفناء. المبنى الجديد يمنح مجتمعنا مساحة للنمو – لعقود قادمة.',
+      vision: [
+        { icon: 'star', title: 'صلاة العيدين والجمعة', text: 'مساحة كافية للجميع – بدلاً من الصلاة في الممرات أو استئجار قاعات.' },
+        { icon: 'moon', title: 'رمضان معاً', text: 'التراويح والإفطار الجماعي والاعتكاف في مكان واحد.' },
+        { icon: 'book', title: 'التعليم', text: 'قاعات لتحفيظ القرآن واللغة العربية والدروس بالألمانية.' },
+        { icon: 'users', title: 'الأطفال والشباب والأخوات', text: 'برامج ومساحات خاصة للأطفال والشباب ومصلى واسع للنساء.' },
+        { icon: 'hands', title: 'ملتقى للجميع', text: 'مركز ثقافي ومكان للقاء مع الجيران وزيارات المدارس والحوار.' },
+        { icon: 'tree', title: '1600 م² ساحة خارجية', text: 'للفعاليات والاحتفالات وصلاة العيد في الهواء الطلق.' },
+      ],
+      quotes: [
+        { arabic: 'إِنَّمَا يَعْمُرُ مَسَاجِدَ اللَّهِ مَنْ آمَنَ بِاللَّهِ وَالْيَوْمِ الْآخِرِ وَأَقَامَ الصَّلَاةَ وَآتَى الزَّكَاةَ وَلَمْ يَخْشَ إِلَّا اللَّهَ ۖ فَعَسَىٰ أُولَٰئِكَ أَن يَكُونُوا مِنَ الْمُهْتَدِينَ', text: '', source: 'سورة التوبة: 18' },
+        { arabic: 'مَنْ بَنَى مَسْجِدًا يَبْتَغِي بِهِ وَجْهَ اللَّهِ، بَنَى اللَّهُ لَهُ مِثْلَهُ فِي الْجَنَّةِ', text: '', source: 'رواه البخاري ومسلم' },
+        { arabic: 'إِذَا مَاتَ الْإِنْسَانُ انْقَطَعَ عَنْهُ عَمَلُهُ إِلَّا مِنْ ثَلَاثَةٍ: إِلَّا مِنْ صَدَقَةٍ جَارِيَةٍ، أَوْ عِلْمٍ يُنْتَفَعُ بِهِ، أَوْ وَلَدٍ صَالِحٍ يَدْعُو لَهُ', text: '', source: 'رواه مسلم' },
+      ],
+      sqmEyebrow: 'صدقة جارية',
+      sqmTitle: `امتلك نصيبك: كل ${campaign.pricePerSqm} € = 1 م²`,
+      sqmText: `يبلغ مجموع المساحة ${formatNumber(campaign.totalSqm)} م² (المبنى والساحة). كل متر مربع تتبرع به يبقى صدقة جارية – في كل صلاة وكل درس وكل لقاء.`,
+      sqmOther: 'مبلغ آخر',
+      newsEyebrow: 'من المسجد',
+      newsTitle: 'الأخبار والإعلانات',
+      allNews: 'كل الأخبار',
+      videoTitle: 'أحدث خطبة',
+      allVideos: 'المكتبة المرئية',
+      aboutEyebrow: 'منذ 1999',
+      aboutTitle: 'مجتمع ينمو منذ أكثر من 25 عاماً',
+      aboutText: 'منذ عام 1999 يجتمع المسلمون في مسجد محمد الأمين في هانوفر-فارينفالد للصلاة والتعلم واللقاء. نحن جمعية مستقلة وعضو في مجلس الشورى في ولاية سكسونيا السفلى. أبوابنا مفتوحة لكل من يرغب في التعرّف على الإسلام.',
+      aboutCta: 'من نحن',
+      visitTitle: 'زورونا',
+      visitText: 'المسجد مفتوح يومياً في أوقات الصلاة. نرحّب بالزوار والمجموعات المدرسية – سجّلوا زيارتكم مسبقاً.',
+      visitCta: 'معلومات الزيارة',
+      route: 'الاتجاهات',
+    }
+  : {
+      title: 'Mohammad Al-Amien Moschee Hannover',
+      description: 'Mohammad Al-Amien Moschee in Hannover: Gebetszeiten, Unterricht, Aktuelles – und unser Kaufprojekt für eine neue Moschee mit 3 Etagen und 1.600 m² Außengelände. Jetzt spenden.',
+      eyebrow: 'Kaufprojekt 2026/2027',
+      h1: 'Ein Haus für Allah –<br/>und für Generationen',
+      lead: `Eine historische Chance für unsere Gemeinde: Wir erwerben ein Gebäude mit drei Etagen à ${campaign.sqmPerFloor} m² und ${formatNumber(campaign.outdoorSqm)} m² Außengelände – nur einen Kilometer von unserer jetzigen Moschee entfernt.`,
+      ctaProject: 'Zum Projekt',
+      facts: [
+        { icon: 'bank', label: 'Kaufpreis', value: '1,3 Mio. €' },
+        { icon: 'layers', label: '3 Etagen', value: `je ${campaign.sqmPerFloor} m²` },
+        { icon: 'tree', label: 'Außengelände', value: `${formatNumber(campaign.outdoorSqm)} m²` },
+        { icon: 'calendar', label: 'Spendenfrist', value: formatDate(campaign.deadline, 'de', { day: '2-digit', month: '2-digit', year: 'numeric' }) },
+      ],
+      location: [`${campaign.minutesToTransit} Min. von Stadtbahn / Bahnhof`, `${campaign.distanceToCurrentKm} km von der jetzigen Moschee`],
+      todayEyebrow: 'Jeden Tag',
+      todayTitle: 'Gebet und Wissen<br/>mitten in Vahrenwald',
+      todayIntro: 'Unsere Moschee ist täglich zu den fünf Gebeten und zum Freitagsgebet geöffnet. Jede Woche finden Unterricht und Vorträge auf Arabisch und Deutsch statt – ohne Anmeldung, alle sind willkommen.',
+      weekProgram: 'Unterricht diese Woche',
+      allProgram: 'Ganzes Programm',
+      visionEyebrow: 'Warum eine neue Moschee?',
+      visionTitle: 'Was die neue Moschee<br/>möglich macht',
+      visionIntro: 'Unsere jetzige Moschee im Hinterhof ist seit Jahren zu klein. Freitags, an den Festtagen und im Ramadan beten Menschen in Fluren und im Hof. Das neue Gebäude gibt unserer Gemeinde Raum zum Wachsen – für Jahrzehnte.',
+      vision: [
+        { icon: 'star', title: 'Eid- und Freitagsgebet', text: 'Platz für alle – statt Gebet in Fluren oder angemieteten Hallen.' },
+        { icon: 'moon', title: 'Ramadan gemeinsam', text: 'Tarawih, gemeinsames Iftar und I’tikaf unter einem Dach.' },
+        { icon: 'book', title: 'Bildung', text: 'Räume für Koranunterricht, Arabischkurse und Vorträge auf Deutsch.' },
+        { icon: 'users', title: 'Kinder, Jugend & Frauen', text: 'Eigene Räume und Programme für Kinder und Jugendliche sowie ein großzügiger Frauenbereich.' },
+        { icon: 'hands', title: 'Begegnung für alle', text: 'Kulturzentrum und Ort der Begegnung – für Nachbarn, Schulklassen und Dialog.' },
+        { icon: 'tree', title: '1.600 m² Außengelände', text: 'Für Feste, Gemeindeveranstaltungen und das Eid-Gebet unter freiem Himmel.' },
+      ],
+      quotes: [
+        { arabic: 'إِنَّمَا يَعْمُرُ مَسَاجِدَ اللَّهِ مَنْ آمَنَ بِاللَّهِ وَالْيَوْمِ الْآخِرِ وَأَقَامَ الصَّلَاةَ وَآتَى الزَّكَاةَ وَلَمْ يَخْشَ إِلَّا اللَّهَ', text: '„Gewiss, Allahs Gebetsstätten bevölkert nur, wer an Allah und den Jüngsten Tag glaubt, das Gebet verrichtet, die Abgabe entrichtet und niemanden außer Allah fürchtet. Diese aber werden vielleicht zu den Rechtgeleiteten gehören.“', source: 'Sure At-Tawba 9:18' },
+        { arabic: 'مَنْ بَنَى مَسْجِدًا يَبْتَغِي بِهِ وَجْهَ اللَّهِ، بَنَى اللَّهُ لَهُ مِثْلَهُ فِي الْجَنَّةِ', text: '„Wer um Allahs Willen eine Moschee baut, dem baut Allah ein Haus im Paradies.“', source: 'Bukhari & Muslim' },
+        { arabic: 'إِذَا مَاتَ الْإِنْسَانُ انْقَطَعَ عَنْهُ عَمَلُهُ إِلَّا مِنْ ثَلَاثَةٍ', text: '„Wenn der Mensch stirbt, hören seine Taten auf, außer dreierlei: einem dauerhaften Almosen, einem nützlichen Wissen und einem rechtschaffenen Kind, das für ihn Bittgebete spricht.“', source: 'Muslim' },
+      ],
+      sqmEyebrow: 'Sadaqa Dschariya',
+      sqmTitle: `Ihr Anteil: ${campaign.pricePerSqm} € = 1 m²`,
+      sqmText: `Gebäude und Gelände umfassen zusammen ${formatNumber(campaign.totalSqm)} m². Jeder Quadratmeter, den Sie spenden, bleibt als fortlaufende Wohltat – bei jedem Gebet, jedem Unterricht, jeder Begegnung.`,
+      sqmOther: 'Anderer Betrag',
+      newsEyebrow: 'Aus der Gemeinde',
+      newsTitle: 'Aktuelles & Ankündigungen',
+      allNews: 'Alle Neuigkeiten',
+      videoTitle: 'Neueste Freitagspredigt',
+      allVideos: 'Zur Mediathek',
+      aboutEyebrow: 'Seit 1999',
+      aboutTitle: 'Eine Gemeinde, die seit über 25 Jahren wächst',
+      aboutText: 'Seit 1999 kommen Musliminnen und Muslime in der Mohammad Al-Amien Moschee in Hannover-Vahrenwald zum Gebet, zum Lernen und zur Begegnung zusammen. Wir sind ein unabhängiger Verein und Mitglied der Schura Niedersachsen. Unsere Türen stehen allen offen, die den Islam kennenlernen möchten.',
+      aboutCta: 'Über uns',
+      visitTitle: 'Besuchen Sie uns',
+      visitText: 'Die Moschee ist täglich zu den Gebetszeiten geöffnet. Besucher und Schulklassen sind herzlich willkommen – melden Sie Gruppen bitte vorher an.',
+      visitCta: 'Besuch planen',
+      route: 'Route planen',
+    };
+
+const sqmOptions = [1, 2, 5, 10];
+---
+<BaseLayout lang={lang} title={c.title} description={c.description}>
+  <!-- HERO -->
+  <section class="relative isolate overflow-hidden bg-wine-ink text-white">
+    <Picture src={building} alt={ar ? 'المبنى الجديد المراد شراؤه' : 'Das neue Gebäude, das wir erwerben möchten'} widths={[640, 960, 1400, 2000, 2400]} sizes="100vw" formats={['avif', 'webp']} class="absolute inset-0 -z-10 h-full w-full object-cover object-[60%_center]" loading="eager" fetchpriority="high" />
+    <div class="absolute inset-0 -z-10 bg-gradient-to-r from-wine-ink/95 via-wine-ink/70 to-wine-ink/10 rtl:bg-gradient-to-l"></div>
+    <div class="absolute inset-0 -z-10 bg-gradient-to-t from-wine-ink/80 via-transparent to-transparent"></div>
+
+    <div class="container-x grid gap-10 pb-24 pt-14 md:pb-32 md:pt-20 lg:grid-cols-[1.1fr_0.9fr] lg:items-end lg:gap-14">
+      <div class="animate-fade-up">
+        <p class="eyebrow !text-gold-soft">{c.eyebrow}</p>
+        <h1 class="mt-4 text-[2.6rem] font-semibold leading-[1.05] sm:text-6xl lg:text-[4.4rem]" set:html={c.h1} />
+        {!ar && <p class="mt-1 font-script text-4xl text-gold-soft md:text-5xl" aria-hidden="true">in Hannover</p>}
+        <p class="mt-6 max-w-xl text-lg leading-relaxed text-white/85 md:text-xl">{c.lead}</p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href={L('/spenden')} class="btn btn-light !min-h-14 !px-7 text-lg" data-cta="hero-donate"><Icon name="heart" size={20} class="text-wine" /> {t('campaign.cta')}</a>
+          <a href={L('/neue-moschee')} class="btn btn-ghost-light !min-h-14 !px-7 text-lg">{c.ctaProject} <Icon name="arrow" size={18} /></a>
+        </div>
+      </div>
+
+      <div class="animate-fade-up rounded-[1.5rem] border border-white/15 bg-wine-ink/55 p-6 shadow-lift backdrop-blur-md [animation-delay:150ms] md:p-8">
+        <CampaignProgress lang={lang} tone="dark" />
+      </div>
+    </div>
+    <Wave class="absolute inset-x-0 bottom-0" />
+  </section>
+
+  <!-- FACTS -->
+  <section class="container-x relative z-20 -mt-4 md:-mt-6">
+    <ul class="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+      {c.facts.map((f) => (
+        <li class="card flex items-center gap-3 p-4 md:p-5">
+          <span class="hidden size-11 shrink-0 place-items-center rounded-full border border-gold-soft text-gold sm:grid"><Icon name={f.icon as 'bank'} size={20} /></span>
+          <span class="min-w-0">
+            <span class="block text-xs font-semibold uppercase tracking-wider text-ink-mute">{f.label}</span>
+            <span class="block font-display text-[1.05rem] font-semibold leading-tight sm:text-lg md:text-xl">{f.value}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+    <ul class="mt-3 flex flex-wrap justify-center gap-x-8 gap-y-2 text-[0.95rem] text-ink-soft">
+      <li class="inline-flex items-center gap-2"><Icon name="tram" size={18} class="text-gold" />{c.location[0]}</li>
+      <li class="inline-flex items-center gap-2"><Icon name="route" size={18} class="text-gold" />{c.location[1]}</li>
+    </ul>
+  </section>
+
+  <!-- PRAYER + PROGRAM -->
+  <section class="container-x mt-24 grid gap-10 lg:grid-cols-[1fr_26rem] lg:gap-14">
+    <div>
+      <SectionHeading eyebrow={c.todayEyebrow} title={c.todayTitle} intro={c.todayIntro} />
+      <div class="mt-8">
+        <h3 class="mb-4 font-sans text-sm font-semibold uppercase tracking-wider text-ink-mute">{c.weekProgram}</h3>
+        <ul class="grid gap-3 sm:grid-cols-2">
+          {program.slice(0, 6).map((p) => (
+            <li class="card flex gap-4 p-4">
+              <span class="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-gold-pale py-2 text-center text-wine-ink">
+                <span class="text-[0.7rem] font-semibold uppercase tracking-wide">{t(`weekday.${p.data.weekday}` as 'weekday.0').slice(0, ar ? 10 : 2)}</span>
+                <span class="text-[0.7rem] leading-tight">{afterLabel(p.data.after) || p.data.time}</span>
+              </span>
+              <span class="min-w-0">
+                <span class="block font-semibold leading-snug" dir="auto">{pick(p.data, 'title', lang)}</span>
+                <span class="mt-1 inline-flex items-center gap-1 text-xs text-ink-mute"><Icon name="globe" size={12} /> {t(`common.lang.${p.data.language}` as 'common.lang.de')}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <a href={L('/programm')} class="mt-5 inline-flex items-center gap-1.5 font-semibold text-wine hover:underline">{c.allProgram} <Icon name="arrow" size={16} /></a>
+      </div>
+    </div>
+    <div class="lg:self-start"><PrayerToday lang={lang} /></div>
+  </section>
+
+  <!-- VISION -->
+  <section class="relative mt-28 bg-paper-2 py-20 md:py-28">
+    <Wave fill="var(--color-paper)" flip class="absolute inset-x-0 -top-px" />
+    <div class="container-x">
+      <div class="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:gap-16">
+        <div>
+          <SectionHeading eyebrow={c.visionEyebrow} title={c.visionTitle} intro={c.visionIntro} />
+          <div class="mt-8 grid grid-cols-2 gap-3">
+            <Picture src={hall} alt={ar ? 'قاعة الصلاة الحالية' : 'Der jetzige Gebetsraum'} widths={[400, 700]} sizes="(min-width: 1024px) 20vw, 45vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-2xl object-cover shadow-soft" />
+            <Picture src={community} alt={ar ? 'المصلون في المسجد الحالي' : 'Gemeinde im jetzigen Gebetsraum'} widths={[400, 700]} sizes="(min-width: 1024px) 20vw, 45vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-2xl object-cover shadow-soft" />
+          </div>
+        </div>
+        <ul class="grid gap-4 sm:grid-cols-2">
+          {c.vision.map((v) => (
+            <li class="card p-6">
+              <span class="grid size-12 place-items-center rounded-full bg-wine text-white"><Icon name={v.icon as 'star'} size={22} /></span>
+              <h3 class="mt-4 text-xl font-semibold">{v.title}</h3>
+              <p class="mt-2 text-ink-soft">{v.text}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUOTES -->
+  <section class="container-x py-20 md:py-24">
+    <Ornament class="mb-10" />
+    <div class="grid gap-6 md:grid-cols-3">
+      {c.quotes.map((q) => <QuoteCard arabic={q.arabic} text={q.text} source={q.source} />)}
+    </div>
+  </section>
+
+  <!-- SQM CTA -->
+  <section class="container-x">
+    <div class="bg-wine-pattern relative overflow-hidden rounded-[2rem] px-6 py-14 text-white shadow-lift md:px-14 md:py-16">
+      <div class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div>
+          <p class="eyebrow !text-gold-soft">{c.sqmEyebrow}</p>
+          <h2 class="mt-3 text-3xl font-semibold leading-tight md:text-5xl">{c.sqmTitle}</h2>
+          <p class="mt-4 max-w-xl text-lg text-white/80">{c.sqmText}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          {sqmOptions.map((n) => (
+            <a href={`${L('/spenden')}?betrag=${n * campaign.pricePerSqm}#spenden-form`} class="group rounded-2xl border border-white/20 bg-white/[0.06] p-5 text-center transition hover:border-gold-soft hover:bg-white/[0.12]">
+              <span class="block font-display text-3xl font-semibold">{n} {ar ? 'م²' : 'm²'}</span>
+              <span class="mt-1 block text-white/75 tabular">{formatEuro(n * campaign.pricePerSqm)}</span>
+            </a>
+          ))}
+          <a href={L('/spenden')} class="col-span-2 btn btn-light">{c.sqmOther} <Icon name="arrow" size={16} /></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEWS + VIDEO -->
+  <section class="container-x mt-24 grid gap-12 lg:grid-cols-[1fr_1fr] lg:gap-14">
+    <div>
+      <SectionHeading eyebrow={c.newsEyebrow} title={c.newsTitle} />
+      <ul class="mt-8 space-y-4">
+        {news.map((n) => (
+          <li class="card p-6">
+            <p class="flex items-center gap-2 text-sm text-ink-mute">
+              {n.data.pinned && <span class="pill">{ar ? 'مثبّت' : 'Wichtig'}</span>}
+              <time datetime={n.data.date.toISOString()}>{formatDate(n.data.date, lang)}</time>
+            </p>
+            <h3 class="mt-2 text-xl font-semibold">{pick(n.data, 'title', lang)}</h3>
+            <div class="prose-igh mt-2 line-clamp-3" set:html={marked.parseInline(pick(n.data, 'text', lang))} />
+          </li>
+        ))}
+      </ul>
+      <a href={L('/aktuelles')} class="mt-5 inline-flex items-center gap-1.5 font-semibold text-wine hover:underline">{c.allNews} <Icon name="arrow" size={16} /></a>
+    </div>
+    {video && (
+      <div>
+        <SectionHeading eyebrow="Mediathek" title={c.videoTitle} />
+        <VideoEmbed class="mt-8" lang={lang} id={video.data.youtubeId} title={pick(video.data, 'title', lang)} subtitle={video.data.speaker} />
+        <a href={L('/mediathek')} class="mt-5 inline-flex items-center gap-1.5 font-semibold text-wine hover:underline">{c.allVideos} <Icon name="arrow" size={16} /></a>
+      </div>
+    )}
+  </section>
+
+  <!-- ABOUT + VISIT -->
+  <section class="container-x mt-28 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+    <div class="card grid overflow-hidden md:grid-cols-2">
+      <Picture src={courtyard} alt={ar ? 'فناء المسجد الحالي مع النافورة' : 'Innenhof der jetzigen Moschee mit Brunnen'} widths={[500, 800]} sizes="(min-width: 768px) 30vw, 100vw" formats={['avif', 'webp']} class="h-full min-h-64 w-full object-cover" />
+      <div class="p-7 md:p-9">
+        <p class="eyebrow">{c.aboutEyebrow}</p>
+        <h2 class="mt-3 text-2xl font-semibold leading-snug md:text-3xl">{c.aboutTitle}</h2>
+        <p class="mt-4 text-ink-soft">{c.aboutText}</p>
+        <a href={L('/ueber-uns')} class="btn btn-outline mt-6">{c.aboutCta} <Icon name="arrow" size={16} /></a>
+      </div>
+    </div>
+    <div class="card relative overflow-hidden">
+      <Picture src={gate} alt={ar ? 'مدخل المسجد في Grabbestraße 3b' : 'Eingang der Moschee, Grabbestraße 3b'} widths={[500, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['avif', 'webp']} class="h-48 w-full object-cover" />
+      <div class="p-7">
+        <h2 class="text-2xl font-semibold">{c.visitTitle}</h2>
+        <p class="mt-3 flex gap-2 text-ink-soft"><Icon name="pin" size={18} class="mt-1 shrink-0 text-gold" /><span>{site.street}, {site.zip} {site.city}<br /><span class="text-sm">{ar ? site.directionsAr : site.directionsDe}</span></span></p>
+        <p class="mt-3 text-ink-soft">{c.visitText}</p>
+        <div class="mt-5 flex flex-wrap gap-2">
+          <a href={L('/besuch')} class="btn btn-outline">{c.visitCta}</a>
+          <a href={site.mapsUrl} target="_blank" rel="noopener" class="btn btn-outline">{c.route} <Icon name="external" size={16} /></a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

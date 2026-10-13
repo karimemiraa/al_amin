@@ -1,0 +1,21 @@
+{
+  "goal": 1300000,
+  "raised": 65000,
+  "donors": 0,
+  "asOf": "2026-10-13",
+  "deadline": "2027-02-01",
+  "pricePerSqm": 351,
+  "totalSqm": 3700,
+  "floors": 3,
+  "sqmPerFloor": 700,
+  "outdoorSqm": 1600,
+  "distanceToCurrentKm": 1,
+  "minutesToTransit": 3,
+  "milestones": [
+    { "date": "2026-09", "done": true, "titleDe": "Gebäude gefunden & Kaufpreis verhandelt", "titleAr": "تم العثور على المبنى والتفاوض على سعر الشراء" },
+    { "date": "2026-10", "done": true, "titleDe": "Start der Spendenkampagne", "titleAr": "انطلاق حملة التبرعات" },
+    { "date": "2027-02-01", "done": false, "titleDe": "Spendenfrist: 1,3 Mio. € gesammelt", "titleAr": "الموعد النهائي: جمع 1.3 مليون يورو" },
+    { "date": "2027", "done": false, "titleDe": "Notartermin & Übergabe", "titleAr": "موعد كاتب العدل واستلام المبنى" },
+    { "date": "2027", "done": false, "titleDe": "Eröffnung der neuen Moschee", "titleAr": "افتتاح المسجد الجديد" }
+  ]
+}

@@ -1,0 +1,159 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import DonationForm from '../components/DonationForm.astro';
+import BankTransfer from '../components/BankTransfer.astro';
+import CampaignProgress from '../components/CampaignProgress.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import Icon from '../components/Icon.astro';
+import Faq from '../components/Faq.astro';
+import Wave from '../components/Wave.astro';
+import site from '../content/settings/site.json';
+import campaign from '../content/settings/campaign.json';
+import { localizePath, formatDate, useTranslations, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+const taxInfo = site.taxOffice && site.taxNumber && site.exemptionNoticeDate;
+
+const c = ar
+  ? {
+      title: 'تبرّع الآن',
+      description: 'تبرّع لشراء مسجد محمد الأمين الجديد في هانوفر أو للمسجد عموماً أو للزكاة – بالبطاقة أو PayPal أو Apple Pay أو التحويل البنكي.',
+      eyebrow: 'التبرعات',
+      h1: 'صدقتك تبني بيتاً لله',
+      intro: 'اختر المبلغ وطريقة الدفع المناسبة لك. يصل تبرعك مباشرة إلى حساب الجمعية.',
+      progressTitle: 'مشروع شراء المسجد الجديد',
+      projectLink: 'تفاصيل المشروع',
+      trust: [
+        ['shield', 'جمعية مسجّلة منذ 1999'],
+        ['receipt', 'إيصال تبرع عند الطلب'],
+        ['card', 'دفع آمن ومشفّر عبر Stripe'],
+        ['heart', 'صدقة جارية بإذن الله'],
+      ],
+      otherEyebrow: 'طرق أخرى',
+      otherTitle: 'طرق أخرى للتبرع',
+      other: [
+        { icon: 'calendar', title: 'أمر دائم', text: `أنشئ في تطبيق البنك أمراً شهرياً إلى حساب الجمعية مع ذكر «${site.bank.reference}».` },
+        { icon: 'hands', title: 'نقداً في المسجد', text: 'عبر صناديق التبرع في المسجد أو شخصياً لدى الإدارة.' },
+        { icon: 'users', title: 'تبرعات كبيرة واستفسارات', text: 'للتبرعات الكبيرة أو أي استفسار تواصل معنا مباشرة – نتحدث معك بكل سرور.' },
+      ],
+      receiptTitle: 'إيصال التبرع (Zuwendungsbestätigung)',
+      receiptText: [
+        'نُصدر إيصالات تبرع عند الطلب. عند التبرع الإلكتروني فعّل الخيار في النموذج، وعند التحويل البنكي أرسل لنا اسمك وعنوانك عبر البريد الإلكتروني.',
+        'للتبرعات حتى 300 € يكفي غالباً كشف الحساب البنكي كإثبات لدى مصلحة الضرائب، بشرط إرفاق إثبات مبسّط من الجمعية.',
+      ],
+      receiptCta: 'طلب إيصال',
+      faq: [
+        { q: 'هل تبرعي آمن؟', a: '<p>نعم. تتم المدفوعات الإلكترونية عبر Stripe، أحد أكبر مزوّدي الدفع في العالم، باتصال مشفّر. لا نحتفظ ببيانات بطاقتك.</p>' },
+        { q: 'هل يمكنني إيقاف التبرع الشهري؟', a: '<p>نعم، في أي وقت. تواصل معنا أو استخدم الرابط في رسالة التأكيد.</p>' },
+        { q: 'هل يجوز دفع الزكاة لشراء المسجد؟', a: '<p>هذه مسألة خلافية بين العلماء، لذلك نجمع الزكاة بشكل منفصل لصالح المحتاجين. اختر «الزكاة» في النموذج إن أردت إخراج زكاتك.</p>' },
+        { q: 'لماذا تُطلب رسوم الدفع؟', a: '<p>يتقاضى مزوّد الدفع رسوماً صغيرة على كل عملية. يمكنك اختيارياً تحمّلها ليصل تبرعك كاملاً. التحويل البنكي دون رسوم.</p>' },
+      ],
+    }
+  : {
+      title: 'Jetzt spenden',
+      description: 'Spenden Sie für den Kauf der neuen Mohammad Al-Amien Moschee in Hannover, für die Moschee oder als Zakat – per Karte, PayPal, Apple Pay, Google Pay, SEPA oder Überweisung.',
+      eyebrow: 'Spenden',
+      h1: 'Ihre Spende baut ein Haus für Allah',
+      intro: 'Wählen Sie Betrag und Zahlungsweg – Ihre Spende geht direkt an das Vereinskonto.',
+      progressTitle: 'Kaufprojekt neue Moschee',
+      projectLink: 'Zum Projekt',
+      trust: [
+        ['shield', 'Eingetragener Verein seit 1999'],
+        ['receipt', 'Zuwendungsbestätigung auf Wunsch'],
+        ['card', 'Sichere, verschlüsselte Zahlung über Stripe'],
+        ['heart', 'Sadaqa Dschariya, so Allah will'],
+      ],
+      otherEyebrow: 'Weitere Wege',
+      otherTitle: 'Weitere Möglichkeiten zu spenden',
+      other: [
+        { icon: 'calendar', title: 'Dauerauftrag', text: `Richten Sie in Ihrer Banking-App einen monatlichen Dauerauftrag auf das Vereinskonto ein – Verwendungszweck „${site.bank.reference}“.` },
+        { icon: 'hands', title: 'Bar in der Moschee', text: 'Über die Spendenboxen in der Moschee oder persönlich beim Vorstand.' },
+        { icon: 'users', title: 'Großspenden & Fragen', text: 'Für größere Spenden oder Fragen sprechen Sie uns gerne direkt an – wir nehmen uns Zeit für Sie.' },
+      ],
+      receiptTitle: 'Zuwendungsbestätigung (Spendenquittung)',
+      receiptText: [
+        'Auf Wunsch stellen wir Ihnen eine Zuwendungsbestätigung aus. Bei Online-Spenden setzen Sie das Häkchen im Formular, bei Überweisungen schreiben Sie uns bitte kurz mit Name und Anschrift.',
+        'Für Spenden bis 300 € genügt dem Finanzamt in der Regel Ihr Kontoauszug zusammen mit einem vereinfachten Zuwendungsnachweis des Vereins.',
+      ],
+      receiptCta: 'Bestätigung anfordern',
+      faq: [
+        { q: 'Ist meine Spende sicher?', a: '<p>Ja. Online-Zahlungen laufen verschlüsselt über Stripe, einen der größten Zahlungsdienstleister weltweit. Ihre Kartendaten werden nicht bei uns gespeichert.</p>' },
+        { q: 'Kann ich eine monatliche Spende beenden?', a: '<p>Ja, jederzeit. Schreiben Sie uns kurz oder nutzen Sie den Link in Ihrer Bestätigungs-E-Mail.</p>' },
+        { q: 'Darf ich meine Zakat für den Moscheekauf geben?', a: '<p>Das ist unter Gelehrten umstritten. Deshalb sammeln wir Zakat getrennt für Bedürftige – wählen Sie im Formular „Zakat“, wenn Sie Ihre Zakat entrichten möchten.</p>' },
+        { q: 'Warum gibt es Zahlungsgebühren?', a: '<p>Der Zahlungsdienstleister berechnet pro Zahlung eine kleine Gebühr. Sie können sie freiwillig übernehmen, damit Ihre Spende vollständig ankommt. Überweisungen sind gebührenfrei.</p>' },
+      ],
+    };
+---
+<BaseLayout lang={lang} title={c.title} description={c.description}>
+  <section class="bg-wine-pattern relative overflow-hidden text-white">
+    <div class="container-x pb-36 pt-12 md:pb-44 md:pt-16">
+      <p class="eyebrow !text-gold-soft">{c.eyebrow}</p>
+      <h1 class="mt-3 max-w-3xl text-4xl font-semibold leading-[1.1] md:text-[3.4rem]">{c.h1}</h1>
+      <p class="mt-4 max-w-2xl text-lg text-white/80">{c.intro}</p>
+    </div>
+    <Wave class="absolute inset-x-0 bottom-0" />
+  </section>
+
+  <section class="container-x relative z-20 -mt-28 grid gap-8 md:-mt-36 lg:grid-cols-[1.15fr_0.85fr] lg:gap-10">
+    <DonationForm lang={lang} />
+
+    <aside class="space-y-6 lg:pt-0">
+      <div class="card p-6 md:p-7">
+        <h2 class="text-lg font-semibold">{c.progressTitle}</h2>
+        <CampaignProgress lang={lang} class="mt-4" />
+        <a href={L('/neue-moschee')} class="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-wine hover:underline">{c.projectLink} <Icon name="arrow" size={16} /></a>
+      </div>
+      <ul class="card divide-y divide-line">
+        {c.trust.map(([icon, text]) => (
+          <li class="flex items-center gap-3 px-6 py-4">
+            <span class="grid size-10 shrink-0 place-items-center rounded-full bg-gold-pale text-wine"><Icon name={icon as 'shield'} size={20} /></span>
+            <span class="font-medium">{text}</span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  </section>
+
+  <section id="ueberweisung" class="container-x mt-16 scroll-mt-28">
+    <BankTransfer lang={lang} />
+  </section>
+
+  <section class="container-x mt-20">
+    <SectionHeading eyebrow={c.otherEyebrow} title={c.otherTitle} />
+    <ul class="mt-8 grid gap-4 md:grid-cols-3">
+      {c.other.map((o) => (
+        <li class="card p-6">
+          <span class="grid size-12 place-items-center rounded-full bg-wine text-white"><Icon name={o.icon as 'calendar'} size={22} /></span>
+          <h3 class="mt-4 text-lg font-semibold">{o.title}</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">{o.text}</p>
+        </li>
+      ))}
+    </ul>
+    <p class="mt-4 text-[0.95rem] text-ink-soft">
+      <a href={`tel:${site.phone.replace(/\s/g, '')}`} class="font-semibold text-wine hover:underline" dir="ltr">{site.phone}</a> · <a href={`mailto:${site.email}`} class="font-semibold text-wine hover:underline">{site.email}</a>
+    </p>
+  </section>
+
+  <section class="container-x mt-20 grid gap-8 lg:grid-cols-2">
+    <div class="card p-7 md:p-9">
+      <span class="grid size-12 place-items-center rounded-full bg-gold-pale text-wine"><Icon name="receipt" size={22} /></span>
+      <h2 class="mt-4 text-2xl font-semibold">{c.receiptTitle}</h2>
+      <div class="prose-igh mt-3">
+        {c.receiptText.map((p) => <p>{p}</p>)}
+        {taxInfo && (
+          <p class="text-sm">{ar ? 'الجمعية معفاة من الضرائب لأغراض ذات نفع عام' : 'Der Verein ist wegen Förderung steuerbegünstigter Zwecke von der Körperschaftsteuer befreit'} – {site.taxOffice}, {ar ? 'الرقم الضريبي' : 'Steuernummer'} <span dir="ltr">{site.taxNumber}</span>, {ar ? 'بتاريخ' : 'Bescheid vom'} {formatDate(site.exemptionNoticeDate, lang)}.</p>
+        )}
+      </div>
+      <a href={`mailto:${site.email}?subject=${encodeURIComponent('Zuwendungsbestätigung')}`} class="btn btn-outline mt-6"><Icon name="mail" size={18} /> {c.receiptCta}</a>
+    </div>
+    <Faq items={c.faq} class="self-start" />
+  </section>
+
+  <p class="container-x mt-10 text-center text-sm text-ink-mute">
+    {t('campaign.deadline')}: {formatDate(campaign.deadline, lang)} · {site.orgName}
+  </p>
+</BaseLayout>

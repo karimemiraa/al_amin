@@ -1,0 +1,70 @@
+---
+import Logo from './Logo.astro';
+import Icon from './Icon.astro';
+import CopyButton from './CopyButton.astro';
+import site from '../content/settings/site.json';
+import { nav, localizePath, useTranslations, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const year = new Date().getFullYear();
+const L = (p: string) => localizePath(p, lang);
+---
+<footer class="bg-wine-pattern relative mt-24 text-white/80">
+  <div class="container-x grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1.2fr] lg:gap-10">
+    <div class="space-y-5">
+      <Logo lang={lang} tone="light" />
+      <p class="max-w-sm text-[0.95rem] leading-relaxed">{t('footer.about')}</p>
+      <div class="flex gap-2">
+        {site.social.telegram && <a href={site.social.telegram} class="grid size-10 place-items-center rounded-full border border-white/20 hover:border-gold-soft hover:text-gold-soft" aria-label="Telegram" rel="noopener" target="_blank"><Icon name="telegram" size={18} /></a>}
+        {site.social.youtubeUrl && <a href={site.social.youtubeUrl} class="grid size-10 place-items-center rounded-full border border-white/20 hover:border-gold-soft hover:text-gold-soft" aria-label="YouTube" rel="noopener" target="_blank"><Icon name="play" size={18} /></a>}
+        {site.social.whatsappChannel && <a href={site.social.whatsappChannel} class="grid size-10 place-items-center rounded-full border border-white/20 hover:border-gold-soft hover:text-gold-soft" aria-label="WhatsApp" rel="noopener" target="_blank"><Icon name="whatsapp" size={18} /></a>}
+        {site.social.instagram && <a href={site.social.instagram} class="grid size-10 place-items-center rounded-full border border-white/20 hover:border-gold-soft hover:text-gold-soft" aria-label="Instagram" rel="noopener" target="_blank"><Icon name="globe" size={18} /></a>}
+      </div>
+    </div>
+
+    <div>
+      <h2 class="mb-4 font-sans text-sm font-semibold uppercase tracking-[0.14em] text-gold-soft">{t('footer.visit')}</h2>
+      <address class="space-y-3 text-[0.95rem] not-italic">
+        <p class="flex gap-2.5"><Icon name="pin" size={18} class="mt-1 shrink-0 text-gold-soft" /><span>{site.street}<br />{site.zip} {site.city}</span></p>
+        <p class="flex gap-2.5"><Icon name="clock" size={18} class="mt-1 shrink-0 text-gold-soft" /><span>{t('footer.open')}</span></p>
+        <p class="flex gap-2.5"><Icon name="phone" size={18} class="mt-1 shrink-0 text-gold-soft" /><a href={`tel:${site.phone.replace(/\s/g, '')}`} class="hover:text-white" dir="ltr">{site.phone}</a></p>
+        <p class="flex gap-2.5"><Icon name="mail" size={18} class="mt-1 shrink-0 text-gold-soft" /><a href={`mailto:${site.email}`} class="hover:text-white">{site.email}</a></p>
+      </address>
+    </div>
+
+    <div>
+      <h2 class="mb-4 font-sans text-sm font-semibold uppercase tracking-[0.14em] text-gold-soft">{t('footer.links')}</h2>
+      <ul class="grid gap-2 text-[0.95rem]">
+        {nav.map((item) => <li><a href={L(item.href)} class="hover:text-white">{t(item.key)}</a></li>)}
+        <li><a href={L('/live')} class="hover:text-white">{t('nav.live')}</a></li>
+        <li><a href={L('/kontakt')} class="hover:text-white">{t('nav.contact')}</a></li>
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="mb-4 font-sans text-sm font-semibold uppercase tracking-[0.14em] text-gold-soft">{t('footer.bank')}</h2>
+      <div class="rounded-2xl border border-white/15 bg-white/[0.04] p-5 text-[0.95rem]">
+        <p class="font-semibold text-white"><bdi dir="ltr">{site.bank.accountHolder}</bdi></p>
+        <p class="mt-2 font-mono text-[0.95rem] tracking-wide text-white" dir="ltr">{site.bank.iban}</p>
+        <p class="mt-1 text-white/70" dir="ltr">BIC {site.bank.bic} · {site.bank.bankName}</p>
+        <div class="mt-4 flex flex-wrap gap-2 text-gold-soft">
+          <CopyButton value={site.bank.iban.replace(/\s+/g, '')} lang={lang} label="IBAN" />
+          <a href={L('/spenden')} class="inline-flex items-center gap-1.5 rounded-full bg-gold-soft px-3 py-1 text-sm font-semibold text-wine-ink hover:bg-white">{t('nav.donate')} <Icon name="arrow" size={14} /></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="border-t border-white/10">
+    <div class="container-x flex flex-col gap-3 py-6 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
+      <p>© {year} {site.orgName}</p>
+      <ul class="flex flex-wrap gap-x-5 gap-y-2">
+        <li><a href={L('/ueber-uns') + '#transparenz'} class="hover:text-white">{t('footer.transparency')}</a></li>
+        <li><a href={L('/impressum')} class="hover:text-white">{t('footer.imprint')}</a></li>
+        <li><a href={L('/datenschutz')} class="hover:text-white">{t('footer.privacy')}</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>

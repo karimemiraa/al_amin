@@ -1,0 +1,40 @@
+---
+/**
+ * Two-click YouTube embed: nothing is requested from YouTube/Google until the visitor clicks.
+ * Pass either `id` (a video) or `channel` (shows the channel's current live stream).
+ */
+import Icon from './Icon.astro';
+import { useTranslations, type Lang } from '../i18n/ui';
+interface Props { lang: Lang; id?: string; channel?: string; title: string; subtitle?: string; class?: string }
+const { lang, id, channel, title, subtitle, class: cls = '' } = Astro.props;
+const t = useTranslations(lang);
+const src = id
+  ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`
+  : `https://www.youtube-nocookie.com/embed/live_stream?channel=${channel}&autoplay=1`;
+const watchUrl = id ? `https://www.youtube.com/watch?v=${id}` : `https://www.youtube.com/channel/${channel}/live`;
+---
+<div class:list={['bg-wine-pattern group relative aspect-video overflow-hidden rounded-[var(--radius-card)] text-white shadow-soft', cls]} data-video data-src={src} data-title={title}>
+  <button type="button" class="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center" data-video-play>
+    <span class="grid size-16 place-items-center rounded-full bg-white/95 text-wine shadow-lift transition group-hover:scale-105 md:size-20">
+      <Icon name="play" size={30} class="translate-x-0.5" />
+    </span>
+    <span class="max-w-md font-display text-lg font-semibold leading-snug md:text-xl" dir="auto">{title}</span>
+    {subtitle && <span class="text-sm text-white/70">{subtitle}</span>}
+    <span class="text-xs text-white/60">{t('video.consent')}</span>
+  </button>
+  <a href={watchUrl} target="_blank" rel="noopener" class="absolute bottom-3 end-3 inline-flex items-center gap-1 rounded-full bg-black/25 px-3 py-1 text-xs text-white/85 hover:bg-black/40">{t('video.watchOn')} <Icon name="external" size={12} /></a>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-video]').forEach((box) => {
+    box.querySelector('[data-video-play]')?.addEventListener('click', () => {
+      const iframe = document.createElement('iframe');
+      iframe.src = box.dataset.src!;
+      iframe.title = box.dataset.title ?? 'Video';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      iframe.allowFullscreen = true;
+      iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+      iframe.className = 'absolute inset-0 h-full w-full';
+      box.replaceChildren(iframe);
+    });
+  });
+</script>

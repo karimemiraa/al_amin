@@ -1,0 +1,382 @@
+---
+import { Picture } from 'astro:assets';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import CampaignProgress from '../components/CampaignProgress.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import QuoteCard from '../components/QuoteCard.astro';
+import Ornament from '../components/Ornament.astro';
+import Wave from '../components/Wave.astro';
+import Icon from '../components/Icon.astro';
+import Faq from '../components/Faq.astro';
+import ShareButtons from '../components/ShareButtons.astro';
+import campaign from '../content/settings/campaign.json';
+import site from '../content/settings/site.json';
+import { localizePath, formatEuro, formatNumber, formatDate, useTranslations, type Lang } from '../i18n/ui';
+import building from '../assets/photos/neues-gebaeude.jpg';
+import hall from '../assets/photos/gebetsraum-2.jpg';
+import crowd from '../assets/photos/gemeinde-freitag.jpg';
+import hallway from '../assets/photos/flur.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+const pageUrl = Astro.site!.toString().replace(/\/$/, '') + L('/neue-moschee');
+const indoor = campaign.floors * campaign.sqmPerFloor;
+const pct = Math.min(100, (campaign.raised / campaign.goal) * 100);
+const tiles = 100;
+const filled = Math.round((pct / 100) * tiles);
+const sqmPerTile = campaign.totalSqm / tiles;
+const packages = [1, 2, 5, 10, 20];
+const deadline = formatDate(campaign.deadline, lang);
+
+const c = ar
+  ? {
+      title: 'المسجد الجديد – مشروع الشراء',
+      description: `ساهموا في شراء مسجد محمد الأمين الجديد في هانوفر: 3 طوابق بمساحة ${campaign.sqmPerFloor} م² لكل طابق و${formatNumber(campaign.outdoorSqm)} م² ساحة خارجية. الهدف 1.3 مليون يورو حتى ${deadline}.`,
+      eyebrow: 'مشروع الشراء',
+      h1: 'مسجد محمد الأمين الجديد',
+      intro: 'مبنى من ثلاثة طوابق مع ساحة خارجية واسعة – على بعد كيلومتر واحد فقط من مسجدنا الحالي. معاً نجعل منه بيتاً لله ومركزاً لمجتمعنا لأجيال قادمة.',
+      subnav: [['#رسالة', 'رسالة الإدارة'], ['#المبنى', 'المبنى'], ['#الأمتار', 'متر مربع'], ['#المراحل', 'المراحل'], ['#الشفافية', 'الشفافية'], ['#أسئلة', 'أسئلة شائعة']],
+      letterEyebrow: 'رسالة من الإدارة',
+      letterTitle: 'إخوتنا وأخواتنا، أصدقاءنا الأعزاء',
+      letter: [
+        'منذ عام 1999 يجمعنا مسجد محمد الأمين في الفناء الخلفي لشارع Grabbestraße. لقد كبر مجتمعنا كثيراً منذ ذلك الحين – وأصبح المكان ضيقاً: في صلاة الجمعة والعيدين وفي رمضان يصلي الناس في الممرات وفي الفناء، ولا تتوفر مساحات كافية لدروس الأطفال والشباب والأخوات.',
+        `الآن لدينا فرصة لم نكن نتوقعها: مبنى من ثلاثة طوابق بمساحة ${formatNumber(indoor)} م² وساحة خارجية بمساحة ${formatNumber(campaign.outdoorSqm)} م²، على بعد كيلومتر واحد فقط من مسجدنا الحالي وثلاث دقائق من الترام. سعر الشراء 1.3 مليون يورو، وعلينا جمع المبلغ حتى ${deadline}.`,
+        'هذا مبلغ كبير – لكنه ممكن إذا ساهم كلٌّ منا بما يستطيع. كل تبرع، صغيراً كان أو كبيراً، يُقرّبنا من الهدف ويبقى صدقة جارية بإذن الله. نسأل الله أن يتقبّل منا ومنكم.',
+      ],
+      letterSign: 'الهيئة الإدارية للجمعية الإسلامية في هانوفر',
+      buildingEyebrow: 'المبنى',
+      buildingTitle: 'مساحة لمجتمع ينمو',
+      buildingIntro: 'مبنى متين من ثلاثة طوابق على أرض واسعة – مثالي ليصبح مسجداً ومركزاً ثقافياً وتعليمياً.',
+      stats: [
+        { value: `${campaign.floors}`, unit: 'طوابق', label: `${campaign.sqmPerFloor} م² لكل طابق` },
+        { value: formatNumber(indoor), unit: 'م²', label: 'مساحة داخلية' },
+        { value: formatNumber(campaign.outdoorSqm), unit: 'م²', label: 'ساحة خارجية' },
+        { value: `${campaign.distanceToCurrentKm}`, unit: 'كم', label: 'من المسجد الحالي' },
+        { value: `${campaign.minutesToTransit}`, unit: 'دقائق', label: 'إلى الترام / المحطة' },
+      ],
+      photoNote: 'صور إضافية من الداخل ومخطط الطوابق ستُنشر قريباً.',
+      plansTitle: 'ماذا نخطط',
+      plans: [
+        ['الطابق الأرضي', 'قاعة صلاة واسعة للرجال، مدخل ووضوء، وقاعة لصلاة الجمعة والعيدين.'],
+        ['الطابق الأول', 'مصلى للنساء، قاعات دراسية لتحفيظ القرآن واللغة العربية، ومكتبة.'],
+        ['الطابق الثاني', 'مساحات للأطفال والشباب، قاعة متعددة الاستخدامات للمحاضرات واللقاءات.'],
+        ['الساحة الخارجية', 'صلاة العيد في الهواء الطلق، إفطار رمضان الجماعي، المهرجانات ومواقف السيارات.'],
+      ],
+      plansNote: 'التوزيع المذكور مقترح أولي وسيتم تحديده بالتفصيل بعد الشراء.',
+      compareTitle: 'اليوم وغداً',
+      today: 'اليوم: مسجد في فناء خلفي',
+      todayItems: ['قاعة صلاة ضيقة تمتلئ أيام الجمعة', 'لا مساحة لصلاة العيد – نضطر لاستئجار قاعات', 'لا قاعات دراسية مستقلة للأطفال والأخوات'],
+      tomorrow: 'غداً: مركز لمجتمعنا',
+      tomorrowItems: [`${formatNumber(indoor)} م² على ثلاثة طوابق`, `${formatNumber(campaign.outdoorSqm)} م² للفعاليات وصلاة العيد`, 'قاعات للتعليم والشباب والنساء والزوار'],
+      sqmEyebrow: 'صدقة جارية',
+      sqmTitle: `${formatNumber(campaign.totalSqm)} م² – ساهم بمترك المربع`,
+      sqmText: `يبلغ مجموع مساحة المبنى (${formatNumber(indoor)} م²) والساحة (${formatNumber(campaign.outdoorSqm)} م²) ${formatNumber(campaign.totalSqm)} م². عند سعر شراء 1.3 مليون يورو يعادل كل متر مربع ${campaign.pricePerSqm} €. كل مربع في الشبكة يمثّل ${formatNumber(sqmPerTile)} م² – والمربعات الملوّنة تم تأمينها بالفعل.`,
+      sqmNote: 'المتر المربع هو رمز لمساهمتك وليس حصة ملكية؛ المبنى سيكون ملكاً للجمعية ووقفاً لخدمة المجتمع.',
+      sqmUnit: 'م²',
+      secured: 'تم تأمينه',
+      open: 'متبقٍ',
+      milestonesEyebrow: 'المراحل',
+      milestonesTitle: 'الطريق إلى المسجد الجديد',
+      done: 'تم',
+      next: 'قادم',
+      trustEyebrow: 'الشفافية',
+      trustTitle: 'تبرعك في أيدٍ أمينة',
+      trust: [
+        { icon: 'shield', title: 'جمعية مسجّلة منذ 1999', text: `${site.orgName} – جمعية مستقلة وعضو في مجلس الشورى بولاية سكسونيا السفلى.` },
+        { icon: 'bank', title: 'حساب بنكي معروف', text: `جميع التبرعات تصل إلى حساب الجمعية لدى ${site.bank.bankName}.` },
+        { icon: 'receipt', title: 'إيصالات التبرع', text: 'نُصدر إيصالات تبرع (Zuwendungsbestätigung) عند الطلب.' },
+        { icon: 'calendar', title: 'تحديث منتظم', text: 'نُحدّث رصيد التبرعات أسبوعياً على الأقل، ونُبلغكم بكل خطوة.' },
+      ],
+      useTitle: 'استخدام التبرعات',
+      useText: 'تُستخدم التبرعات المخصّصة لمشروع الشراء حصرياً لشراء المبنى الجديد وتجهيزه. إذا لم تتم عملية الشراء أو تجاوزت التبرعات الحاجة، فسنستخدمها لأهداف الجمعية المنصوص عليها في نظامها الأساسي – وسنُعلن عن ذلك بشفافية.',
+      transparencyLink: 'المزيد عن الشفافية',
+      faqTitle: 'أسئلة شائعة',
+      faq: [
+        { q: 'ماذا يحدث إذا لم نصل إلى الهدف في الموعد؟', a: '<p>نحن على تواصل مستمر مع البائع وسنُبلغكم بشفافية بكل تطور. إذا لم تتم عملية الشراء، تُستخدم التبرعات لأهداف الجمعية المنصوص عليها في نظامها الأساسي – مثلاً لشراء مبنى بديل. يمكنكم التواصل معنا في أي وقت لأي استفسار.</p>' },
+        { q: 'هل أحصل على إيصال تبرع؟', a: '<p>نعم، نُصدر عند الطلب إيصال تبرع (Zuwendungsbestätigung). عند التبرع الإلكتروني اختر خيار «أرغب في الحصول على إيصال»، وعند التحويل البنكي راسلنا مع ذكر اسمك وعنوانك.</p>' },
+        { q: 'هل يجوز دفع الزكاة لشراء المسجد؟', a: '<p>مسألة صرف الزكاة في بناء المساجد مسألة خلافية بين العلماء. نجمع الزكاة بشكل منفصل لصالح المحتاجين. للاستفسار الشرعي يرجى التواصل مع إمام المسجد.</p>' },
+        { q: 'هل أشتري فعلاً متراً مربعاً؟', a: '<p>المتر المربع رمز يوضح حجم مساهمتك. المبنى سيكون ملكاً للجمعية ويخدم المجتمع كله – وأجرك صدقة جارية بإذن الله.</p>' },
+        { q: 'هل يمكنني التبرع شهرياً؟', a: '<p>نعم. في نموذج التبرع اختر «شهرياً»، أو أنشئ أمراً دائماً في حسابك البنكي. يمكن إيقاف التبرع الشهري في أي وقت.</p>' },
+        { q: 'هل يمكنني التبرع نقداً؟', a: '<p>نعم، عبر صناديق التبرع في المسجد أو شخصياً لدى الإدارة. للمبالغ الكبيرة نوصي بالتحويل البنكي ليكون التبرع موثّقاً.</p>' },
+        { q: 'كيف أتابع تقدّم المشروع؟', a: '<p>نُحدّث هذه الصفحة بانتظام وننشر الأخبار في قناتنا على تيليغرام وفي المسجد بعد صلاة الجمعة.</p>' },
+      ],
+      ctaTitle: 'كن جزءاً من هذا البيت',
+      ctaText: 'كل مساهمة لها قيمتها. وشارك المشروع مع عائلتك وأصدقائك – فالمشاركة أيضاً خير.',
+      shareText: 'ساهم معنا في شراء مسجد محمد الأمين الجديد في هانوفر – كل متر مربع صدقة جارية:',
+      bankAlt: 'أو بالتحويل البنكي',
+    }
+  : {
+      title: 'Neue Moschee – Kaufprojekt',
+      description: `Helfen Sie mit, die neue Mohammad Al-Amien Moschee in Hannover zu erwerben: 3 Etagen à ${campaign.sqmPerFloor} m² und ${formatNumber(campaign.outdoorSqm)} m² Außengelände. Ziel: 1,3 Mio. € bis ${deadline}.`,
+      eyebrow: 'Kaufprojekt',
+      h1: 'Die neue Mohammad Al-Amien Moschee',
+      intro: 'Ein dreistöckiges Gebäude mit großem Außengelände – nur einen Kilometer von unserer jetzigen Moschee entfernt. Gemeinsam machen wir daraus ein Haus Allahs und ein Zentrum für unsere Gemeinde, für Generationen.',
+      subnav: [['#brief', 'Brief des Vorstands'], ['#gebaeude', 'Das Gebäude'], ['#quadratmeter', 'Quadratmeter'], ['#meilensteine', 'Meilensteine'], ['#transparenz', 'Transparenz'], ['#fragen', 'Fragen']],
+      letterEyebrow: 'Ein Wort des Vorstands',
+      letterTitle: 'Liebe Geschwister, liebe Freunde,',
+      letter: [
+        'seit 1999 ist die Mohammad Al-Amien Moschee im Hinterhof der Grabbestraße unser gemeinsames Zuhause. Unsere Gemeinde ist seitdem stark gewachsen – und der Platz reicht längst nicht mehr: Freitags, an den Festtagen und im Ramadan beten Menschen in den Fluren und im Hof, und für Unterricht mit Kindern, Jugendlichen und Frauen fehlen eigene Räume.',
+        `Jetzt haben wir eine Chance, mit der wir kaum gerechnet hätten: ein Gebäude mit drei Etagen und ${formatNumber(indoor)} m² Fläche, dazu ${formatNumber(campaign.outdoorSqm)} m² Außengelände – nur einen Kilometer von unserer jetzigen Moschee und drei Minuten von der Stadtbahn entfernt. Der Kaufpreis beträgt 1,3 Mio. Euro, und wir müssen ihn bis zum ${deadline} aufbringen.`,
+        'Das ist viel Geld – aber es ist zu schaffen, wenn jede und jeder beiträgt, was möglich ist. Jede Spende, ob klein oder groß, bringt uns dem Ziel näher und bleibt, so Allah will, eine fortlaufende Wohltat. Möge Allah es von uns und von Ihnen annehmen.',
+      ],
+      letterSign: 'Der Vorstand des Islamischen Gemeindehauses Hannover e.V.',
+      buildingEyebrow: 'Das Gebäude',
+      buildingTitle: 'Raum für eine wachsende Gemeinde',
+      buildingIntro: 'Ein solides dreistöckiges Gebäude auf einem großzügigen Grundstück – ideal, um daraus Moschee, Kultur- und Bildungszentrum zu machen.',
+      stats: [
+        { value: `${campaign.floors}`, unit: 'Etagen', label: `je ${campaign.sqmPerFloor} m²` },
+        { value: formatNumber(indoor), unit: 'm²', label: 'Innenfläche' },
+        { value: formatNumber(campaign.outdoorSqm), unit: 'm²', label: 'Außengelände' },
+        { value: `${campaign.distanceToCurrentKm}`, unit: 'km', label: 'von der jetzigen Moschee' },
+        { value: `${campaign.minutesToTransit}`, unit: 'Min.', label: 'zur Stadtbahn / zum Bahnhof' },
+      ],
+      photoNote: 'Weitere Innenaufnahmen und Grundrisse veröffentlichen wir in Kürze.',
+      plansTitle: 'Was wir planen',
+      plans: [
+        ['Erdgeschoss', 'Großer Gebetsraum für Männer, Eingang und Waschräume, Platz für Freitags- und Festgebete.'],
+        ['1. Obergeschoss', 'Gebetsraum für Frauen, Unterrichtsräume für Koran und Arabisch, Bibliothek.'],
+        ['2. Obergeschoss', 'Räume für Kinder und Jugendliche, Mehrzwecksaal für Vorträge und Begegnungen.'],
+        ['Außengelände', 'Eid-Gebet unter freiem Himmel, gemeinsames Iftar, Gemeindefeste und Parkplätze.'],
+      ],
+      plansNote: 'Die Aufteilung ist ein erster Entwurf und wird nach dem Kauf im Detail geplant.',
+      compareTitle: 'Heute und morgen',
+      today: 'Heute: Moschee im Hinterhof',
+      todayItems: ['Enger Gebetsraum, freitags überfüllt', 'Kein Platz für das Eid-Gebet – Hallen müssen angemietet werden', 'Keine eigenen Räume für Kinder, Jugend und Frauen'],
+      tomorrow: 'Morgen: ein Zentrum für die Gemeinde',
+      tomorrowItems: [`${formatNumber(indoor)} m² auf drei Etagen`, `${formatNumber(campaign.outdoorSqm)} m² für Feste und das Eid-Gebet`, 'Räume für Bildung, Jugend, Frauen und Besucher'],
+      sqmEyebrow: 'Sadaqa Dschariya',
+      sqmTitle: `${formatNumber(campaign.totalSqm)} m² – sichern Sie Ihren Quadratmeter`,
+      sqmText: `Gebäude (${formatNumber(indoor)} m²) und Außengelände (${formatNumber(campaign.outdoorSqm)} m²) umfassen zusammen ${formatNumber(campaign.totalSqm)} m². Beim Kaufpreis von 1,3 Mio. € entspricht jeder Quadratmeter ${campaign.pricePerSqm} €. Jedes Feld im Raster steht für ${formatNumber(sqmPerTile)} m² – die gefärbten Felder sind bereits gesichert.`,
+      sqmNote: 'Der Quadratmeter ist ein Symbol für Ihren Beitrag, kein Eigentumsanteil: Das Gebäude gehört dem Verein und dient der ganzen Gemeinde.',
+      sqmUnit: 'm²',
+      secured: 'gesichert',
+      open: 'offen',
+      milestonesEyebrow: 'Meilensteine',
+      milestonesTitle: 'Der Weg zur neuen Moschee',
+      done: 'Erledigt',
+      next: 'Geplant',
+      trustEyebrow: 'Transparenz',
+      trustTitle: 'Ihre Spende in guten Händen',
+      trust: [
+        { icon: 'shield', title: 'Eingetragener Verein seit 1999', text: `${site.orgName} – unabhängig und Mitglied der Schura Niedersachsen.` },
+        { icon: 'bank', title: 'Bekanntes Vereinskonto', text: `Alle Spenden gehen direkt auf das Vereinskonto bei der ${site.bank.bankName}.` },
+        { icon: 'receipt', title: 'Zuwendungsbestätigung', text: 'Auf Wunsch stellen wir Ihnen eine Zuwendungsbestätigung aus.' },
+        { icon: 'calendar', title: 'Regelmäßige Updates', text: 'Den Spendenstand aktualisieren wir mindestens wöchentlich und berichten über jeden Schritt.' },
+      ],
+      useTitle: 'Verwendung der Spenden',
+      useText: 'Spenden für das Kaufprojekt verwenden wir ausschließlich für den Erwerb und die Herrichtung des neuen Gebäudes. Kommt der Kauf nicht zustande oder übersteigen die Spenden den Bedarf, verwenden wir sie für unsere satzungsgemäßen Zwecke – und informieren darüber offen.',
+      transparencyLink: 'Mehr zur Transparenz',
+      faqTitle: 'Häufige Fragen',
+      faq: [
+        { q: 'Was passiert, wenn das Ziel nicht rechtzeitig erreicht wird?', a: '<p>Wir stehen in engem Kontakt mit dem Verkäufer und informieren Sie transparent über jede Entwicklung. Kommt der Kauf nicht zustande, verwenden wir die Spenden für unsere satzungsgemäßen Zwecke – zum Beispiel für den Erwerb eines anderen Gebäudes. Bei Fragen können Sie uns jederzeit ansprechen.</p>' },
+        { q: 'Bekomme ich eine Zuwendungsbestätigung?', a: '<p>Ja, auf Wunsch stellen wir Ihnen eine Zuwendungsbestätigung aus. Bei Online-Spenden setzen Sie einfach das Häkchen „Ich möchte eine Zuwendungsbestätigung“. Bei Überweisungen schreiben Sie uns bitte mit Name und Anschrift.</p>' },
+        { q: 'Darf ich meine Zakat für den Moscheekauf geben?', a: '<p>Ob Zakat für den Bau oder Kauf von Moscheen verwendet werden darf, ist unter Gelehrten umstritten. Zakat sammeln wir deshalb getrennt für Bedürftige. Für eine religiöse Auskunft wenden Sie sich bitte an unseren Imam.</p>' },
+        { q: 'Kaufe ich wirklich einen Quadratmeter?', a: '<p>Der Quadratmeter macht anschaulich, was Ihre Spende bewirkt. Das Gebäude gehört dem Verein und dient der ganzen Gemeinde – Ihr Lohn ist, so Allah will, eine fortlaufende Wohltat (Sadaqa Dschariya).</p>' },
+        { q: 'Kann ich monatlich spenden?', a: '<p>Ja. Wählen Sie im Spendenformular „Monatlich“ oder richten Sie einen Dauerauftrag bei Ihrer Bank ein. Monatliche Spenden können Sie jederzeit beenden.</p>' },
+        { q: 'Kann ich bar spenden?', a: '<p>Ja, über die Spendenboxen in der Moschee oder persönlich beim Vorstand. Für größere Beträge empfehlen wir die Überweisung, damit Ihre Spende nachweisbar ist.</p>' },
+        { q: 'Wie erfahre ich, wie es weitergeht?', a: '<p>Wir aktualisieren diese Seite regelmäßig und berichten in unserem Telegram-Kanal sowie nach dem Freitagsgebet in der Moschee.</p>' },
+      ],
+      ctaTitle: 'Werden Sie Teil dieses Hauses',
+      ctaText: 'Jeder Beitrag zählt. Und teilen Sie das Projekt mit Familie und Freunden – auch das ist eine gute Tat.',
+      shareText: 'Hilf mit, die neue Mohammad Al-Amien Moschee in Hannover zu kaufen – jeder Quadratmeter ist Sadaqa Dschariya:',
+      bankAlt: 'Oder per Überweisung',
+    };
+const ids = c.subnav.map(([href]) => href.slice(1));
+---
+<BaseLayout lang={lang} title={c.title} description={c.description}>
+  <!-- HERO -->
+  <section class="relative isolate overflow-hidden bg-wine-ink text-white">
+    <Picture src={building} alt={ar ? 'المبنى الجديد المراد شراؤه' : 'Das Gebäude, das wir erwerben möchten'} widths={[640, 960, 1400, 2000, 2400]} sizes="100vw" formats={['avif', 'webp']} class="absolute inset-0 -z-10 h-full w-full object-cover" loading="eager" fetchpriority="high" />
+    <div class="absolute inset-0 -z-10 bg-gradient-to-t from-wine-ink via-wine-ink/70 to-wine-ink/20"></div>
+    <div class="container-x pb-24 pt-28 md:pb-32 md:pt-48">
+      <p class="eyebrow !text-gold-soft">{c.eyebrow}</p>
+      <h1 class="mt-3 max-w-3xl text-4xl font-semibold leading-[1.08] md:text-6xl">{c.h1}</h1>
+      <p class="mt-5 max-w-2xl text-lg text-white/85 md:text-xl">{c.intro}</p>
+      <div class="mt-10 grid gap-6 rounded-[1.5rem] border border-white/15 bg-wine-ink/55 p-6 backdrop-blur-md md:grid-cols-[1fr_auto] md:items-center md:p-8">
+        <CampaignProgress lang={lang} tone="dark" />
+        <a href={L('/spenden')} class="btn btn-light !min-h-14 !px-8 text-lg" data-cta="project-hero-donate"><Icon name="heart" size={20} class="text-wine" /> {t('campaign.cta')}</a>
+      </div>
+    </div>
+    <Wave class="absolute inset-x-0 bottom-0" />
+  </section>
+
+  <!-- SUB NAV -->
+  <nav class="sticky top-[4.5rem] z-30 border-b border-line/70 bg-paper/90 backdrop-blur md:top-20" aria-label={c.eyebrow}>
+    <div class="container-x flex gap-1 overflow-x-auto py-2 [scrollbar-width:none]">
+      {c.subnav.map(([href, label]) => (
+        <a href={href} class="whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold text-ink-soft transition hover:bg-paper-2 hover:text-wine">{label}</a>
+      ))}
+      <a href={L('/spenden')} class="ms-auto whitespace-nowrap rounded-full bg-wine px-4 py-2 text-sm font-semibold text-white hover:bg-wine-deep">{t('nav.donate')}</a>
+    </div>
+  </nav>
+
+  <!-- LETTER -->
+  <section id={ids[0]} class="container-x mt-16 md:mt-24">
+    <div class="grid gap-10 lg:grid-cols-[1.25fr_0.75fr] lg:gap-16">
+      <article class="card relative p-8 md:p-12">
+        <p class="eyebrow">{c.letterEyebrow}</p>
+        <h2 class="mt-4 text-3xl font-semibold md:text-4xl">{c.letterTitle}</h2>
+        <div class="prose-igh mt-6 text-[1.08rem] leading-[1.8]">
+          {c.letter.map((p) => <p>{p}</p>)}
+        </div>
+        <p class="mt-8 font-display text-lg italic text-wine">{c.letterSign}</p>
+      </article>
+      <div class="grid content-start gap-4">
+        <Picture src={crowd} alt={ar ? 'المصلون في صلاة الجمعة بالمسجد الحالي' : 'Freitagsgebet in der jetzigen Moschee'} widths={[500, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-[var(--radius-card)] object-cover shadow-soft" />
+        <div class="card p-6">
+          <h3 class="text-lg font-semibold">{c.compareTitle}</h3>
+          <p class="mt-4 text-sm font-semibold uppercase tracking-wider text-ink-mute">{c.today}</p>
+          <ul class="mt-2 space-y-1.5 text-[0.95rem] text-ink-soft">{c.todayItems.map((i) => <li class="flex gap-2"><span class="mt-2.5 size-1.5 shrink-0 rounded-full bg-ink-mute"></span>{i}</li>)}</ul>
+          <p class="mt-5 text-sm font-semibold uppercase tracking-wider text-wine">{c.tomorrow}</p>
+          <ul class="mt-2 space-y-1.5 text-[0.95rem]">{c.tomorrowItems.map((i) => <li class="flex gap-2"><Icon name="check" size={18} class="mt-0.5 shrink-0 text-wine" />{i}</li>)}</ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BUILDING -->
+  <section id={ids[1]} class="relative mt-24 bg-paper-2 py-20 md:py-28">
+    <Wave fill="var(--color-paper)" flip class="absolute inset-x-0 -top-px" />
+    <div class="container-x">
+      <SectionHeading eyebrow={c.buildingEyebrow} title={c.buildingTitle} intro={c.buildingIntro} />
+      <dl class="mt-10 grid grid-cols-2 gap-3 md:grid-cols-5 md:gap-4">
+        {c.stats.map((s) => (
+          <div class="card p-5 text-center">
+            <dd class="font-display text-4xl font-semibold text-wine tabular md:text-5xl"><span dir="ltr">{s.value}</span><span class="ms-1 text-lg text-ink-soft">{s.unit}</span></dd>
+            <dt class="mt-1 text-sm text-ink-soft">{s.label}</dt>
+          </div>
+        ))}
+      </dl>
+      <div class="mt-10 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <figure>
+          <Picture src={building} alt={ar ? 'واجهة المبنى الجديد' : 'Außenansicht des neuen Gebäudes'} widths={[640, 1000, 1400]} sizes="(min-width: 1024px) 55vw, 100vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-[var(--radius-card)] object-cover shadow-lift" />
+          <figcaption class="mt-3 flex items-center gap-2 text-sm text-ink-mute"><Icon name="info" size={16} />{c.photoNote}</figcaption>
+        </figure>
+        <div class="card p-7">
+          <h3 class="text-2xl font-semibold">{c.plansTitle}</h3>
+          <ol class="mt-5 space-y-5">
+            {c.plans.map(([title, text], i) => (
+              <li class="flex gap-4">
+                <span class="grid size-9 shrink-0 place-items-center rounded-full bg-wine font-display font-semibold text-white">{i + 1}</span>
+                <span><span class="block font-semibold">{title}</span><span class="text-[0.95rem] text-ink-soft">{text}</span></span>
+              </li>
+            ))}
+          </ol>
+          <p class="mt-6 text-xs text-ink-mute">{c.plansNote}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SQM GRID -->
+  <section id={ids[2]} class="container-x mt-24">
+    <div class="bg-wine-pattern overflow-hidden rounded-[2rem] px-6 py-14 text-white shadow-lift md:px-12 md:py-16">
+      <div class="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center">
+        <div>
+          <p class="eyebrow !text-gold-soft">{c.sqmEyebrow}</p>
+          <h2 class="mt-3 text-3xl font-semibold leading-tight md:text-[2.6rem]">{c.sqmTitle}</h2>
+          <p class="mt-5 text-lg text-white/80">{c.sqmText}</p>
+          <div class="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {packages.map((n) => (
+              <a href={`${L('/spenden')}?betrag=${n * campaign.pricePerSqm}#spenden-form`} class="rounded-2xl border border-white/20 bg-white/[0.06] p-4 text-center transition hover:border-gold-soft hover:bg-white/[0.12]">
+                <span class="block font-display text-2xl font-semibold">{n} {c.sqmUnit}</span>
+                <span class="block text-sm text-white/75 tabular" dir="ltr">{formatEuro(n * campaign.pricePerSqm)}</span>
+              </a>
+            ))}
+            <a href={L('/spenden')} class="grid place-items-center rounded-2xl bg-gold-soft p-4 text-center font-semibold text-wine-ink transition hover:bg-white">{ar ? 'مبلغ آخر' : 'Freier Betrag'}</a>
+          </div>
+          <p class="mt-6 text-sm text-white/60">{c.sqmNote}</p>
+        </div>
+        <div>
+          <div class="grid grid-cols-10 gap-1.5 rounded-2xl border border-white/15 bg-white/[0.04] p-4 md:gap-2 md:p-5" role="img" aria-label={`${formatNumber(Math.floor(campaign.raised / campaign.pricePerSqm))} ${c.sqmUnit} ${c.secured}, ${formatNumber(campaign.totalSqm)} ${c.sqmUnit}`}>
+            {Array.from({ length: tiles }, (_, i) => (
+              <span class:list={['aspect-square rounded-[4px]', i < filled ? 'bg-gradient-to-br from-gold-soft to-gold shadow-[0_0_10px_rgb(217_195_157/0.45)]' : 'border border-white/15 bg-white/[0.03]']}></span>
+            ))}
+          </div>
+          <div class="mt-4 flex flex-wrap justify-between gap-3 text-sm text-white/75">
+            <span class="inline-flex items-center gap-2"><span class="size-3 rounded-sm bg-gold-soft"></span><span dir="ltr">{formatNumber(Math.floor(campaign.raised / campaign.pricePerSqm))} {c.sqmUnit}</span> {c.secured}</span>
+            <span class="inline-flex items-center gap-2"><span class="size-3 rounded-sm border border-white/30"></span><span dir="ltr">{formatNumber(Math.max(0, campaign.totalSqm - Math.floor(campaign.raised / campaign.pricePerSqm)))} {c.sqmUnit}</span> {c.open}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MILESTONES -->
+  <section id={ids[3]} class="container-x mt-24">
+    <SectionHeading eyebrow={c.milestonesEyebrow} title={c.milestonesTitle} />
+    <ol class="relative mt-10 grid gap-4 md:grid-cols-5">
+      {campaign.milestones.map((m, i) => (
+        <li class:list={['card relative p-5', m.done && 'border-wine/30']}>
+          <span class:list={['grid size-10 place-items-center rounded-full font-display font-semibold', m.done ? 'bg-wine text-white' : 'border-2 border-dashed border-gold-soft text-gold']}>
+            {m.done ? <Icon name="check" size={18} /> : i + 1}
+          </span>
+          <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-ink-mute" dir="ltr">{m.date.length > 7 ? formatDate(m.date, 'de', { day: '2-digit', month: '2-digit', year: 'numeric' }) : m.date}</p>
+          <p class="mt-1 font-semibold leading-snug">{ar ? m.titleAr : m.titleDe}</p>
+          <p class:list={['mt-2 text-xs font-semibold', m.done ? 'text-sage' : 'text-ink-mute']}>{m.done ? c.done : c.next}</p>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <!-- TRANSPARENCY -->
+  <section id={ids[4]} class="container-x mt-24 grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
+    <div>
+      <SectionHeading eyebrow={c.trustEyebrow} title={c.trustTitle} />
+      <div class="card mt-8 p-7">
+        <h3 class="text-xl font-semibold">{c.useTitle}</h3>
+        <p class="mt-3 text-ink-soft">{c.useText}</p>
+        <a href={L('/ueber-uns') + '#transparenz'} class="mt-5 inline-flex items-center gap-1.5 font-semibold text-wine hover:underline">{c.transparencyLink} <Icon name="arrow" size={16} /></a>
+      </div>
+      <Picture src={hallway} alt="" widths={[500, 800]} sizes="(min-width: 1024px) 35vw, 100vw" formats={['avif', 'webp']} class="mt-6 hidden aspect-[16/9] w-full rounded-[var(--radius-card)] object-cover shadow-soft lg:block" />
+    </div>
+    <ul class="grid content-start gap-4 sm:grid-cols-2">
+      {c.trust.map((item) => (
+        <li class="card p-6">
+          <span class="grid size-12 place-items-center rounded-full bg-gold-pale text-wine"><Icon name={item.icon as 'shield'} size={22} /></span>
+          <h3 class="mt-4 text-lg font-semibold">{item.title}</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">{item.text}</p>
+        </li>
+      ))}
+      <li class="sm:col-span-2">
+        <Picture src={hall} alt={ar ? 'قاعة الصلاة الحالية' : 'Der jetzige Gebetsraum'} widths={[600, 1000]} sizes="(min-width: 1024px) 45vw, 100vw" formats={['avif', 'webp']} class="aspect-[16/7] w-full rounded-[var(--radius-card)] object-cover shadow-soft" />
+      </li>
+    </ul>
+  </section>
+
+  <!-- QUOTES -->
+  <section class="container-x mt-24">
+    <Ornament class="mb-10" />
+    <div class="mx-auto grid max-w-4xl gap-6 md:grid-cols-2">
+      <QuoteCard arabic="مَنْ بَنَى مَسْجِدًا يَبْتَغِي بِهِ وَجْهَ اللَّهِ، بَنَى اللَّهُ لَهُ مِثْلَهُ فِي الْجَنَّةِ" text={ar ? '' : '„Wer um Allahs Willen eine Moschee baut, dem baut Allah ein Haus im Paradies.“'} source={ar ? 'رواه البخاري ومسلم' : 'Bukhari & Muslim'} />
+      <QuoteCard arabic="إِذَا مَاتَ الْإِنْسَانُ انْقَطَعَ عَنْهُ عَمَلُهُ إِلَّا مِنْ ثَلَاثَةٍ: إِلَّا مِنْ صَدَقَةٍ جَارِيَةٍ، أَوْ عِلْمٍ يُنْتَفَعُ بِهِ، أَوْ وَلَدٍ صَالِحٍ يَدْعُو لَهُ" text={ar ? '' : '„Wenn der Mensch stirbt, hören seine Taten auf, außer dreierlei: einem dauerhaften Almosen, einem nützlichen Wissen und einem rechtschaffenen Kind, das für ihn Bittgebete spricht.“'} source={ar ? 'رواه مسلم' : 'Muslim'} />
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id={ids[5]} class="container-x mt-24">
+    <div class="mx-auto max-w-3xl">
+      <SectionHeading title={c.faqTitle} align="center" />
+      <Faq class="mt-10" items={c.faq} />
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="container-x mt-24">
+    <div class="card overflow-hidden md:grid md:grid-cols-[1fr_auto]">
+      <div class="p-8 md:p-12">
+        <h2 class="text-3xl font-semibold md:text-4xl">{c.ctaTitle}</h2>
+        <p class="mt-3 max-w-xl text-lg text-ink-soft">{c.ctaText}</p>
+        <div class="mt-6 flex flex-wrap items-center gap-3">
+          <a href={L('/spenden')} class="btn btn-primary !min-h-14 !px-8 text-lg" data-cta="project-bottom-donate"><Icon name="heart" size={20} /> {t('campaign.cta')}</a>
+          <a href={L('/spenden') + '#ueberweisung'} class="btn btn-outline !min-h-14">{c.bankAlt}</a>
+        </div>
+        <ShareButtons class="mt-8" lang={lang} url={pageUrl} text={c.shareText} />
+      </div>
+      <div class="bg-wine-pattern hidden w-72 md:block" aria-hidden="true"></div>
+    </div>
+  </section>
+</BaseLayout>

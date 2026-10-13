@@ -1,0 +1,8 @@
+{
+  "iqamaOffsets": { "fajr": 30, "dhuhr": 15, "asr": 15, "maghrib": 10, "isha": 10 },
+  "jumuah": [
+    { "time": "14:00", "noteDe": "Predigt auf Arabisch, simultan ins Deutsche übersetzt", "noteAr": "الخطبة باللغة العربية مع ترجمة فورية إلى الألمانية" }
+  ],
+  "noticeDe": "",
+  "noticeAr": ""
+}

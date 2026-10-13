@@ -1,0 +1,41 @@
+---
+import Icon from './Icon.astro';
+import type { Lang } from '../i18n/ui';
+interface Props { lang: Lang; url: string; text: string; tone?: 'dark' | 'light'; class?: string }
+const { lang, url, text, tone = 'dark', class: cls = '' } = Astro.props;
+const ar = lang === 'ar';
+const enc = encodeURIComponent;
+const base = tone === 'light'
+  ? 'border-white/25 text-white hover:border-gold-soft hover:text-gold-soft'
+  : 'border-line text-ink hover:border-wine hover:text-wine';
+const items = [
+  { href: `https://wa.me/?text=${enc(`${text} ${url}`)}`, icon: 'whatsapp', label: 'WhatsApp' },
+  { href: `https://t.me/share/url?url=${enc(url)}&text=${enc(text)}`, icon: 'telegram', label: 'Telegram' },
+] as const;
+---
+<div class:list={['flex flex-wrap gap-2', cls]} data-share data-url={url} data-text={text}>
+  {items.map((i) => (
+    <a href={i.href} target="_blank" rel="noopener" class:list={['inline-flex min-h-11 items-center gap-2 rounded-full border-[1.5px] px-4 text-sm font-semibold transition', base]}>
+      <Icon name={i.icon} size={18} /> {i.label}
+    </a>
+  ))}
+  <button type="button" data-share-copy data-done={ar ? 'تم نسخ الرابط' : 'Link kopiert'} class:list={['inline-flex min-h-11 items-center gap-2 rounded-full border-[1.5px] px-4 text-sm font-semibold transition', base]}>
+    <Icon name="share" size={18} /> <span>{ar ? 'نسخ الرابط' : 'Link kopieren'}</span>
+  </button>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-share]').forEach((box) => {
+    const btn = box.querySelector<HTMLButtonElement>('[data-share-copy]');
+    btn?.addEventListener('click', async () => {
+      const { url = location.href, text = document.title } = box.dataset;
+      if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+        try { await navigator.share({ url, text }); return; } catch { /* cancelled */ }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        const label = btn.querySelector('span');
+        if (label) { const prev = label.textContent; label.textContent = btn.dataset.done ?? '✓'; setTimeout(() => (label.textContent = prev), 1800); }
+      } catch { /* ignore */ }
+    });
+  });
+</script>

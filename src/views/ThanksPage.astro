@@ -1,0 +1,69 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ShareButtons from '../components/ShareButtons.astro';
+import CampaignProgress from '../components/CampaignProgress.astro';
+import Ornament from '../components/Ornament.astro';
+import Icon from '../components/Icon.astro';
+import site from '../content/settings/site.json';
+import { localizePath, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+const projectUrl = Astro.site!.toString().replace(/\/$/, '') + L('/neue-moschee');
+const adsLabel = import.meta.env.PUBLIC_GOOGLE_ADS_DONATION_LABEL;
+const adsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID;
+
+const c = ar
+  ? {
+      title: 'جزاكم الله خيراً',
+      dua: 'تَقَبَّلَ اللَّهُ مِنَّا وَمِنْكُمْ',
+      text: 'شكراً جزيلاً على تبرعك! ستصلك رسالة تأكيد عبر البريد الإلكتروني من Stripe. إذا طلبت إيصال تبرع، فسنرسله إليك في أقرب وقت.',
+      shareTitle: 'ضاعف الأجر: شارك المشروع',
+      shareText: 'تبرعت للتو لشراء مسجد محمد الأمين الجديد في هانوفر – شارك معنا، فكل متر مربع صدقة جارية:',
+      home: 'إلى الصفحة الرئيسية',
+      project: 'تابع المشروع',
+      questions: 'هل لديك سؤال حول تبرعك؟',
+    }
+  : {
+      title: 'Dschazakum Allahu khairan!',
+      dua: 'تَقَبَّلَ اللَّهُ مِنَّا وَمِنْكُمْ',
+      text: 'Herzlichen Dank für Ihre Spende! Sie erhalten in Kürze eine Bestätigung per E-Mail von Stripe. Wenn Sie eine Zuwendungsbestätigung angefordert haben, senden wir sie Ihnen zeitnah zu.',
+      shareTitle: 'Verdoppeln Sie die Wirkung: Teilen Sie das Projekt',
+      shareText: 'Ich habe gerade für die neue Mohammad Al-Amien Moschee in Hannover gespendet – mach mit, jeder Quadratmeter ist Sadaqa Dschariya:',
+      home: 'Zur Startseite',
+      project: 'Projekt verfolgen',
+      questions: 'Fragen zu Ihrer Spende?',
+    };
+---
+<BaseLayout lang={lang} title={c.title} description={c.text} noindex>
+  <section class="container-x py-16 md:py-24">
+    <div class="card mx-auto max-w-2xl p-8 text-center md:p-12">
+      <span class="mx-auto grid size-16 place-items-center rounded-full bg-wine text-white shadow-lift"><Icon name="heart" size={30} /></span>
+      <p class="arabic-verse mt-6" lang="ar">{c.dua}</p>
+      <h1 class="mt-2 text-3xl font-semibold md:text-4xl">{c.title}</h1>
+      <p class="mx-auto mt-4 max-w-lg text-lg text-ink-soft">{c.text}</p>
+      <Ornament class="my-8" />
+      <h2 class="text-xl font-semibold">{c.shareTitle}</h2>
+      <ShareButtons class="mt-5 justify-center" lang={lang} url={projectUrl} text={c.shareText} />
+      <div class="mt-10 text-start"><CampaignProgress lang={lang} /></div>
+      <div class="mt-10 flex flex-wrap justify-center gap-3">
+        <a href={L('/neue-moschee')} class="btn btn-primary">{c.project} <Icon name="arrow" size={16} /></a>
+        <a href={L('/')} class="btn btn-outline">{c.home}</a>
+      </div>
+      <p class="mt-8 text-sm text-ink-mute">{c.questions} <a href={`mailto:${site.email}`} class="text-wine underline">{site.email}</a></p>
+    </div>
+  </section>
+  {adsId && adsLabel && (
+    <script is:inline define:vars={{ sendTo: `${adsId}/${adsLabel}` }}>
+      // Google Ads conversion: only fires if the visitor consented (gtag is loaded by the consent banner).
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var tx = params.get('session_id') || undefined;
+        function fire() { if (window.gtag) window.gtag('event', 'conversion', { send_to: sendTo, transaction_id: tx }); }
+        if (window.__ighAdsLoaded) fire(); else document.addEventListener('igh:ads-ready', fire, { once: true });
+      })();
+    </script>
+  )}
+</BaseLayout>

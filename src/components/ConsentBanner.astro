@@ -1,0 +1,57 @@
+---
+/**
+ * Consent banner, rendered only when PUBLIC_GOOGLE_ADS_ID is configured.
+ * Google Consent Mode v2 "basic": the Google tag is NOT loaded at all until the visitor accepts.
+ * Accept and Reject are equally prominent on the first layer (VG Hannover, 10 A 5385/22).
+ */
+import { localizePath, type Lang } from '../i18n/ui';
+interface Props { lang: Lang; adsId: string }
+const { lang, adsId } = Astro.props;
+const text = lang === 'ar'
+  ? { title: 'الخصوصية', body: 'نستخدم أداة Google Ads لقياس فعالية إعلاناتنا (مثلاً إتمام التبرعات) فقط بعد موافقتك. يمكنك تغيير اختيارك في أي وقت عبر صفحة حماية البيانات.', accept: 'موافق', reject: 'رفض', more: 'حماية البيانات' }
+  : { title: 'Ihre Privatsphäre', body: 'Mit Ihrer Einwilligung messen wir mit Google Ads, ob unsere Anzeigen zu Spenden führen. Ohne Einwilligung wird nichts geladen. Sie können Ihre Wahl jederzeit auf der Datenschutzseite ändern.', accept: 'Akzeptieren', reject: 'Ablehnen', more: 'Datenschutz' };
+---
+<div data-consent hidden class="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-xl rounded-2xl border border-line bg-card p-5 shadow-lift md:inset-x-auto md:end-6 md:bottom-6" role="dialog" aria-live="polite" aria-label={text.title}>
+  <p class="font-display text-lg font-semibold text-ink">{text.title}</p>
+  <p class="mt-2 text-[0.95rem] text-ink-soft">{text.body} <a class="text-wine underline" href={localizePath('/datenschutz', lang)}>{text.more}</a></p>
+  <div class="mt-4 grid grid-cols-2 gap-3">
+    <button type="button" class="btn btn-outline" data-consent-choice="denied">{text.reject}</button>
+    <button type="button" class="btn btn-outline" data-consent-choice="granted">{text.accept}</button>
+  </div>
+</div>
+<script is:inline define:vars={{ adsId }}>
+  (function () {
+    var KEY = 'igh-consent-ads';
+    var banner = document.querySelector('[data-consent]');
+    function load() {
+      if (window.__ighAdsLoaded) return;
+      window.__ighAdsLoaded = true;
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function () { window.dataLayer.push(arguments); };
+      window.gtag('consent', 'default', { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied', analytics_storage: 'denied' });
+      window.gtag('js', new Date());
+      window.gtag('config', adsId);
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(adsId);
+      document.head.appendChild(s);
+      document.dispatchEvent(new Event('igh:ads-ready'));
+    }
+    var choice = null;
+    try { choice = localStorage.getItem(KEY); } catch (e) {}
+    if (choice === 'granted') load();
+    else if (choice !== 'denied' && banner) banner.hidden = false;
+    document.querySelectorAll('[data-consent-choice]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var value = btn.getAttribute('data-consent-choice');
+        try { localStorage.setItem(KEY, value); } catch (e) {}
+        if (banner) banner.hidden = true;
+        if (value === 'granted') load();
+        else if (window.__ighAdsLoaded) location.reload();
+      });
+    });
+    document.querySelectorAll('[data-consent-open]').forEach(function (el) {
+      el.addEventListener('click', function (e) { e.preventDefault(); if (banner) banner.hidden = false; });
+    });
+  })();
+</script>

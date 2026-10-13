@@ -1,0 +1,272 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import Icon from '../components/Icon.astro';
+import site from '../content/settings/site.json';
+import { jumuah } from '../lib/prayer';
+import { localizePath, pick, useTranslations, type Lang } from '../i18n/ui';
+import lecture from '../assets/photos/gemeinde-vortrag.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+
+// Approximate minute of day, only used to order lessons within a day.
+const slot: Record<string, number> = { fajr: 330, dhuhr: 780, asr: 960, maghrib: 1110, isha: 1230 };
+const minuteOf = (after: string, time?: string) => {
+  if (after !== 'time') return slot[after] ?? 0;
+  const [h, m] = (time ?? '00:00').split(':').map(Number);
+  return h * 60 + (m || 0);
+};
+
+type Lesson = {
+  id: string; timing: string; isTime: boolean; title: string; desc: string;
+  language: 'de' | 'ar' | 'de-ar'; langLabel: string; audience: string; teacher?: string; order: number; jumuah?: boolean;
+};
+
+const c = ar
+  ? {
+      title: 'البرنامج الأسبوعي والدروس',
+      description: 'الدروس الأسبوعية في مسجد محمد الأمين بهانوفر: السيرة النبوية والعقيدة والتزكية وحلقات القرآن – بالعربية والألمانية، مجاناً ودون تسجيل.',
+      eyebrow: 'العلم والتعلّم',
+      h1: 'البرنامج الأسبوعي',
+      intro: 'دروس ومجالس علم كل أسبوع – بالعربية والألمانية، في قلب حي فارينفالد.',
+      perks: [
+        { icon: 'heart', title: 'مجاناً', text: 'جميع الدروس مجانية – فالعلم حق للجميع.' },
+        { icon: 'check', title: 'دون تسجيل', text: 'تعال ببساطة في الموعد، فلا حاجة إلى تسجيل مسبق.' },
+        { icon: 'users', title: 'الجميع مرحّب بهم', text: 'للمبتدئين والمتقدمين، للمسلمين ولكل من يرغب في التعرف على الإسلام.' },
+      ],
+      timingNote: 'تُحدَّد مواعيد معظم الدروس بحسب أوقات الصلاة: «بعد العصر» مثلاً يعني مباشرة بعد صلاة العصر جماعةً في المسجد.',
+      timingLink: 'مواقيت الصلاة',
+      weekEyebrow: 'كل أسبوع',
+      weekTitle: 'الدروس من السبت إلى الجمعة',
+      filterLabel: 'تصفية حسب اللغة',
+      filterAll: 'الكل',
+      empty: 'لا توجد دروس بهذه اللغة حالياً.',
+      at: (time: string) => `الساعة ${time}`,
+      with: 'مع',
+      jumuahTitle: 'خطبة الجمعة وصلاة الجمعة',
+      jumuahLang: 'بالعربية مع ترجمة فورية',
+      audience: { men: 'للرجال', women: 'للنساء', kids: 'للأطفال', youth: 'للشباب' } as Record<string, string>,
+      liveNote: 'تُبث كثير من الدروس مباشرة عبر قناتنا على تيليغرام.',
+      liveLink: 'البث المباشر',
+      planEyebrow: 'قريباً في المبنى الجديد',
+      planTitle: 'دروس للأطفال والنساء – قيد التخطيط',
+      planText: 'مسجدنا الحالي لا يتسع لصفوف إضافية. في المبنى الجديد نخطط لتحفيظ القرآن ودروس اللغة العربية للأطفال، ولبرنامج خاص بالأخوات مع قاعات مستقلة.',
+      planCta: 'إلى مشروع المسجد الجديد',
+      contactTitle: 'هل لديك سؤال عن الدروس؟',
+      contactText: 'نجيبك بكل سرور – سواء عن المحتوى أو المستوى أو اللغة.',
+      contactCta: 'تواصل معنا',
+      telegram: 'قناة تيليغرام',
+    }
+  : {
+      title: 'Programm & Unterricht',
+      description: 'Wöchentlicher Unterricht in der Mohammad Al-Amien Moschee Hannover: Sirah, Glaubenslehre, Tazkiyah und Koranstunden – auf Deutsch und Arabisch, kostenlos und ohne Anmeldung.',
+      eyebrow: 'Lernen & Wissen',
+      h1: 'Wochenprogramm',
+      intro: 'Jede Woche Unterricht und Vorträge auf Arabisch und Deutsch – mitten in Hannover-Vahrenwald.',
+      perks: [
+        { icon: 'heart', title: 'Kostenlos', text: 'Alle Unterrichte sind kostenfrei – Wissen soll allen offenstehen.' },
+        { icon: 'check', title: 'Ohne Anmeldung', text: 'Kommen Sie einfach zur angegebenen Zeit vorbei.' },
+        { icon: 'users', title: 'Alle sind willkommen', text: 'Für Einsteiger und Fortgeschrittene, für Muslime und alle, die den Islam kennenlernen möchten.' },
+      ],
+      timingNote: 'Die meisten Unterrichte richten sich nach den Gebetszeiten: „nach Asr“ bedeutet direkt im Anschluss an das gemeinsame Asr-Gebet in der Moschee.',
+      timingLink: 'Zu den Gebetszeiten',
+      weekEyebrow: 'Jede Woche',
+      weekTitle: 'Unterricht von Samstag bis Freitag',
+      filterLabel: 'Nach Sprache filtern',
+      filterAll: 'Alle',
+      empty: 'Zurzeit gibt es keinen Unterricht in dieser Sprache.',
+      at: (time: string) => `${time} Uhr`,
+      with: 'mit',
+      jumuahTitle: 'Freitagspredigt & Freitagsgebet',
+      jumuahLang: 'Arabisch mit Simultanübersetzung',
+      audience: { men: 'Für Männer', women: 'Für Frauen', kids: 'Für Kinder', youth: 'Für Jugendliche' } as Record<string, string>,
+      liveNote: 'Viele Unterrichte werden live in unserem Telegram-Kanal übertragen.',
+      liveLink: 'Zum Livestream',
+      planEyebrow: 'Bald im neuen Gebäude',
+      planTitle: 'Unterricht für Kinder & Frauen – in Planung',
+      planText: 'In unserer jetzigen Moschee fehlt der Platz für weitere Klassen. Im neuen Gebäude planen wir Koran- und Arabischunterricht für Kinder sowie ein eigenes Programm für Frauen – mit eigenen Räumen.',
+      planCta: 'Zum Projekt Neue Moschee',
+      contactTitle: 'Fragen zum Unterricht?',
+      contactText: 'Wir helfen gern weiter – ob zu Inhalten, Niveau oder Sprache.',
+      contactCta: 'Kontakt aufnehmen',
+      telegram: 'Telegram-Kanal',
+    };
+
+const afterLabel = (after: string, time?: string) =>
+  after === 'time' ? c.at(time ?? '') : `${t('common.after')} ${t(`prayer.${after}` as 'prayer.asr')}`;
+
+const entries = await getCollection('program', (e) => e.data.active);
+const lessons = new Map<number, Lesson[]>();
+for (const e of entries) {
+  const d = e.data;
+  const list = lessons.get(d.weekday) ?? [];
+  list.push({
+    id: e.id,
+    timing: afterLabel(d.after, d.time),
+    isTime: d.after === 'time',
+    title: pick(d, 'title', lang),
+    desc: pick(d, 'desc', lang),
+    language: d.language,
+    langLabel: t(`common.lang.${d.language}` as 'common.lang.de'),
+    audience: d.audience,
+    teacher: d.teacher,
+    order: minuteOf(d.after, d.time),
+  });
+  lessons.set(d.weekday, list);
+}
+// Friday prayer belongs in the weekly rhythm.
+for (const j of jumuah) {
+  const list = lessons.get(5) ?? [];
+  const [h, m] = j.time.split(':').map(Number);
+  list.push({
+    id: `jumuah-${j.time}`, timing: c.at(j.time), isTime: true, title: c.jumuahTitle, desc: ar ? j.noteAr : j.noteDe,
+    language: 'de-ar', langLabel: c.jumuahLang, audience: 'all', order: h * 60 + m, jumuah: true,
+  });
+  lessons.set(5, list);
+}
+
+// Islamic week order: Saturday → Friday.
+const week = [6, 0, 1, 2, 3, 4, 5]
+  .map((wd) => ({ wd, name: t(`weekday.${wd}` as 'weekday.0'), items: (lessons.get(wd) ?? []).sort((a, b) => a.order - b.order) }))
+  .filter((d) => d.items.length > 0);
+const filters = [
+  { key: 'all', label: c.filterAll },
+  { key: 'de', label: t('common.lang.de') },
+  { key: 'ar', label: t('common.lang.ar') },
+];
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={lecture}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={lecture} imageAlt={ar ? 'درس في المسجد' : 'Vortrag in der Moschee'} />
+
+  <!-- INTRO -->
+  <section class="container-x relative z-20 -mt-6 md:-mt-10">
+    <ul class="grid gap-4 md:grid-cols-3">
+      {c.perks.map((p) => (
+        <li class="card flex gap-4 p-5 md:p-6">
+          <span class="grid size-11 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name={p.icon as 'heart'} size={20} /></span>
+          <span>
+            <span class="block font-display text-xl font-semibold">{p.title}</span>
+            <span class="mt-1 block text-[0.95rem] text-ink-soft">{p.text}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+    <p class="mx-auto mt-6 flex max-w-3xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[0.95rem] text-ink-soft">
+      <Icon name="clock" size={18} class="text-gold" />
+      <span>{c.timingNote}</span>
+      <a href={L('/gebetszeiten')} class="inline-flex items-center gap-1 font-semibold text-wine hover:underline">{c.timingLink} <Icon name="arrow" size={15} /></a>
+    </p>
+  </section>
+
+  <!-- WEEK -->
+  <section class="container-x mt-20 md:mt-24" data-program>
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <SectionHeading eyebrow={c.weekEyebrow} title={c.weekTitle} />
+      <div class="flex flex-col items-start gap-2">
+        <p class="text-sm font-semibold text-ink-mute" id={`program-filter-${lang}`}>{c.filterLabel}</p>
+        <div class="flex flex-wrap gap-2" role="group" aria-labelledby={`program-filter-${lang}`}>
+          {filters.map((f, i) => (
+            <button type="button" class="chip" data-filter={f.key} aria-pressed={i === 0 ? 'true' : 'false'}>{f.label}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+    <p class="sr-only" aria-live="polite" data-program-status></p>
+
+    <div class="mt-10 divide-y divide-line border-y border-line">
+      {week.map((day) => (
+        <section class="grid gap-4 py-7 md:grid-cols-[13rem_1fr] md:gap-8 md:py-9" data-day aria-labelledby={`day-${day.wd}-${lang}`}>
+          <h3 id={`day-${day.wd}-${lang}`} class="flex items-center gap-3 text-2xl font-semibold text-wine-ink md:block md:pt-3">
+            <span class="hidden size-2 rounded-full bg-gold md:mb-3 md:block"></span>
+            {day.name}
+          </h3>
+          <ul class="grid gap-4 lg:grid-cols-2">
+            {day.items.map((l) => (
+              <li class:list={['card flex flex-col p-5 md:p-6', l.jumuah && '!border-gold-soft !bg-gold-pale/70']} data-lang={l.language}>
+                <p class="flex flex-wrap items-center gap-2 text-sm">
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-wine px-3 py-1 font-semibold text-white">
+                    <Icon name={l.jumuah ? 'star' : 'clock'} size={14} />
+                    {l.isTime ? <span dir="ltr">{l.timing}</span> : l.timing}
+                  </span>
+                  <span class="pill"><Icon name="globe" size={13} /> {l.langLabel}</span>
+                  {l.audience !== 'all' && <span class="pill !bg-rose-soft"><Icon name="users" size={13} /> {c.audience[l.audience]}</span>}
+                </p>
+                <h4 class="mt-3 font-display text-xl font-semibold leading-snug text-ink" dir="auto">{l.title}</h4>
+                {l.desc && <p class="mt-1.5 text-[0.98rem] text-ink-soft">{l.desc}</p>}
+                {l.teacher && <p class="mt-3 inline-flex items-center gap-1.5 text-sm text-ink-mute"><Icon name="users" size={15} /> {c.with} <span dir="auto">{l.teacher}</span></p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+    <p class="card mt-6 hidden p-6 text-center text-ink-soft" data-program-empty>{c.empty}</p>
+
+    <p class="mt-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.95rem] text-ink-soft">
+      <Icon name="live" size={18} class="text-gold" />
+      <span>{c.liveNote}</span>
+      <a href={L('/live')} class="inline-flex items-center gap-1 font-semibold text-wine hover:underline">{c.liveLink} <Icon name="arrow" size={15} /></a>
+    </p>
+  </section>
+
+  <!-- PLANNED + CONTACT -->
+  <section class="container-x mb-24 mt-20 grid gap-6 md:mb-28 lg:grid-cols-[1.35fr_1fr]">
+    <div class="bg-wine-pattern relative overflow-hidden rounded-[2rem] p-8 text-white shadow-lift md:p-12">
+      <p class="eyebrow !text-gold-soft">{c.planEyebrow}</p>
+      <h2 class="mt-3 text-3xl font-semibold leading-tight md:text-4xl">{c.planTitle}</h2>
+      <p class="mt-4 max-w-xl text-lg text-white/80">{c.planText}</p>
+      <a href={L('/neue-moschee')} class="btn btn-light mt-7">{c.planCta} <Icon name="arrow" size={16} /></a>
+    </div>
+    <div class="card flex flex-col p-8 md:p-10">
+      <span class="grid size-12 place-items-center rounded-full border border-gold-soft text-gold"><Icon name="mail" size={22} /></span>
+      <h2 class="mt-5 text-2xl font-semibold md:text-3xl">{c.contactTitle}</h2>
+      <p class="mt-3 text-ink-soft">{c.contactText}</p>
+      <div class="mt-auto flex flex-wrap gap-2 pt-7">
+        <a href={L('/kontakt')} class="btn btn-primary">{c.contactCta} <Icon name="arrow" size={16} /></a>
+        <a href={site.social.telegram} target="_blank" rel="noopener" class="btn btn-outline"><Icon name="telegram" size={18} /> {c.telegram}</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style is:global>
+  .chip {
+    display: inline-flex; align-items: center; min-height: 2.5rem; padding: 0.45rem 1.1rem; border-radius: 999px;
+    border: 1.5px solid var(--color-line); background: var(--color-card); color: var(--color-ink-soft);
+    font-size: 0.95rem; font-weight: 600; transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+  }
+  .chip:hover { border-color: var(--color-wine); color: var(--color-wine); }
+  .chip[aria-pressed='true'] { background: var(--color-wine); border-color: var(--color-wine); color: #fff; }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-program]').forEach((root) => {
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    const days = [...root.querySelectorAll<HTMLElement>('[data-day]')];
+    const empty = root.querySelector<HTMLElement>('[data-program-empty]');
+    const status = root.querySelector<HTMLElement>('[data-program-status]');
+    const apply = (key: string) => {
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.filter === key)));
+      let shown = 0;
+      days.forEach((day) => {
+        let visible = 0;
+        day.querySelectorAll<HTMLElement>('[data-lang]').forEach((item) => {
+          const ok = key === 'all' || item.dataset.lang === key || item.dataset.lang === 'de-ar';
+          item.hidden = !ok;
+          if (ok) visible++;
+        });
+        day.hidden = visible === 0;
+        shown += visible;
+      });
+      empty?.classList.toggle('hidden', shown > 0);
+      if (status) status.textContent = buttons.find((b) => b.dataset.filter === key)?.textContent ?? '';
+    };
+    buttons.forEach((b) => b.addEventListener('click', () => apply(b.dataset.filter!)));
+  });
+</script>

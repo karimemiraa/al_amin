@@ -1,0 +1,16 @@
+---
+import Icon from './Icon.astro';
+interface Props { items: { q: string; a: string }[]; class?: string }
+const { items, class: cls = '' } = Astro.props;
+---
+<div class:list={['divide-y divide-line overflow-hidden rounded-[var(--radius-card)] border border-line bg-card', cls]}>
+  {items.map((item) => (
+    <details class="group">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 text-start font-semibold text-ink hover:bg-paper/60 [&::-webkit-details-marker]:hidden">
+        <span>{item.q}</span>
+        <span class="grid size-8 shrink-0 place-items-center rounded-full border border-line text-wine transition group-open:rotate-90"><Icon name="chevron" size={16} /></span>
+      </summary>
+      <div class="prose-igh px-6 pb-6" set:html={item.a} />
+    </details>
+  ))}
+</div>

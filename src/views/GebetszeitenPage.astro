@@ -1,0 +1,361 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import PrayerToday from '../components/PrayerToday.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import Icon from '../components/Icon.astro';
+import prayerSettings from '../content/settings/prayer.json';
+import { berlinToday, getMonth, publishedYears, jumuah, iqamaOffsets, PRAYERS, isoDate } from '../lib/prayer';
+import { localizePath, intlLocale, useTranslations, type Lang } from '../i18n/ui';
+import hall from '../assets/photos/gebetsraum-2.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const L = (p: string) => localizePath(p, lang);
+const ar = lang === 'ar';
+
+// Every month of the published years plus the following (provisional) year.
+const lastYear = publishedYears.at(-1)! + 1;
+const years = [...publishedYears, lastYear];
+const [ty, tm, td] = berlinToday();
+const todayIso = isoDate(ty, tm, td);
+const currentKey = `${ty}-${String(tm).padStart(2, '0')}`;
+
+const monthFmt = new Intl.DateTimeFormat(intlLocale(lang), { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const monthOnlyFmt = new Intl.DateTimeFormat(intlLocale(lang), { month: 'long', timeZone: 'UTC' });
+const wdFmt = new Intl.DateTimeFormat(intlLocale(lang), { weekday: 'short', timeZone: 'UTC' });
+
+const months = years.flatMap((y) =>
+  Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    const days = getMonth(y, m);
+    const first = new Date(Date.UTC(y, i, 1));
+    return {
+      key: `${y}-${String(m).padStart(2, '0')}`,
+      year: y,
+      label: monthFmt.format(first),
+      short: monthOnlyFmt.format(first),
+      provisional: days.some((d) => d.provisional),
+      days: days.map((d) => {
+        const date = new Date(d.date + 'T00:00:00Z');
+        return { iso: d.date, day: date.getUTCDate(), wd: wdFmt.format(date), fri: date.getUTCDay() === 5, times: d.times };
+      }),
+    };
+  }),
+);
+const initialKey = months.some((m) => m.key === currentKey) ? currentKey : months.at(-1)!.key;
+
+// Official PDFs that are actually present in public/downloads.
+const pdfs = years
+  .map((y) => ({ year: y, href: `/downloads/gebetskalender-${y}.pdf` }))
+  .filter((p) => fs.existsSync(path.join(process.cwd(), 'public', p.href)));
+
+const cols = PRAYERS;
+const prayerLabel = (p: string) => t(`prayer.${p}` as 'prayer.fajr');
+const offsets = iqamaOffsets as Record<string, number>;
+const notice = ar ? prayerSettings.noticeAr : prayerSettings.noticeDe;
+
+const c = ar
+  ? {
+      title: 'مواقيت الصلاة في هانوفر',
+      description: 'مواقيت الصلاة اليومية والشهرية لمسجد محمد الأمين في هانوفر: الفجر والظهر والعصر والمغرب والعشاء، مواعيد الإقامة وصلاة الجمعة، مع تحميل التقويم السنوي بصيغة PDF.',
+      eyebrow: 'مسجد محمد الأمين',
+      h1: 'مواقيت الصلاة',
+      intro: 'مواقيت اليوم والجدول الشهري الكامل لمدينة هانوفر – وفق تقويم الصلاة السنوي الخاص بمسجدنا.',
+      toMonth: 'الجدول الشهري',
+      infoTitle: 'صلاة الجمعة والإقامة',
+      jumuahLabel: 'صلاة الجمعة',
+      translation: 'الترجمة الفورية للخطبة',
+      translationText: 'تُترجم خطبة الجمعة مباشرة إلى الألمانية – استمع إليها عبر هاتفك وسماعات الأذن.',
+      translationLink: 'معلومات الزيارة',
+      iqamaTitle: 'متى تُقام الصلاة؟',
+      iqamaText: 'الأوقات في الجدول هي أوقات الأذان. تُقام صلاة الجماعة بعد الأذان بالمدة التالية:',
+      minutes: (n: number) => `بعد ${n === 1 ? 'دقيقة واحدة' : n === 2 ? 'دقيقتين' : n <= 10 ? `${n} دقائق` : `${n} دقيقة`}`,
+      sourceTitle: 'مصدر المواقيت',
+      sourceText: 'تستند جميع المواقيت إلى تقويم الصلاة السنوي الذي يصدره مسجدنا لمدينة هانوفر، وهو المرجع المعتمد لصلاة الجماعة في المسجد.',
+      monthEyebrow: 'التقويم',
+      monthTitle: 'الجدول الشهري',
+      monthIntro: 'أوقات الأذان لكل يوم من أيام الشهر. يوم الجمعة مميَّز بلون خفيف، واليوم الحالي مظلَّل.',
+      prev: 'الشهر السابق',
+      next: 'الشهر التالي',
+      current: 'الشهر الحالي',
+      choose: 'اختر الشهر',
+      date: 'التاريخ',
+      legendToday: 'اليوم',
+      legendFriday: 'الجمعة',
+      pdfTitle: 'التقويم الرسمي للتحميل',
+      pdfText: 'التقويم السنوي للمسجد بصيغة PDF – للطباعة أو للحفظ على الهاتف.',
+      pdfLabel: (y: number) => `تقويم الصلاة ${y}`,
+      scrollHint: 'اسحب الجدول أفقياً لرؤية جميع الأوقات',
+    }
+  : {
+      title: 'Gebetszeiten Hannover',
+      description: 'Aktuelle Gebetszeiten der Mohammad Al-Amien Moschee in Hannover: Fadschr, Dhuhr, Asr, Maghrib und Ischa, Iqama und Freitagsgebet, Monatsübersicht und offizieller Gebetskalender als PDF.',
+      eyebrow: 'Mohammad Al-Amien Moschee',
+      h1: 'Gebetszeiten',
+      intro: 'Die Zeiten für heute und die vollständige Monatsübersicht für Hannover – nach dem eigenen Jahres-Gebetskalender unserer Moschee.',
+      toMonth: 'Zur Monatsübersicht',
+      infoTitle: 'Freitagsgebet & Iqama',
+      jumuahLabel: 'Freitagsgebet',
+      translation: 'Simultanübersetzung der Predigt',
+      translationText: 'Die Freitagspredigt wird live ins Deutsche übersetzt – zum Mithören mit Smartphone und Kopfhörern.',
+      translationLink: 'Infos für Ihren Besuch',
+      iqamaTitle: 'Wann beginnt das Gemeinschaftsgebet?',
+      iqamaText: 'Die Tabellen zeigen die Zeiten des Adhan (Gebetsruf). Das Gemeinschaftsgebet (Iqama) beginnt jeweils so viele Minuten später:',
+      minutes: (n: number) => `+ ${n} Min.`,
+      sourceTitle: 'Quelle der Zeiten',
+      sourceText: 'Alle Zeiten stammen aus dem jährlichen Gebetskalender, den unsere Moschee für Hannover herausgibt. Er ist maßgeblich für das Gemeinschaftsgebet in der Moschee.',
+      monthEyebrow: 'Kalender',
+      monthTitle: 'Monatsübersicht',
+      monthIntro: 'Die Adhan-Zeiten für jeden Tag des Monats. Freitage sind dezent hervorgehoben, der heutige Tag ist markiert.',
+      prev: 'Vorheriger Monat',
+      next: 'Nächster Monat',
+      current: 'Aktueller Monat',
+      choose: 'Monat wählen',
+      date: 'Datum',
+      legendToday: 'Heute',
+      legendFriday: 'Freitag',
+      pdfTitle: 'Offizieller Gebetskalender',
+      pdfText: 'Der Jahreskalender der Moschee als PDF – zum Ausdrucken oder Speichern auf dem Handy.',
+      pdfLabel: (y: number) => `Gebetskalender ${y}`,
+      scrollHint: 'Tabelle seitlich wischen, um alle Zeiten zu sehen',
+    };
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: c.title,
+    description: c.description,
+    inLanguage: ar ? 'ar' : 'de',
+  },
+];
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={hall} schema={schema}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={hall} imageAlt={ar ? 'قاعة الصلاة في مسجد محمد الأمين' : 'Gebetsraum der Mohammad Al-Amien Moschee'}>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a href="#monatsuebersicht" class="btn btn-light"><Icon name="calendar" size={18} class="text-wine" /> {c.toMonth}</a>
+      {pdfs.at(-1) && (
+        <a href={pdfs.at(-1)!.href} class="btn btn-ghost-light" download><Icon name="download" size={18} /> <span>{c.pdfLabel(pdfs.at(-1)!.year)} <span class="text-white/70">(PDF)</span></span></a>
+      )}
+    </div>
+  </PageHero>
+
+  <!-- TODAY + INFO -->
+  <section class="container-x relative z-20 -mt-6 grid gap-8 md:-mt-10 lg:grid-cols-[26rem_1fr] lg:gap-10">
+    <div class="lg:self-start"><PrayerToday lang={lang} /></div>
+
+    <div class="card p-6 md:p-8">
+      <h2 class="text-2xl font-semibold md:text-3xl">{c.infoTitle}</h2>
+
+      {notice && (
+        <p class="mt-5 flex gap-3 rounded-xl border border-rose/30 bg-rose-soft px-4 py-3 text-wine-ink">
+          <Icon name="info" size={20} class="mt-0.5 shrink-0" /><span>{notice}</span>
+        </p>
+      )}
+
+      <ul class="mt-5 space-y-3">
+        {jumuah.map((j) => (
+          <li class="grid grid-cols-[auto_1fr_auto] items-center gap-x-4 gap-y-2 rounded-2xl bg-gold-pale px-5 py-4 sm:gap-x-5">
+            <span class="grid size-11 shrink-0 place-items-center rounded-full bg-wine text-white"><Icon name="star" size={20} /></span>
+            <span class="text-sm font-semibold uppercase tracking-wider text-wine-ink/80 rtl:text-base rtl:normal-case rtl:tracking-normal">{c.jumuahLabel}</span>
+            <span class="font-display text-3xl font-semibold leading-none text-wine tabular" dir="ltr">{j.time}</span>
+            <span class="col-span-3 text-ink-soft sm:col-span-2 sm:col-start-2 sm:-mt-1">{ar ? j.noteAr : j.noteDe}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div class="mt-6 grid gap-6 md:grid-cols-2">
+        <div>
+          <h3 class="flex items-center gap-2 font-sans text-base font-semibold text-ink"><Icon name="clock" size={18} class="text-gold" /> {c.iqamaTitle}</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">{c.iqamaText}</p>
+          <dl class="mt-3 divide-y divide-line/70 rounded-xl border border-line text-[0.95rem]">
+            {Object.entries(offsets).map(([p, n]) => (
+              <div class="flex items-center justify-between gap-3 px-4 py-2">
+                <dt class="text-ink-soft">{prayerLabel(p)}</dt>
+                <dd class="font-semibold tabular">{c.minutes(n)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div class="space-y-5">
+          <div>
+            <h3 class="flex items-center gap-2 font-sans text-base font-semibold text-ink"><Icon name="globe" size={18} class="text-gold" /> {c.translation}</h3>
+            <p class="mt-2 text-[0.95rem] text-ink-soft">{c.translationText}</p>
+            <a href={L('/besuch')} class="mt-2 inline-flex items-center gap-1.5 text-[0.95rem] font-semibold text-wine hover:underline">{c.translationLink} <Icon name="arrow" size={16} /></a>
+          </div>
+          <div>
+            <h3 class="flex items-center gap-2 font-sans text-base font-semibold text-ink"><Icon name="book" size={18} class="text-gold" /> {c.sourceTitle}</h3>
+            <p class="mt-2 text-[0.95rem] text-ink-soft">{c.sourceText}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONTH TABLE -->
+  <section id="monatsuebersicht" class="container-x mt-20 md:mt-24" data-pt-months data-initial={initialKey}>
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <SectionHeading eyebrow={c.monthEyebrow} title={c.monthTitle} intro={c.monthIntro} />
+      <ul class="flex items-center gap-4 text-sm text-ink-soft" aria-hidden="true">
+        <li class="inline-flex items-center gap-2"><span class="size-3.5 rounded border border-rose/40 bg-rose-soft"></span>{c.legendToday}</li>
+        <li class="inline-flex items-center gap-2"><span class="size-3.5 rounded border border-gold-soft bg-gold-pale"></span>{c.legendFriday}</li>
+      </ul>
+    </div>
+
+    <div class="card mt-8 overflow-hidden">
+      <div class="flex flex-wrap items-center gap-3 border-b border-line bg-paper-2/60 px-4 py-3 md:px-6">
+        <button type="button" class="pt-nav" data-pt-prev aria-label={c.prev} title={c.prev}><Icon name="chevron" size={18} class="rotate-180" /></button>
+        <label class="sr-only" for={`pt-select-${lang}`}>{c.choose}</label>
+        <select id={`pt-select-${lang}`} class="pt-select min-w-0 flex-1 sm:flex-none" data-pt-select>
+          {years.map((y) => (
+            <optgroup label={String(y)}>
+              {months.filter((m) => m.year === y).map((m) => (
+                <option value={m.key} selected={m.key === initialKey}>{m.label}{m.provisional ? ' *' : ''}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <button type="button" class="pt-nav" data-pt-next aria-label={c.next} title={c.next}><Icon name="chevron" size={18} /></button>
+        <button type="button" class="ms-auto hidden rounded-full px-3 py-1.5 text-sm font-semibold text-wine hover:bg-rose-soft sm:inline-flex" data-pt-current>{c.current}</button>
+        <p class="sr-only" aria-live="polite" data-pt-status></p>
+      </div>
+
+      {months.map((m) => (
+        <div data-month={m.key} hidden={m.key !== initialKey}>
+          {m.provisional && (
+            <p class="flex gap-2 border-b border-line bg-rose-soft/60 px-4 py-2.5 text-sm text-wine-ink md:px-6"><Icon name="info" size={18} class="mt-0.5 shrink-0" /><span>{t('prayer.provisional')}</span></p>
+          )}
+          <div class="pt-scroll overflow-x-auto" tabindex="0" role="region" aria-label={`${c.monthTitle}: ${m.label}`}>
+            <table class="pt-table">
+              <caption class="sr-only">{c.monthTitle}: {m.label}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">{c.date}</th>
+                  {cols.map((p) => <th scope="col">{p === 'sunrise' && !ar ? <Fragment set:html="Sonnen&shy;aufgang" /> : prayerLabel(p)}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {m.days.map((d) => (
+                  <tr data-date={d.iso} class={d.fri ? 'is-fri' : undefined} aria-current={d.iso === todayIso ? 'date' : undefined}>
+                    <th scope="row"><span>{d.wd}</span> <b>{d.day}</b></th>
+                    {cols.map((p) => <td class={p === 'sunrise' ? 'is-sun' : undefined}>{d.times[p]}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+    <p class="mt-3 text-center text-sm text-ink-mute md:hidden">{c.scrollHint}</p>
+
+    {pdfs.length > 0 && (
+      <div class="mt-10 flex flex-col gap-5 rounded-[var(--radius-card)] border border-gold-soft/70 bg-gold-pale/60 p-6 sm:flex-row sm:items-center md:p-8">
+        <span class="grid size-14 shrink-0 place-items-center rounded-full bg-card text-wine shadow-soft"><Icon name="download" size={24} /></span>
+        <div class="flex-1">
+          <h3 class="text-xl font-semibold">{c.pdfTitle}</h3>
+          <p class="mt-1 text-ink-soft">{c.pdfText}</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {pdfs.map((p) => (
+            <a href={p.href} class="btn btn-primary" download><Icon name="download" size={18} /> {c.pdfLabel(p.year)} <span class="font-normal opacity-80">PDF</span></a>
+          ))}
+        </div>
+      </div>
+    )}
+  </section>
+
+  <div class="h-20 md:h-28"></div>
+</BaseLayout>
+
+<style is:global>
+  .pt-nav {
+    display: inline-grid; place-items: center; width: 2.5rem; height: 2.5rem; flex-shrink: 0;
+    border-radius: 999px; border: 1.5px solid var(--color-line); background: var(--color-card); color: var(--color-wine);
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+  .pt-nav:hover:not(:disabled) { border-color: var(--color-wine); }
+  .pt-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+  .pt-select {
+    height: 2.5rem; padding-inline: 1rem 2.25rem; border-radius: 999px; border: 1.5px solid var(--color-line);
+    background-color: var(--color-card); font-weight: 600; color: var(--color-ink); appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238e2c3f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0.85rem center;
+  }
+  [dir='rtl'] .pt-select { padding-inline: 1rem 2.25rem; background-position: left 0.85rem center; }
+
+  .pt-table { width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; font-size: 0.95rem; }
+  .pt-table th, .pt-table td { padding: 0.5rem 0.75rem; text-align: center; white-space: nowrap; background: var(--color-card); }
+  .pt-table thead th {
+    position: sticky; top: 0; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--color-ink-mute); background: var(--color-card); border-bottom: 1px solid var(--color-line);
+    white-space: normal; hyphens: manual; line-height: 1.25; vertical-align: bottom; padding-block: 0.75rem;
+  }
+  html[lang='ar'] .pt-table thead th { text-transform: none; letter-spacing: 0; font-size: 0.85rem; }
+  .pt-table th:first-child { position: sticky; inset-inline-start: 0; z-index: 1; text-align: start; padding-inline-start: 1.25rem; border-inline-end: 1px solid var(--color-line); }
+  .pt-table thead th:first-child { z-index: 2; }
+  .pt-table tbody th { font-weight: 500; color: var(--color-ink-soft); }
+  .pt-table tbody th span { display: inline-block; min-width: 2.4em; color: var(--color-ink-mute); font-size: 0.85em; }
+  .pt-table tbody th b { font-weight: 650; color: var(--color-ink); }
+  .pt-table tbody td { color: var(--color-ink); }
+  .pt-table tbody td.is-sun { color: var(--color-ink-mute); }
+  .pt-table tbody tr + tr > * { border-top: 1px solid rgb(221 208 191 / 0.55); }
+  .pt-table tbody tr.is-fri > * { background: var(--color-gold-pale); }
+  .pt-table tbody tr.is-fri th span { color: var(--color-wine-ink); font-weight: 600; }
+  .pt-table tbody tr[aria-current='date'] > * { background: var(--color-rose-soft); font-weight: 650; }
+  .pt-table tbody tr[aria-current='date'] > th { box-shadow: inset 3px 0 0 var(--color-wine); color: var(--color-wine-ink); }
+  [dir='rtl'] .pt-table tbody tr[aria-current='date'] > th { box-shadow: inset -3px 0 0 var(--color-wine); }
+  .pt-scroll:focus-visible { outline-offset: -3px; }
+  @media (max-width: 639px) {
+    .pt-table { font-size: 0.8125rem; }
+    .pt-table th, .pt-table td { padding: 0.45rem 0.22rem; }
+    .pt-table th:first-child { padding-inline: 0.6rem 0.35rem; }
+    .pt-table thead th { font-size: 0.6rem; letter-spacing: 0.01em; }
+    html[lang='ar'] .pt-table thead th { font-size: 0.75rem; }
+    .pt-table tbody th span { min-width: 0; }
+  }
+</style>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-pt-months]');
+  if (root) {
+    const panels = [...root.querySelectorAll<HTMLElement>('[data-month]')];
+    const keys = panels.map((p) => p.dataset.month!);
+    const select = root.querySelector<HTMLSelectElement>('[data-pt-select]')!;
+    const prev = root.querySelector<HTMLButtonElement>('[data-pt-prev]')!;
+    const next = root.querySelector<HTMLButtonElement>('[data-pt-next]')!;
+    const current = root.querySelector<HTMLButtonElement>('[data-pt-current]');
+    const status = root.querySelector<HTMLElement>('[data-pt-status]')!;
+
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const todayKey = today.slice(0, 7);
+
+    // Mark today's row based on the visitor's clock (the HTML may have been built earlier).
+    root.querySelectorAll('tr[aria-current]').forEach((tr) => tr.removeAttribute('aria-current'));
+    root.querySelector(`tr[data-date="${today}"]`)?.setAttribute('aria-current', 'date');
+
+    let index = keys.indexOf(todayKey);
+    if (index < 0) index = todayKey < keys[0] ? 0 : keys.length - 1;
+    const homeIndex = index;
+
+    const show = (i: number, announce = false) => {
+      index = Math.max(0, Math.min(keys.length - 1, i));
+      panels.forEach((p, n) => (p.hidden = n !== index));
+      select.value = keys[index];
+      prev.disabled = index === 0;
+      next.disabled = index === keys.length - 1;
+      if (current) current.hidden = index === homeIndex;
+      if (announce) status.textContent = select.selectedOptions[0]?.textContent?.replace(' *', '') ?? '';
+    };
+
+    prev.addEventListener('click', () => show(index - 1, true));
+    next.addEventListener('click', () => show(index + 1, true));
+    current?.addEventListener('click', () => show(homeIndex, true));
+    select.addEventListener('change', () => show(keys.indexOf(select.value), true));
+    show(index);
+  }
+</script>

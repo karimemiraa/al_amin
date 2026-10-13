@@ -1,0 +1,19 @@
+---
+import { Picture } from 'astro:assets';
+import Wave from './Wave.astro';
+interface Props { eyebrow?: string; title: string; intro?: string; image?: ImageMetadata; imageAlt?: string }
+const { eyebrow, title, intro, image, imageAlt = '' } = Astro.props;
+---
+<section class="bg-wine-pattern relative overflow-hidden text-white">
+  {image && (
+    <Picture src={image} alt={imageAlt} widths={[640, 1024, 1600, 2000]} sizes="100vw" formats={['avif', 'webp']} class="absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-luminosity" loading="eager" fetchpriority="high" />
+  )}
+  <div class="absolute inset-0 bg-gradient-to-b from-wine-ink/30 via-transparent to-wine-ink/40"></div>
+  <div class="container-x relative pb-20 pt-14 md:pb-28 md:pt-20">
+    {eyebrow && <p class="eyebrow !text-gold-soft">{eyebrow}</p>}
+    <h1 class="mt-3 max-w-3xl text-4xl font-semibold leading-[1.1] md:text-6xl" set:html={title} />
+    {intro && <p class="mt-5 max-w-2xl text-lg leading-relaxed text-white/85 md:text-xl">{intro}</p>}
+    <slot />
+  </div>
+  <Wave class="absolute inset-x-0 bottom-0" />
+</section>

@@ -1,0 +1,98 @@
+# Caddy configuration for www.igh-hannover.de
+#
+# Caddy obtains and renews Let's Encrypt certificates automatically for every
+# hostname below, as soon as DNS points at this server and ports 80/443 are open.
+# Certificates are stored in the `caddy_data` volume (see docker-compose.yml).
+#
+# Check syntax after editing:
+#   docker compose -f deploy/docker-compose.yml exec caddy caddy validate --config /etc/caddy/Caddyfile
+# Apply changes without downtime:
+#   docker compose -f deploy/docker-compose.yml exec caddy caddy reload --config /etc/caddy/Caddyfile
+{
+	# Optional: e-mail for Let's Encrypt expiry notices.
+	# email it@igh-hannover.de
+}
+
+(security_headers) {
+	header {
+		# No includeSubDomains: other subdomains (mail, etc.) may not serve HTTPS.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()"
+		-Server
+	}
+}
+
+# Main site ------------------------------------------------------------------
+www.igh-hannover.de {
+	import security_headers
+	encode zstd gzip
+
+	# Content-Security-Policy for the public site.
+	# - 'unsafe-inline' scripts/styles: Astro inlines small scripts and styles.
+	# - plausible.io: optional cookieless analytics (PUBLIC_PLAUSIBLE_*). If you
+	#   self-host Plausible, add that host to script-src and connect-src.
+	# - Google hosts: optional Google Ads conversion tracking (PUBLIC_GOOGLE_ADS_*),
+	#   loaded only after consent.
+	# - i.ytimg.com: YouTube thumbnails in the Mediathek.
+	# - checkout.stripe.com in form-action: donation form redirects to Stripe Checkout.
+	# The CMS under /admin loads its code from unpkg.com and talks to the GitHub
+	# API, so it is excluded from this policy (it has no user-generated content).
+	@site not path /admin /admin/*
+	header @site Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://plausible.io https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com https://www.googletagmanager.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.de; font-src 'self' data:; connect-src 'self' https://plausible.io https://www.google.com https://www.googleadservices.com https://googleads.g.doubleclick.net; frame-src https://www.youtube-nocookie.com https://www.youtube.com https://td.doubleclick.net; form-action 'self' https://checkout.stripe.com; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; upgrade-insecure-requests"
+
+	@admin path /admin /admin/*
+	header @admin {
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex, nofollow"
+		Cache-Control "no-cache"
+	}
+
+	# Fingerprinted build assets never change -> cache for one year.
+	header /_astro/* Cache-Control "public, max-age=31536000, immutable"
+
+	# `route` keeps the redirects in exactly this order.
+	route {
+		# Legacy URLs of the old WordPress site (301). Old /wp-content/* files
+		# (e.g. prayer-table PDFs) are intentionally left to return 404.
+		redir /uberuns /ueber-uns permanent
+		redir /uberuns/ /ueber-uns permanent
+		redir /kontakt/ /kontakt permanent
+		redir /spendenkonto /spenden permanent
+		redir /spendenkonto/ /spenden permanent
+		redir /spenden/ /spenden permanent
+		redir /gebetskalendar /gebetszeiten permanent
+		redir /gebetskalendar/ /gebetszeiten permanent
+		redir /monatliche-gebetstabelle /gebetszeiten permanent
+		redir /monatliche-gebetstabelle/ /gebetszeiten permanent
+		redir /artikeln /aktuelles permanent
+		redir /artikeln/ /aktuelles permanent
+		redir /impressum.html /impressum permanent
+		redir /impressum/ /impressum permanent
+		redir /simultanuebersetzung /besuch permanent
+		redir /simultanuebersetzung/ /besuch permanent
+		redir /datenschutzerklaerung /datenschutz permanent
+		redir /datenschutzerklaerung/ /datenschutz permanent
+
+		# The site uses trailingSlash: 'never' -> strip any other trailing slash
+		# (GET/HEAD only, so API POSTs are never redirected). Query is kept.
+		@trailingSlash {
+			method GET HEAD
+			path_regexp trailing ^(.+)/$
+		}
+		redir @trailingSlash {re.trailing.1}{?query} permanent
+
+		reverse_proxy web:4321
+	}
+}
+
+# Bare domain -> www ------------------------------------------------------------
+igh-hannover.de {
+	redir https://www.igh-hannover.de{uri} permanent
+}
+
+# Donation shortcut (flyers, QR codes) -> donation page, keeping UTM parameters
+spende.igh-hannover.de {
+	redir https://www.igh-hannover.de/spenden{?query} permanent
+}

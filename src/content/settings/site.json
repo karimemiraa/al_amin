@@ -1,0 +1,35 @@
+{
+  "orgName": "Islamisches Gemeindehaus Hannover e.V.",
+  "mosqueName": "Mohammad Al-Amien Moschee",
+  "mosqueNameAr": "مسجد محمد الأمين",
+  "street": "Grabbestraße 3b",
+  "zip": "30165",
+  "city": "Hannover",
+  "directionsDe": "Die Moschee liegt im Hinterhof von Grabbestraße 3b. Stadtbahn-Haltestelle Vahrenwalder Platz (Linien 1, 2 und 8), Bus 131.",
+  "directionsAr": "يقع المسجد في الفناء الخلفي للعنوان Grabbestraße 3b. محطة الترام Vahrenwalder Platz (الخطوط 1 و2 و8) والحافلة 131.",
+  "phone": "+49 173 7307516",
+  "phoneContactName": "Mohamad Kobbani (Abu Elias)",
+  "email": "kontakt@igh-hannover.de",
+  "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Grabbestra%C3%9Fe+3b+30165+Hannover",
+  "founded": 1999,
+  "representatives": ["Mohammad Kobbani"],
+  "registerCourt": "Amtsgericht Hannover",
+  "registerNumber": "",
+  "taxOffice": "",
+  "taxNumber": "",
+  "exemptionNoticeDate": "",
+  "bank": {
+    "accountHolder": "Islamisches Gemeindehaus Hannover e.V.",
+    "iban": "DE43 2505 0000 0152 0613 70",
+    "bic": "NOLADE2HXXX",
+    "bankName": "Sparkasse Hannover",
+    "reference": "Spende Moscheekauf"
+  },
+  "social": {
+    "telegram": "https://t.me/Masjid_Mohammad_Al_Amien",
+    "youtubeChannelId": "",
+    "youtubeUrl": "",
+    "whatsappChannel": "",
+    "instagram": ""
+  }
+}

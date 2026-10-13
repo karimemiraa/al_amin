@@ -1,0 +1,80 @@
+---
+import Icon from './Icon.astro';
+import CopyButton from './CopyButton.astro';
+import site from '../content/settings/site.json';
+import { giroCodeSvg } from '../lib/girocode';
+import { useTranslations, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang; reference?: string; class?: string }
+const { lang, reference = site.bank.reference, class: cls = '' } = Astro.props;
+const t = useTranslations(lang);
+const amounts = [0, 50, 100, 351];
+const codes = await Promise.all(amounts.map((a) => giroCodeSvg(a || undefined, reference)));
+const ar = lang === 'ar';
+const L = {
+  title: ar ? 'تحويل بنكي' : 'Banküberweisung',
+  hint: ar ? 'الطريقة الأوفر: يصلنا 100% من تبرعك دون رسوم.' : 'Der günstigste Weg: 100 % Ihrer Spende kommen ohne Gebühren an.',
+  holder: ar ? 'صاحب الحساب' : 'Kontoinhaber',
+  ref: ar ? 'سبب التحويل' : 'Verwendungszweck',
+  scan: ar ? 'امسح الرمز بتطبيق البنك (GiroCode)' : 'Mit der Banking-App scannen (GiroCode)',
+  free: ar ? 'مبلغ حر' : 'Freier Betrag',
+};
+---
+<div class:list={['card p-6 md:p-8', cls]}>
+  <div class="flex items-center gap-3">
+    <span class="grid size-11 place-items-center rounded-full bg-gold-pale text-wine"><Icon name="bank" size={22} /></span>
+    <div>
+      <h3 class="text-xl font-semibold">{L.title}</h3>
+      <p class="text-sm text-ink-soft">{L.hint}</p>
+    </div>
+  </div>
+
+  <div class="mt-6 grid gap-6 md:grid-cols-[1fr_auto] md:items-start">
+    <dl class="space-y-3 text-[0.98rem]">
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wider text-ink-mute">{L.holder}</dt>
+        <dd class="font-semibold"><bdi dir="ltr">{site.bank.accountHolder}</bdi></dd>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wider text-ink-mute">IBAN</dt>
+        <dd class="flex flex-wrap items-center gap-3"><span class="font-mono text-lg font-semibold tracking-wide" dir="ltr">{site.bank.iban}</span><CopyButton value={site.bank.iban.replace(/\s+/g, '')} lang={lang} class="text-wine" label="IBAN" /></dd>
+      </div>
+      <div class="flex flex-wrap gap-x-8 gap-y-3">
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wider text-ink-mute">BIC</dt>
+          <dd class="font-mono" dir="ltr">{site.bank.bic}</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wider text-ink-mute">Bank</dt>
+          <dd>{site.bank.bankName}</dd>
+        </div>
+      </div>
+      <div>
+        <dt class="text-xs font-semibold uppercase tracking-wider text-ink-mute">{L.ref}</dt>
+        <dd class="flex flex-wrap items-center gap-3"><span class="font-semibold" dir="ltr">{reference}</span><CopyButton value={reference} lang={lang} class="text-wine" /></dd>
+      </div>
+    </dl>
+
+    <div class="rounded-2xl border border-line bg-paper p-4 text-center" data-girocode>
+      <div class="mx-auto size-40">
+        {codes.map((svg, i) => <div class:list={['size-40 [&>svg]:size-full', i !== 0 && 'hidden']} data-code={amounts[i]} set:html={svg} />)}
+      </div>
+      <p class="mt-3 max-w-[11rem] text-xs text-ink-soft">{L.scan}</p>
+      <div class="mt-3 flex flex-wrap justify-center gap-1.5" role="group" aria-label="GiroCode">
+        {amounts.map((a, i) => (
+          <button type="button" data-code-btn={a} aria-pressed={i === 0 ? 'true' : 'false'} class="rounded-full border border-line px-2.5 py-1 text-xs font-semibold aria-pressed:border-wine aria-pressed:bg-wine aria-pressed:text-white">{a ? <span dir="ltr">{a} €</span> : L.free}</button>
+        ))}
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-girocode]').forEach((box) => {
+    box.querySelectorAll<HTMLButtonElement>('[data-code-btn]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        box.querySelectorAll('[data-code-btn]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+        box.querySelectorAll<HTMLElement>('[data-code]').forEach((c) => c.classList.toggle('hidden', c.dataset.code !== btn.dataset.codeBtn));
+      });
+    });
+  });
+</script>

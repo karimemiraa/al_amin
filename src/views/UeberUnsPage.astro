@@ -1,0 +1,402 @@
+---
+import { Picture } from 'astro:assets';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import SectionHeading from '../components/SectionHeading.astro';
+import QuoteCard from '../components/QuoteCard.astro';
+import Ornament from '../components/Ornament.astro';
+import Wave from '../components/Wave.astro';
+import Icon from '../components/Icon.astro';
+import CopyButton from '../components/CopyButton.astro';
+import site from '../content/settings/site.json';
+import { localizePath, formatDate, type Lang } from '../i18n/ui';
+import heroImg from '../assets/photos/innenhof.jpg';
+import historyImg from '../assets/photos/gemeinde-freitag.jpg';
+import hall from '../assets/photos/gebetsraum.jpg';
+import hall2 from '../assets/photos/gebetsraum-2.jpg';
+import courtyard from '../assets/photos/innenhof.jpg';
+import fountain from '../assets/photos/brunnen.jpg';
+import corridor from '../assets/photos/flur.jpg';
+import stairs from '../assets/photos/treppe.jpg';
+import gate from '../assets/photos/eingang-tor.jpg';
+import lecture from '../assets/photos/gemeinde-vortrag.jpg';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const ar = lang === 'ar';
+const L = (p: string) => localizePath(p, lang);
+const years = new Date().getFullYear() - site.founded;
+
+const c = ar
+  ? {
+      title: 'من نحن',
+      description: `مسجد محمد الأمين في هانوفر – الجمعية الإسلامية Islamisches Gemeindehaus Hannover e.V. منذ ${site.founded}: تاريخنا، رسالتنا، ما نقدّمه، صور المسجد، والشفافية حول جمعيتنا وحساب التبرعات.`,
+      eyebrow: `من نحن · منذ ${site.founded}`,
+      h1: 'مكانٌ للصلاة<br/>والعلم واللقاء',
+      intro: `منذ أكثر من ${years} عاماً يجتمع المسلمون في مسجد محمد الأمين في حي فارينفالد بهانوفر – للصلاة والتعلّم والتعارف ومساعدة المحتاجين.`,
+      historyEyebrow: 'تاريخنا',
+      historyTitle: 'من فناء خلفي صغير<br/>إلى مجتمع حيّ',
+      history: [
+        `تأسست جمعية Islamisches Gemeindehaus Hannover e.V. عام ${site.founded} بهدف واضح: أن يكون للمسلمين في هانوفر مكانٌ يعيشون فيه دينهم – وفي مقدّمة ذلك أداء الصلوات الخمس وصلاة الجمعة جماعةً.`,
+        'نحن مجتمع سنّي مستقل، أغلب روّاده من الناطقين بالعربية، وأبوابنا مفتوحة للجميع بغض النظر عن الأصل أو اللغة. والجمعية عضو في مجلس الشورى في ولاية سكسونيا السفلى (Schura Niedersachsen).',
+        'تُلقى خطبة الجمعة باللغة العربية، ويُترجَم مضمونها مباشرةً إلى الألمانية – حتى يفهمها كل من يحضر. وعلى مرّ السنين استقبلنا كثيراً من الضيوف، من بينهم عام 2010 عمدة مدينة هانوفر آنذاك شتيفان فايل.',
+      ],
+      facts: [
+        { icon: 'calendar', value: String(site.founded), label: 'سنة التأسيس' },
+        { icon: 'users', value: 'Schura', label: 'عضو في شورى سكسونيا السفلى' },
+        { icon: 'globe', value: 'لغتان', label: 'خطبة الجمعة بالعربية مع ترجمة فورية إلى الألمانية' },
+      ],
+      missionEyebrow: 'رسالتنا',
+      missionTitle: 'ما الذي يحرّكنا',
+      missionIntro: 'أربعة أعمدة تحمل عملنا اليومي – بجهود متطوعين من مجتمعنا.',
+      values: [
+        { icon: 'moon', title: 'الصلاة', text: 'الصلوات الخمس جماعةً كل يوم، وصلاة الجمعة، والصلاة في رمضان والأعياد – في جوٍّ من السكينة.' },
+        { icon: 'book', title: 'العلم', text: 'دروس أسبوعية في القرآن الكريم والتجويد والسيرة النبوية وأصول العقيدة والتزكية – بالعربية والألمانية.' },
+        { icon: 'hands', title: 'اللقاء', text: 'نستقبل الجيران والمدارس والكنائس والمهتمين، ونؤمن بأن التعارف أساس العيش المشترك.' },
+        { icon: 'heart', title: 'مساعدة المحتاجين', text: 'نجمع الزكاة وزكاة الفطر ونوصلها إلى مستحقيها، ونقف إلى جانب من يحتاج إلى العون.' },
+      ],
+      quote: {
+        arabic: 'يَا أَيُّهَا النَّاسُ إِنَّا خَلَقْنَاكُم مِّن ذَكَرٍ وَأُنثَىٰ وَجَعَلْنَاكُمْ شُعُوبًا وَقَبَائِلَ لِتَعَارَفُوا ۚ إِنَّ أَكْرَمَكُمْ عِندَ اللَّهِ أَتْقَاكُمْ',
+        text: '',
+        source: 'سورة الحجرات: 13',
+      },
+      offerEyebrow: 'ما نقدّمه',
+      offerTitle: 'المسجد في حياتك اليومية',
+      offers: [
+        { icon: 'clock', title: 'الصلوات الخمس وصلاة الجمعة', text: 'المسجد مفتوح يومياً في أوقات الصلاة.', href: '/gebetszeiten', link: 'مواقيت الصلاة' },
+        { icon: 'globe', title: 'ترجمة فورية لخطبة الجمعة', text: 'استمع إلى الترجمة الألمانية عبر هاتفك وسمّاعات الأذن داخل المسجد.', href: '/besuch#uebersetzung', link: 'كيف تعمل؟' },
+        { icon: 'book', title: 'دروس أسبوعية', text: 'القرآن والتجويد والسيرة والعقيدة والتزكية – دون تسجيل مسبق.', href: '/programm', link: 'البرنامج' },
+        { icon: 'users', title: 'جولات تعريفية بالمسجد', text: 'للمدارس والكنائس والمجموعات: جولة وتعريف وحوار مفتوح.', href: '/besuch', link: 'زيارة المسجد' },
+        { icon: 'heart', title: 'الزكاة وزكاة الفطر', text: 'نجمع زكاتكم ونوصلها إلى المستحقين.', href: '/spenden', link: 'التبرع' },
+        { icon: 'live', title: 'بث مباشر وتليغرام', text: 'الدروس والإعلانات والبث المباشر على قناتنا في تليغرام.', href: '/live', link: 'البث المباشر' },
+      ],
+      galleryEyebrow: 'المسجد الحالي',
+      galleryTitle: 'نظرة إلى داخل مسجدنا',
+      galleryIntro: 'يقع مسجدنا الحالي في الفناء الخلفي للعنوان Grabbestraße 3b. وقد أصبح منذ سنوات أضيق من أن يتّسع لمجتمعنا – ولهذا نعمل على شراء مبنى جديد.',
+      gallery: [
+        { src: hall, alt: 'قاعة الصلاة بسجادها الأخضر، مع كراسٍ لكبار السن' },
+        { src: courtyard, alt: 'فناء المسجد' },
+        { src: fountain, alt: 'النافورة عند مدخل المسجد' },
+        { src: hall2, alt: 'قاعة الصلاة بأعمدتها' },
+        { src: gate, alt: 'بوابة المسجد «3b» في الفناء الخلفي' },
+        { src: lecture, alt: 'المصلون أثناء درس في قاعة الصلاة (الوجوه مموّهة)' },
+        { src: corridor, alt: 'ممرّ المدخل ورفوف الأحذية' },
+        { src: stairs, alt: 'غرفة في المسجد مع الدرج المؤدي إلى الطابق العلوي' },
+      ],
+      transEyebrow: 'الشفافية',
+      transTitle: 'من نحن – بالأرقام والوقائع',
+      transIntro: 'يحق لكل متبرّع أن يعرف إلى من يتبرّع. هنا نجمع أهم المعلومات عن جمعيتنا.',
+      labels: {
+        name: 'اسم الجمعية',
+        seat: 'المقر',
+        founded: 'سنة التأسيس',
+        board: 'الهيئة الإدارية المخوّلة بالتمثيل',
+        register: 'السجل',
+        registerValue: (court: string, no: string) => `سجل الجمعيات، ${court}، رقم ${no}`,
+        tax: 'النفع العام',
+        taxValue: 'الجمعية معترف بها كجمعية ذات نفع عام',
+        taxOffice: 'مكتب الضرائب',
+        taxNotice: 'تاريخ إشعار الإعفاء',
+        bank: 'حساب التبرعات',
+        holder: 'صاحب الحساب',
+      },
+      useTitle: 'استخدام التبرعات',
+      useText: 'تُستخدم التبرعات المخصّصة لمشروع الشراء حصرياً لشراء المبنى الجديد وتجهيزه. وإذا لم تتمّ عملية الشراء، أو تجاوزت التبرعات الحاجة، فإننا نستخدمها في الأغراض المنصوص عليها في النظام الأساسي للجمعية.',
+      useNote: 'Mittelverwendung',
+      commitTitle: 'نُطلعكم باستمرار',
+      commitText: 'ننشر بانتظام حالة التبرعات والخطوات التالية لمشروع الشراء – مع تاريخ كل تحديث.',
+      commitCta: 'إلى مشروع المسجد الجديد',
+      questions: 'لديك سؤال حول جمعيتنا أو التبرعات؟',
+      contact: 'تواصل معنا',
+      ctaTitle: 'تعالوا وتعرّفوا علينا',
+      ctaText: 'سواء للصلاة أو لدرس أو لزيارة مع مدرسة – يسعدنا استقبالكم.',
+      ctaVisit: 'خطّط لزيارتك',
+      ctaDonate: 'تبرّع للمسجد الجديد',
+    }
+  : {
+      title: 'Über uns',
+      description: `Die Mohammad Al-Amien Moschee in Hannover-Vahrenwald – getragen vom Islamischen Gemeindehaus Hannover e.V. seit ${site.founded}: Geschichte, Werte, Angebote, Bilder und Transparenz zu Verein und Spendenkonto.`,
+      eyebrow: `Über uns · Seit ${site.founded}`,
+      h1: 'Ein Ort des Gebets,<br/>des Lernens und der Begegnung',
+      intro: `Seit über ${years} Jahren kommen Musliminnen und Muslime in der Mohammad Al-Amien Moschee in Hannover-Vahrenwald zusammen – zum Gebet, zum Lernen, zur Begegnung und um Bedürftigen zu helfen.`,
+      historyEyebrow: 'Unsere Geschichte',
+      historyTitle: 'Vom kleinen Hinterhof<br/>zur lebendigen Gemeinde',
+      history: [
+        `Das Islamische Gemeindehaus Hannover e.V. wurde ${site.founded} gegründet – mit einem klaren Ziel: Musliminnen und Muslimen in Hannover einen Ort zu geben, an dem sie ihren Glauben leben können, allen voran die fünf täglichen Gebete und das Freitagsgebet in Gemeinschaft.`,
+        'Wir sind eine unabhängige, überwiegend arabischsprachige sunnitische Gemeinde. Unsere Türen stehen allen offen – unabhängig von Herkunft und Sprache. Der Verein ist Mitglied der Schura Niedersachsen, des Landesverbands der Muslime in Niedersachsen.',
+        'Die Freitagspredigt wird auf Arabisch gehalten und live ins Deutsche übersetzt, damit alle sie verstehen können. Über die Jahre durften wir viele Gäste begrüßen – 2010 etwa den damaligen Oberbürgermeister Stephan Weil.',
+      ],
+      facts: [
+        { icon: 'calendar', value: String(site.founded), label: 'Gründungsjahr' },
+        { icon: 'users', value: 'Schura', label: 'Mitglied der Schura Niedersachsen' },
+        { icon: 'globe', value: '2 Sprachen', label: 'Freitagspredigt auf Arabisch, live ins Deutsche übersetzt' },
+      ],
+      missionEyebrow: 'Unser Auftrag',
+      missionTitle: 'Was uns bewegt',
+      missionIntro: 'Vier Säulen tragen unsere Arbeit – getragen vom ehrenamtlichen Engagement unserer Gemeinde.',
+      values: [
+        { icon: 'moon', title: 'Gebet', text: 'Die fünf täglichen Gebete in Gemeinschaft, das Freitagsgebet sowie die Gebete im Ramadan und an den Festtagen – in einer ruhigen, würdigen Atmosphäre.' },
+        { icon: 'book', title: 'Bildung', text: 'Wöchentlicher Unterricht zu Koran und Tadschwid, Prophetenbiografie (Sira), Glaubensgrundlagen und Herzensbildung – auf Arabisch und Deutsch.' },
+        { icon: 'hands', title: 'Begegnung', text: 'Wir empfangen Nachbarn, Schulklassen, Kirchengemeinden und alle Interessierten. Einander kennenzulernen ist die Grundlage guten Zusammenlebens.' },
+        { icon: 'heart', title: 'Hilfe für Bedürftige', text: 'Wir sammeln Zakat und Zakat al-Fitr und geben sie an Bedürftige weiter – und stehen Menschen bei, die Unterstützung brauchen.' },
+      ],
+      quote: {
+        arabic: 'يَا أَيُّهَا النَّاسُ إِنَّا خَلَقْنَاكُم مِّن ذَكَرٍ وَأُنثَىٰ وَجَعَلْنَاكُمْ شُعُوبًا وَقَبَائِلَ لِتَعَارَفُوا',
+        text: '„O ihr Menschen, Wir haben euch ja von einem männlichen und einem weiblichen Wesen erschaffen, und Wir haben euch zu Völkern und Stämmen gemacht, damit ihr einander kennenlernt.“',
+        source: 'Sure Al-Hudschurat 49:13',
+      },
+      offerEyebrow: 'Was wir anbieten',
+      offerTitle: 'Moschee im Alltag',
+      offers: [
+        { icon: 'clock', title: 'Tägliche Gebete & Freitagsgebet', text: 'Die Moschee ist täglich zu den Gebetszeiten geöffnet.', href: '/gebetszeiten', link: 'Gebetszeiten' },
+        { icon: 'globe', title: 'Freitagspredigt auf Deutsch', text: 'Hören Sie die Live-Übersetzung der Predigt mit Ihrem Smartphone und Kopfhörern.', href: '/besuch#uebersetzung', link: 'So funktioniert’s' },
+        { icon: 'book', title: 'Wöchentlicher Unterricht', text: 'Koran, Tadschwid, Sira, Glaubenslehre und Tazkiya – ohne Anmeldung.', href: '/programm', link: 'Zum Programm' },
+        { icon: 'users', title: 'Moscheeführungen', text: 'Für Schulklassen, Kirchengemeinden und Gruppen: Rundgang, Einführung und offenes Gespräch.', href: '/besuch', link: 'Besuch planen' },
+        { icon: 'heart', title: 'Zakat & Zakat al-Fitr', text: 'Wir nehmen Ihre Zakat entgegen und leiten sie an Bedürftige weiter.', href: '/spenden', link: 'Zu den Spenden' },
+        { icon: 'live', title: 'Live & Telegram', text: 'Unterricht, Ankündigungen und Live-Übertragungen über unseren Telegram-Kanal.', href: '/live', link: 'Zum Live-Bereich' },
+      ],
+      galleryEyebrow: 'Unsere jetzige Moschee',
+      galleryTitle: 'Ein Blick hinein',
+      galleryIntro: 'Unsere jetzige Moschee liegt im Hinterhof der Grabbestraße 3b. Sie ist seit Jahren zu klein für unsere Gemeinde – deshalb möchten wir ein neues Gebäude erwerben.',
+      gallery: [
+        { src: hall, alt: 'Gebetsraum mit grünem Teppich und Stühlen für ältere Betende' },
+        { src: courtyard, alt: 'Innenhof der Moschee' },
+        { src: fountain, alt: 'Brunnen am Eingang der Moschee' },
+        { src: hall2, alt: 'Gebetsraum mit Säulen' },
+        { src: gate, alt: 'Eingangstor „3b“ im Hinterhof' },
+        { src: lecture, alt: 'Gemeinde bei einem Vortrag im Gebetsraum (Gesichter unkenntlich gemacht)' },
+        { src: corridor, alt: 'Eingangsflur mit Schuhregalen' },
+        { src: stairs, alt: 'Raum in der Moschee mit Treppe ins Obergeschoss' },
+      ],
+      transEyebrow: 'Transparenz',
+      transTitle: 'Wer wir sind – Fakten zum Verein',
+      transIntro: 'Wer spendet, soll wissen, wem er vertraut. Hier finden Sie die wichtigsten Angaben zu unserem Verein auf einen Blick.',
+      labels: {
+        name: 'Vereinsname',
+        seat: 'Sitz',
+        founded: 'Gründungsjahr',
+        board: 'Vertretungsberechtigter Vorstand',
+        register: 'Registereintrag',
+        registerValue: (court: string, no: string) => `Vereinsregister, ${court}, ${no}`,
+        tax: 'Gemeinnützigkeit',
+        taxValue: 'Als gemeinnützig anerkannt',
+        taxOffice: 'Finanzamt',
+        taxNotice: 'Freistellungsbescheid vom',
+        bank: 'Spendenkonto',
+        holder: 'Kontoinhaber',
+      },
+      useTitle: 'Mittelverwendung',
+      useText: 'Spenden für das Kaufprojekt werden ausschließlich für den Erwerb und die Herrichtung des neuen Gebäudes verwendet. Kommt der Kauf nicht zustande oder übersteigen die Spenden den Bedarf, verwenden wir sie für unsere satzungsgemäßen Zwecke.',
+      useNote: '',
+      commitTitle: 'Wir halten Sie auf dem Laufenden',
+      commitText: 'Den Spendenstand und die nächsten Schritte des Kaufprojekts veröffentlichen wir regelmäßig – jeweils mit Datum der letzten Aktualisierung.',
+      commitCta: 'Zum Kaufprojekt',
+      questions: 'Fragen zu unserem Verein oder zu Spenden?',
+      contact: 'Kontakt aufnehmen',
+      ctaTitle: 'Lernen Sie uns kennen',
+      ctaText: 'Ob zum Gebet, zum Unterricht oder mit Ihrer Schulklasse – wir freuen uns auf Ihren Besuch.',
+      ctaVisit: 'Besuch planen',
+      ctaDonate: 'Für die neue Moschee spenden',
+    };
+
+const seat = `${site.city}`;
+const hasRegister = Boolean(site.registerNumber?.trim());
+const hasTax = Boolean(site.taxOffice?.trim() || site.exemptionNoticeDate?.trim());
+const iban = site.bank.iban;
+---
+<BaseLayout lang={lang} title={c.title} description={c.description} image={heroImg}>
+  <PageHero eyebrow={c.eyebrow} title={c.h1} intro={c.intro} image={heroImg} imageAlt="" />
+
+  <!-- HISTORY -->
+  <section class="container-x mt-16 grid gap-10 md:mt-24 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16">
+    <div>
+      <SectionHeading eyebrow={c.historyEyebrow} title={c.historyTitle} />
+      <div class="prose-igh mt-6 text-[1.06rem] leading-relaxed">
+        {c.history.map((p) => <p>{p}</p>)}
+      </div>
+      <ul class="mt-8 grid gap-3 sm:grid-cols-3">
+        {c.facts.map((f) => (
+          <li class="card flex items-start gap-3 p-4 sm:flex-col sm:gap-2.5 sm:p-5">
+            <span class="grid size-10 shrink-0 place-items-center rounded-full border border-gold-soft text-gold"><Icon name={f.icon as 'calendar'} size={18} /></span>
+            <span class="min-w-0">
+              <span class="block font-display text-xl font-semibold leading-tight text-ink">{f.value}</span>
+              <span class="mt-1 block text-sm leading-snug text-ink-soft">{f.label}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+    <figure class="relative">
+      <Picture src={historyImg} alt={ar ? 'المصلون في صلاة الجمعة بالمسجد الحالي (الوجوه مموّهة)' : 'Gemeinde beim Freitagsgebet in der jetzigen Moschee (Gesichter unkenntlich gemacht)'} widths={[480, 800, 1200]} sizes="(min-width: 1024px) 40vw, 100vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-[1.5rem] object-cover shadow-lift" />
+      <div class="absolute -bottom-5 start-5 hidden rounded-2xl border border-line bg-card px-5 py-3 shadow-soft sm:block">
+        <span class="block font-display text-3xl font-semibold text-wine">{years}+</span>
+        <span class="block text-sm text-ink-soft">{ar ? 'عاماً في هانوفر' : 'Jahre in Hannover'}</span>
+      </div>
+    </figure>
+  </section>
+
+  <!-- MISSION / VALUES -->
+  <section class="relative mt-24 bg-paper-2 py-20 md:mt-28 md:py-24">
+    <div class="absolute inset-x-0 -top-px"><Wave fill="var(--color-paper)" flip /></div>
+    <div class="container-x">
+      <SectionHeading eyebrow={c.missionEyebrow} title={c.missionTitle} intro={c.missionIntro} align="center" />
+      <ul class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {c.values.map((v) => (
+          <li class="card flex flex-col p-6 md:p-7">
+            <span class="grid size-12 place-items-center rounded-full bg-wine text-white"><Icon name={v.icon as 'moon'} size={22} /></span>
+            <h3 class="mt-5 text-xl font-semibold">{v.title}</h3>
+            <p class="mt-2 text-ink-soft">{v.text}</p>
+          </li>
+        ))}
+      </ul>
+      <div class="mx-auto mt-14 max-w-2xl">
+        <QuoteCard arabic={c.quote.arabic} text={c.quote.text} source={c.quote.source} />
+      </div>
+    </div>
+  </section>
+
+  <!-- OFFERS -->
+  <section class="container-x mt-20 md:mt-24">
+    <SectionHeading eyebrow={c.offerEyebrow} title={c.offerTitle} />
+    <ul class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {c.offers.map((o) => (
+        <li>
+          <a href={L(o.href)} class="card group flex h-full gap-4 p-5 transition hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-lift md:p-6">
+            <span class="grid size-11 shrink-0 place-items-center rounded-full bg-gold-pale text-wine"><Icon name={o.icon as 'clock'} size={20} /></span>
+            <span class="min-w-0">
+              <span class="block text-lg font-semibold leading-snug text-ink">{o.title}</span>
+              <span class="mt-1 block text-[0.98rem] text-ink-soft">{o.text}</span>
+              <span class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-wine group-hover:underline">{o.link} <Icon name="arrow" size={15} /></span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- GALLERY -->
+  <section class="container-x mt-24 md:mt-28" aria-labelledby="galerie-titel">
+    <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div class="max-w-2xl">
+        <p class="eyebrow">{c.galleryEyebrow}</p>
+        <h2 id="galerie-titel" class="mt-3 text-3xl font-semibold leading-[1.15] md:text-[2.6rem]">{c.galleryTitle}</h2>
+        <p class="mt-4 text-lg text-ink-soft">{c.galleryIntro}</p>
+      </div>
+      <a href={L('/neue-moschee')} class="btn btn-outline shrink-0 self-start md:self-auto">{c.commitCta} <Icon name="arrow" size={16} /></a>
+    </div>
+    <ul class="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+      {c.gallery.map((g, i) => {
+        const big = i === 0;
+        const wide = i === 5;
+        return (
+          <li class:list={['overflow-hidden rounded-2xl bg-paper-3 shadow-soft', big && 'col-span-2 row-span-2', wide && 'col-span-2']}>
+            <Picture
+              src={g.src}
+              alt={g.alt}
+              widths={big || wide ? [480, 800, 1200] : [320, 480, 640]}
+              sizes={big || wide ? '(min-width: 768px) 50vw, 100vw' : '(min-width: 768px) 25vw, 50vw'}
+              formats={['avif', 'webp']}
+              loading="lazy"
+              decoding="async"
+              class:list={['h-full w-full object-cover transition duration-500 hover:scale-[1.03]', wide ? 'aspect-[2/1]' : 'aspect-square']}
+            />
+          </li>
+        );
+      })}
+    </ul>
+  </section>
+
+  <!-- TRANSPARENZ -->
+  <section id="transparenz" class="container-x mt-24 scroll-mt-28 md:mt-28" aria-labelledby="transparenz-titel">
+    <Ornament class="mb-10" />
+    <div class="max-w-3xl">
+      <p class="eyebrow">{c.transEyebrow}</p>
+      <h2 id="transparenz-titel" class="mt-3 text-3xl font-semibold leading-[1.15] md:text-[2.6rem]">{c.transTitle}</h2>
+      <p class="mt-4 text-lg text-ink-soft">{c.transIntro}</p>
+    </div>
+
+    <div class="mt-10 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+      <div class="card p-6 md:p-8">
+        <dl class="divide-y divide-line">
+          <div class="grid gap-1 py-4 first:pt-0 sm:grid-cols-[13rem_1fr] sm:gap-6">
+            <dt class="text-sm font-semibold text-ink-mute">{c.labels.name}</dt>
+            <dd class="font-semibold text-ink" lang="de" dir="auto">{site.orgName}</dd>
+          </div>
+          <div class="grid gap-1 py-4 sm:grid-cols-[13rem_1fr] sm:gap-6">
+            <dt class="text-sm font-semibold text-ink-mute">{c.labels.seat}</dt>
+            <dd class="text-ink"><span dir="ltr">{site.street}, {site.zip} {seat}</span></dd>
+          </div>
+          <div class="grid gap-1 py-4 sm:grid-cols-[13rem_1fr] sm:gap-6">
+            <dt class="text-sm font-semibold text-ink-mute">{c.labels.founded}</dt>
+            <dd class="text-ink tabular">{site.founded}</dd>
+          </div>
+          <div class="grid gap-1 py-4 sm:grid-cols-[13rem_1fr] sm:gap-6">
+            <dt class="text-sm font-semibold text-ink-mute">{c.labels.board}</dt>
+            <dd class="text-ink">
+              <ul>{site.representatives.map((r) => <li dir="auto">{r}</li>)}</ul>
+            </dd>
+          </div>
+          {hasRegister && (
+            <div class="grid gap-1 py-4 sm:grid-cols-[13rem_1fr] sm:gap-6">
+              <dt class="text-sm font-semibold text-ink-mute">{c.labels.register}</dt>
+              <dd class="text-ink">{c.labels.registerValue(site.registerCourt, site.registerNumber)}</dd>
+            </div>
+          )}
+          {hasTax && (
+            <div class="grid gap-1 py-4 sm:grid-cols-[13rem_1fr] sm:gap-6">
+              <dt class="text-sm font-semibold text-ink-mute">{c.labels.tax}</dt>
+              <dd class="text-ink">
+                {c.labels.taxValue}
+                {site.taxOffice && <span class="block text-ink-soft">{c.labels.taxOffice}: {site.taxOffice}</span>}
+                {site.exemptionNoticeDate && <span class="block text-ink-soft">{c.labels.taxNotice}{ar ? ': ' : ' '}{formatDate(site.exemptionNoticeDate, lang)}</span>}
+              </dd>
+            </div>
+          )}
+          <div class="grid gap-1 py-4 last:pb-0 sm:grid-cols-[13rem_1fr] sm:gap-6">
+            <dt class="text-sm font-semibold text-ink-mute">{c.labels.bank}</dt>
+            <dd class="text-ink">
+              <span class="block text-ink-soft">{c.labels.holder}: <span class="text-ink" lang="de" dir="ltr">{site.bank.accountHolder}</span></span>
+              <span class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span class="font-mono text-[1.02rem] tracking-wide text-ink" dir="ltr">{iban}</span>
+                <CopyButton value={iban.replace(/\s+/g, '')} lang={lang} label="IBAN" class="text-wine" />
+              </span>
+              <span class="mt-1 block text-ink-soft" dir="ltr">BIC {site.bank.bic} · {site.bank.bankName}</span>
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="flex flex-col gap-6">
+        <div class="bg-wine-pattern relative overflow-hidden rounded-[var(--radius-card)] p-6 text-white shadow-lift md:p-8">
+          <span class="grid size-11 place-items-center rounded-full border border-gold-soft/60 text-gold-soft"><Icon name="shield" size={20} /></span>
+          <h3 class="mt-4 text-2xl font-semibold">{c.useTitle}</h3>
+          <p class="mt-3 leading-relaxed text-white/85">{c.useText}</p>
+        </div>
+        <div class="card p-6 md:p-8">
+          <span class="grid size-11 place-items-center rounded-full bg-gold-pale text-wine"><Icon name="calendar" size={20} /></span>
+          <h3 class="mt-4 text-xl font-semibold">{c.commitTitle}</h3>
+          <p class="mt-2 text-ink-soft">{c.commitText}</p>
+          <a href={L('/neue-moschee')} class="btn btn-primary mt-5">{c.commitCta} <Icon name="arrow" size={16} /></a>
+        </div>
+      </div>
+    </div>
+    <p class="mt-6 text-ink-soft">
+      {c.questions} <a href={L('/kontakt')} class="font-semibold text-wine underline underline-offset-4">{c.contact}</a>
+    </p>
+  </section>
+
+  <!-- CTA -->
+  <section class="container-x mt-24">
+    <div class="card relative grid overflow-hidden md:grid-cols-[0.9fr_1.1fr]">
+      <Picture src={gate} alt="" widths={[480, 800]} sizes="(min-width: 768px) 40vw, 100vw" formats={['avif', 'webp']} class="h-56 w-full object-cover md:h-full" />
+      <div class="p-7 md:p-10">
+        <h2 class="text-3xl font-semibold leading-tight">{c.ctaTitle}</h2>
+        <p class="mt-3 text-lg text-ink-soft">{c.ctaText}</p>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a href={L('/besuch')} class="btn btn-outline">{c.ctaVisit} <Icon name="arrow" size={16} /></a>
+          <a href={L('/spenden')} class="btn btn-primary"><Icon name="heart" size={18} /> {c.ctaDonate}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,91 @@
+---
+import '../styles/global.css';
+import { getImage } from 'astro:assets';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import ConsentBanner from '../components/ConsentBanner.astro';
+import site from '../content/settings/site.json';
+import ogDefault from '../assets/photos/neues-gebaeude.jpg';
+import { dir, localizePath, basePath, useTranslations, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: Lang;
+  title: string;
+  description: string;
+  image?: ImageMetadata;
+  noindex?: boolean;
+  schema?: Record<string, unknown>[];
+}
+
+const { lang, title, description, image = ogDefault, noindex = false, schema = [] } = Astro.props;
+const t = useTranslations(lang);
+const path = basePath(Astro.url.pathname);
+const siteUrl = Astro.site!.toString().replace(/\/$/, '');
+const canonical = siteUrl + localizePath(path, lang);
+const altDe = siteUrl + localizePath(path, 'de');
+const altAr = siteUrl + localizePath(path, 'ar');
+const brand = lang === 'ar' ? 'مسجد محمد الأمين – هانوفر' : 'Mohammad Al-Amien Moschee Hannover';
+const fullTitle = title === brand ? title : `${title} · ${brand}`;
+const og = await getImage({ src: image, width: 1200, height: 630, fit: 'cover', format: 'jpg', quality: 78 });
+
+const plausibleDomain = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
+const plausibleSrc = import.meta.env.PUBLIC_PLAUSIBLE_SRC || 'https://plausible.io/js/script.js';
+const googleAdsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID;
+
+const orgSchema = {
+  '@context': 'https://schema.org',
+  '@type': ['Mosque', 'PlaceOfWorship'],
+  name: site.mosqueName,
+  alternateName: [site.mosqueNameAr, 'Vahrenwalder Moschee', site.orgName],
+  url: siteUrl,
+  telephone: site.phone,
+  email: site.email,
+  image: siteUrl + og.src,
+  foundingDate: String(site.founded),
+  address: { '@type': 'PostalAddress', streetAddress: site.street, postalCode: site.zip, addressLocality: site.city, addressCountry: 'DE' },
+  parentOrganization: { '@type': 'NGO', name: site.orgName, url: siteUrl },
+  sameAs: [site.social.telegram, site.social.youtubeUrl, site.social.instagram].filter(Boolean),
+};
+---
+<!doctype html>
+<html lang={lang} dir={dir(lang)}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="de" href={altDe} />
+    <link rel="alternate" hreflang="ar" href={altAr} />
+    <link rel="alternate" hreflang="x-default" href={altDe} />
+    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="theme-color" content="#6b1f2f" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={brand} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={siteUrl + og.src} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content={lang === 'ar' ? 'ar_AR' : 'de_DE'} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script type="application/ld+json" set:html={JSON.stringify([orgSchema, ...schema])} />
+
+    {plausibleDomain && <script is:inline defer data-domain={plausibleDomain} src={plausibleSrc}></script>}
+  </head>
+  <body class="min-h-dvh">
+    <a href="#main" class="sr-only z-[60] rounded-full bg-wine px-4 py-2 text-white focus:not-sr-only focus:fixed focus:start-4 focus:top-4">{t('nav.skip')}</a>
+    <Header lang={lang} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+    {googleAdsId && <ConsentBanner lang={lang} adsId={googleAdsId} />}
+  </body>
+</html>

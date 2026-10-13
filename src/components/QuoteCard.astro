@@ -1,0 +1,10 @@
+---
+interface Props { arabic?: string; text: string; source: string; class?: string }
+const { arabic, text, source, class: cls = '' } = Astro.props;
+---
+<figure class:list={['card relative flex h-full flex-col p-7 md:p-8', cls]}>
+  <span class="pointer-events-none absolute -top-3 start-6 bg-paper px-2 font-display text-5xl leading-none text-gold-soft" aria-hidden="true">“</span>
+  {arabic && <p class="arabic-verse mb-4 text-center !text-[1.35rem] md:!text-[1.5rem]" lang="ar">{arabic}</p>}
+  <blockquote class="flex-1 text-[1.02rem] leading-relaxed text-ink-soft">{text}</blockquote>
+  <figcaption class="mt-4 text-sm font-semibold text-rose">{source}</figcaption>
+</figure>

@@ -1,0 +1,117 @@
+---
+import Icon from './Icon.astro';
+import { berlinToday, getRange, jumuah, type PrayerKey } from '../lib/prayer';
+import { localizePath, useTranslations, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang; variant?: 'card' | 'compact' }
+const { lang, variant = 'card' } = Astro.props;
+const t = useTranslations(lang);
+const window = getRange(berlinToday(), 21);
+const today = window[0];
+const rows: PrayerKey[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+const inline = Object.fromEntries(window.map((d) => [d.date, [d.times, d.iqama, d.provisional ? 1 : 0]]));
+const labels = Object.fromEntries(rows.map((r) => [r, t(`prayer.${r}`)]));
+---
+<div class:list={['card overflow-hidden', variant === 'compact' && 'text-[0.95rem]']} data-prayer-widget data-lang={lang}>
+  <div class="bg-wine-pattern relative px-6 py-5 text-white">
+    <p class="text-sm font-semibold uppercase tracking-[0.14em] text-gold-soft">{t('prayer.next')}</p>
+    <div class="mt-1 flex items-end justify-between gap-4">
+      <p class="font-display text-3xl font-semibold" data-next-name>{labels.dhuhr}</p>
+      <p class="tabular text-right text-white/85"><span class="text-sm">{t('prayer.in')} </span><span class="font-display text-2xl font-semibold text-white" data-next-countdown>–</span></p>
+    </div>
+  </div>
+  <div class="px-3 py-3 md:px-4">
+    <table class="w-full text-start">
+      <caption class="sr-only">{t('prayer.today')}</caption>
+      <thead>
+        <tr class="text-xs font-semibold uppercase tracking-wider text-ink-mute">
+          <th scope="col" class="px-3 py-2 text-start font-semibold"><span data-today-label>{t('prayer.today')}</span></th>
+          <th scope="col" class="px-3 py-2 text-end font-semibold">{t('prayer.adhan')}</th>
+          <th scope="col" class="px-3 py-2 text-end font-semibold">{t('prayer.iqama')}</th>
+        </tr>
+      </thead>
+      <tbody class="tabular">
+        {rows.map((r) => (
+          <tr data-row={r} class="border-t border-line/70 transition-colors data-[next=true]:bg-rose-soft/70 data-[passed=true]:text-ink-mute">
+            <th scope="row" class="px-3 py-2.5 text-start font-medium">
+              <span class="inline-flex items-center gap-2">
+                <span class="size-1.5 rounded-full bg-transparent" data-dot></span>{labels[r]}
+              </span>
+            </th>
+            <td class="px-3 py-2.5 text-end font-semibold" data-adhan>{today.times[r]}</td>
+            <td class="px-3 py-2.5 text-end text-ink-soft" data-iqama>{today.iqama[r] ?? '–'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {jumuah.length > 0 && (
+      <p class="mx-3 mt-2 flex items-center justify-between gap-3 rounded-xl bg-gold-pale px-4 py-3 text-[0.95rem]">
+        <span class="font-semibold text-wine-ink">{t('prayer.jumuah')}</span>
+        <span class="tabular font-semibold">{jumuah.map((j) => j.time).join(' · ')}</span>
+      </p>
+    )}
+    <p class="mx-3 mt-2 hidden text-xs text-ink-mute" data-provisional>{t('prayer.provisional')}</p>
+    <a href={localizePath('/gebetszeiten', lang)} class="mx-3 mb-2 mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-wine hover:underline">{t('prayer.all')} <Icon name="arrow" size={16} /></a>
+  </div>
+  <script type="application/json" data-prayer-data set:html={JSON.stringify(inline)} />
+  <script type="application/json" data-prayer-labels set:html={JSON.stringify(labels)} />
+</div>
+
+<script>
+  type Entry = [Record<string, string>, Record<string, string>, number];
+  const ORDER = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
+  let full: Record<string, Entry> | null = null;
+
+  const berlinParts = (d: Date) => {
+    const f = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+    const p = Object.fromEntries(f.formatToParts(d).map((x) => [x.type, x.value]));
+    return { date: `${p.year}-${p.month}-${p.day}`, secs: +p.hour * 3600 + +p.minute * 60 + +p.second };
+  };
+  const addDay = (iso: string) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+  const secsOf = (hm: string) => { const [h, m] = hm.split(':').map(Number); return h * 3600 + m * 60; };
+
+  async function lookup(widget: HTMLElement, date: string): Promise<Entry | undefined> {
+    const inline = JSON.parse(widget.querySelector('[data-prayer-data]')!.textContent!);
+    if (inline[date]) return inline[date];
+    if (!full) full = await fetch('/prayer-times.json').then((r) => r.json()).catch(() => ({}));
+    return full![date];
+  }
+
+  async function render(widget: HTMLElement) {
+    const labels = JSON.parse(widget.querySelector('[data-prayer-labels]')!.textContent!);
+    const now = berlinParts(new Date());
+    const today = await lookup(widget, now.date);
+    if (!today) return;
+    const [times, iqama, provisional] = today;
+    widget.querySelector('[data-provisional]')?.classList.toggle('hidden', !provisional);
+    let next: { key: string; at: number } | null = null;
+    for (const key of ORDER) {
+      const row = widget.querySelector<HTMLElement>(`[data-row="${key}"]`);
+      if (!row) continue;
+      row.querySelector('[data-adhan]')!.textContent = times[key];
+      row.querySelector('[data-iqama]')!.textContent = iqama[key] ?? '–';
+      const at = secsOf(times[key]);
+      const passed = at <= now.secs;
+      row.dataset.passed = String(passed);
+      row.dataset.next = 'false';
+      if (!passed && !next && key !== 'sunrise') next = { key, at };
+    }
+    if (!next) {
+      const tomorrow = await lookup(widget, addDay(now.date));
+      if (tomorrow) next = { key: 'fajr', at: secsOf(tomorrow[0].fajr) + 86400 };
+    } else {
+      widget.querySelector<HTMLElement>(`[data-row="${next.key}"]`)!.dataset.next = 'true';
+    }
+    if (next) {
+      widget.querySelector('[data-next-name]')!.textContent = labels[next.key];
+      const diff = Math.max(0, next.at - now.secs);
+      const h = Math.floor(diff / 3600), m = Math.floor((diff % 3600) / 60);
+      widget.querySelector('[data-next-countdown]')!.textContent = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m} min`;
+    }
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-prayer-widget]').forEach((w) => {
+    render(w);
+    setInterval(() => render(w), 30_000);
+  });
+</script>

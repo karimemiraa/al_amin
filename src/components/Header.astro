@@ -1,0 +1,125 @@
+---
+import Logo from './Logo.astro';
+import Icon from './Icon.astro';
+import site from '../content/settings/site.json';
+import prayer from '../content/settings/prayer.json';
+import { nav, localizePath, basePath, useTranslations, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang }
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+const current = basePath(Astro.url.pathname);
+const other: Lang = lang === 'de' ? 'ar' : 'de';
+const switchHref = localizePath(current, other);
+const jumuah = prayer.jumuah[0]?.time;
+const isActive = (href: string) => current === href || current.startsWith(href + '/');
+---
+<div class="bg-wine-ink text-[0.8125rem] text-white/85">
+  <div class="container-x flex h-9 items-center justify-between gap-4">
+    <p class="flex min-w-0 items-center gap-2 truncate">
+      <Icon name="moon" size={14} class="shrink-0 text-gold-soft" />
+      <span data-hijri-date data-lang={lang} class="truncate"></span>
+      {jumuah && (
+        <span class="hidden items-center gap-2 sm:inline-flex">
+          <span class="text-white/30">|</span>
+          {t('prayer.jumuah')}: <strong class="font-semibold text-white">{jumuah}</strong>
+        </span>
+      )}
+    </p>
+    <div class="flex shrink-0 items-center gap-4">
+      <a href={`tel:${site.phone.replace(/\s/g, '')}`} class="hidden items-center gap-1.5 hover:text-white md:inline-flex" dir="ltr">
+        <Icon name="phone" size={14} /> {site.phone}
+      </a>
+      <a href={switchHref} hreflang={other} lang={other} aria-label={t('lang.switchLabel')} class="inline-flex items-center gap-1.5 font-semibold text-gold-soft hover:text-white">
+        <Icon name="globe" size={14} /> {t('lang.switch')}
+      </a>
+    </div>
+  </div>
+</div>
+
+<header class="sticky top-0 z-40 border-b border-line/70 bg-paper/90 backdrop-blur-md supports-[backdrop-filter]:bg-paper/80" data-header>
+  <div class="container-x flex h-[4.5rem] items-center justify-between gap-4 md:h-20">
+    <a href={localizePath('/', lang)} class="min-w-0 shrink" aria-label={t('nav.home')}>
+      <Logo lang={lang} />
+    </a>
+
+    <nav class="hidden xl:block" aria-label="Hauptnavigation">
+      <ul class="flex items-center gap-1">
+        {nav.map((item) => (
+          <li>
+            <a
+              href={localizePath(item.href, lang)}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              class="rounded-full px-3 py-2 text-[0.95rem] font-medium text-ink-soft transition hover:bg-paper-2 hover:text-ink aria-[current=page]:text-wine"
+            >{t(item.key)}</a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <div class="flex items-center gap-2">
+      <a href={localizePath('/spenden', lang)} class="btn btn-primary !min-h-[2.75rem] !gap-1.5 !px-3.5 text-[0.95rem] sm:!px-4 md:!px-5" data-cta="header-donate">
+        <Icon name="heart" size={18} /> <span class="hidden sm:inline">{t('nav.donate')}</span><span class="sm:hidden">{lang === 'ar' ? 'تبرّع' : 'Spenden'}</span>
+      </a>
+      <button type="button" class="grid size-11 place-items-center rounded-full border border-line text-ink xl:hidden" aria-controls="mobile-nav" aria-expanded="false" data-menu-open>
+        <Icon name="menu" size={22} /><span class="sr-only">{t('nav.menu')}</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<div id="mobile-nav" class="fixed inset-0 z-50 hidden xl:hidden" role="dialog" aria-modal="true" aria-label={t('nav.menu')} data-menu>
+  <div class="absolute inset-0 bg-wine-ink/40 backdrop-blur-sm" data-menu-close></div>
+  <div class="bg-paper-grain absolute inset-y-0 end-0 flex w-[min(24rem,100%)] flex-col overflow-y-auto shadow-lift">
+    <div class="flex h-[4.5rem] items-center justify-between border-b border-line px-5">
+      <Logo lang={lang} />
+      <button type="button" class="grid size-11 place-items-center rounded-full border border-line" data-menu-close>
+        <Icon name="close" size={22} /><span class="sr-only">{t('nav.close')}</span>
+      </button>
+    </div>
+    <nav class="flex-1 px-3 py-4" aria-label={t('nav.menu')}>
+      <ul class="space-y-1">
+        <li><a href={localizePath('/', lang)} class="flex items-center justify-between rounded-xl px-4 py-3 text-lg font-medium hover:bg-paper-2">{t('nav.home')}<Icon name="chevron" size={18} class="text-ink-mute" /></a></li>
+        {nav.map((item) => (
+          <li><a href={localizePath(item.href, lang)} aria-current={isActive(item.href) ? 'page' : undefined} class="flex items-center justify-between rounded-xl px-4 py-3 text-lg font-medium hover:bg-paper-2 aria-[current=page]:text-wine">{t(item.key)}<Icon name="chevron" size={18} class="text-ink-mute" /></a></li>
+        ))}
+        <li><a href={localizePath('/live', lang)} class="flex items-center justify-between rounded-xl px-4 py-3 text-lg font-medium hover:bg-paper-2">{t('nav.live')}<Icon name="chevron" size={18} class="text-ink-mute" /></a></li>
+        <li><a href={localizePath('/kontakt', lang)} class="flex items-center justify-between rounded-xl px-4 py-3 text-lg font-medium hover:bg-paper-2">{t('nav.contact')}<Icon name="chevron" size={18} class="text-ink-mute" /></a></li>
+      </ul>
+    </nav>
+    <div class="space-y-3 border-t border-line p-5">
+      <a href={localizePath('/spenden', lang)} class="btn btn-primary w-full"><Icon name="heart" size={18} /> {t('nav.donate')}</a>
+      <a href={switchHref} hreflang={other} lang={other} class="btn btn-outline w-full"><Icon name="globe" size={18} /> {t('lang.switch')}</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Hijri + Gregorian date in the top bar (computed in the browser so it is always current).
+  document.querySelectorAll<HTMLElement>('[data-hijri-date]').forEach((el) => {
+    const lang = el.dataset.lang === 'ar' ? 'ar' : 'de';
+    const now = new Date();
+    try {
+      const hijri = new Intl.DateTimeFormat(lang === 'ar' ? 'ar-SA-u-ca-islamic-umalqura-nu-latn' : 'de-DE-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' }).format(now);
+      const greg = new Intl.DateTimeFormat(lang === 'ar' ? 'ar-u-nu-latn' : 'de-DE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Berlin' }).format(now);
+      el.textContent = `${greg} · ${hijri.replace(/ (AH|n\. ?H\.?)$/i, ' AH')}`;
+    } catch {
+      el.textContent = now.toLocaleDateString();
+    }
+  });
+
+  // Mobile menu
+  const menu = document.querySelector<HTMLElement>('[data-menu]');
+  const opener = document.querySelector<HTMLButtonElement>('[data-menu-open]');
+  const setOpen = (open: boolean) => {
+    if (!menu || !opener) return;
+    menu.classList.toggle('hidden', !open);
+    opener.setAttribute('aria-expanded', String(open));
+    document.documentElement.style.overflow = open ? 'hidden' : '';
+    if (open) menu.querySelector<HTMLElement>('[data-menu-close]:not(div)')?.focus();
+    else opener.focus();
+  };
+  opener?.addEventListener('click', () => setOpen(true));
+  menu?.querySelectorAll('[data-menu-close]').forEach((el) => el.addEventListener('click', () => setOpen(false)));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu?.classList.contains('hidden')) setOpen(false); });
+</script>

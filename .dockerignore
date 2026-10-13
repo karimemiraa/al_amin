@@ -1,0 +1,16 @@
+# Keep the build context small and free of secrets.
+.git
+.github
+.astro
+.vscode
+.idea
+node_modules
+dist
+docs
+deploy
+scripts
+*.log
+.DS_Store
+# Never copy secrets into the image (PUBLIC_* values come in via a build secret).
+.env
+.env.*

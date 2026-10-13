@@ -1,0 +1,179 @@
+---
+/**
+ * Donation form. Works without JavaScript: it posts to /api/checkout, which redirects to Stripe Checkout.
+ * JavaScript only enhances it (live summary, m² calculator, monthly presets).
+ */
+import Icon from './Icon.astro';
+import campaign from '../content/settings/campaign.json';
+import { formatEuro, localizePath, type Lang } from '../i18n/ui';
+
+interface Props { lang: Lang; fund?: 'kauf' | 'allgemein' | 'zakat' }
+const { lang, fund = 'kauf' } = Astro.props;
+const ar = lang === 'ar';
+const sqm = campaign.pricePerSqm;
+const once = [50, 100, 250, sqm, 1000, sqm * 10];
+const monthly = [20, 30, 50, 100, 150, 250];
+
+const L = ar
+  ? {
+      fund: 'الغرض من التبرع', kauf: 'شراء المسجد الجديد', allgemein: 'تبرع عام للمسجد', zakat: 'الزكاة (للمحتاجين)',
+      freq: 'نوع التبرع', once: 'مرة واحدة', monthly: 'شهرياً', amount: 'المبلغ', other: 'مبلغ آخر', popular: 'الأكثر اختياراً',
+      sqmLabel: 'م²', sqmInfo: `كل ${sqm} € = 1 م² من مسجدنا الجديد`, sqmYour: 'تبرعك يعادل', perMonth: '/ شهرياً',
+      dedication: 'نية أو إهداء (اختياري)', dedicationHint: 'مثلاً: «صدقة جارية عن والدَيّ رحمهما الله»',
+      receipt: 'أرغب في الحصول على إيصال تبرع (Zuwendungsbestätigung)', receiptHint: 'سنطلب عنوانك في الخطوة التالية.',
+      fees: 'أتحمّل رسوم الدفع (حوالي 1.5% + 0.25 €) ليصل تبرعي كاملاً', submit: 'المتابعة إلى الدفع الآمن',
+      secure: 'دفع آمن عبر Stripe: بطاقة، PayPal، Apple Pay، Google Pay، SEPA', total: 'المجموع',
+      error: 'تعذّر بدء الدفع الإلكتروني حالياً. يرجى استخدام التحويل البنكي أدناه أو المحاولة لاحقاً.',
+      canceled: 'تم إلغاء عملية الدفع. يمكنك المحاولة مرة أخرى في أي وقت.',
+      monthlyNote: 'يمكنك إلغاء التبرع الشهري في أي وقت.',
+    }
+  : {
+      fund: 'Wofür möchten Sie spenden?', kauf: 'Kauf der neuen Moschee', allgemein: 'Allgemeine Moscheespende', zakat: 'Zakat (für Bedürftige)',
+      freq: 'Spendenart', once: 'Einmalig', monthly: 'Monatlich', amount: 'Betrag', other: 'Anderer Betrag', popular: 'Beliebt',
+      sqmLabel: 'm²', sqmInfo: `Je ${sqm} € = 1 m² unserer neuen Moschee`, sqmYour: 'Ihre Spende entspricht', perMonth: '/ Monat',
+      dedication: 'Niyyah oder Widmung (optional)', dedicationHint: 'z. B. „Sadaqa Dschariya für meine verstorbenen Eltern“',
+      receipt: 'Ich möchte eine Zuwendungsbestätigung (Spendenquittung)', receiptHint: 'Ihre Adresse wird im nächsten Schritt abgefragt.',
+      fees: 'Ich übernehme die Zahlungsgebühren (ca. 1,5 % + 0,25 €), damit meine Spende vollständig ankommt', submit: 'Weiter zur sicheren Zahlung',
+      secure: 'Sichere Zahlung über Stripe: Karte, PayPal, Apple Pay, Google Pay, SEPA-Lastschrift', total: 'Gesamt',
+      error: 'Die Online-Zahlung konnte gerade nicht gestartet werden. Bitte nutzen Sie die Überweisung unten oder versuchen Sie es später erneut.',
+      canceled: 'Die Zahlung wurde abgebrochen. Sie können es jederzeit erneut versuchen.',
+      monthlyNote: 'Monatliche Spenden können Sie jederzeit beenden.',
+    };
+const funds = [
+  { id: 'kauf', label: L.kauf },
+  { id: 'allgemein', label: L.allgemein },
+  { id: 'zakat', label: L.zakat },
+] as const;
+const radio = 'peer sr-only';
+const chip = 'flex min-h-[3.25rem] cursor-pointer items-center justify-center rounded-xl border-[1.5px] border-line bg-card px-3 py-2 text-center font-semibold transition hover:border-wine/50 peer-checked:border-wine peer-checked:bg-wine peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-3 peer-focus-visible:outline-gold';
+---
+<form method="post" action="/api/checkout" class="card overflow-hidden" id="spenden-form" data-donation-form data-sqm={sqm}>
+  <input type="hidden" name="lang" value={lang} />
+  <div class="space-y-7 p-6 md:p-8">
+    <div class="hidden rounded-xl border border-rose/40 bg-rose-soft px-4 py-3 text-[0.95rem] text-wine-ink" role="alert" data-msg="error">{L.error}</div>
+    <div class="hidden rounded-xl border border-line bg-paper px-4 py-3 text-[0.95rem] text-ink-soft" role="status" data-msg="canceled">{L.canceled}</div>
+
+    <fieldset>
+      <legend class="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-mute">{L.fund}</legend>
+      <div class="grid gap-2 sm:grid-cols-3">
+        {funds.map((f) => (
+          <label class="relative">
+            <input type="radio" name="fund" value={f.id} checked={f.id === fund} class={radio} />
+            <span class={chip + ' text-[0.95rem]'}>{f.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend class="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-mute">{L.freq}</legend>
+      <div class="inline-grid grid-cols-2 gap-1 rounded-full border border-line bg-paper p-1">
+        <label><input type="radio" name="frequency" value="once" checked class={radio} /><span class="block cursor-pointer rounded-full px-5 py-2 text-center font-semibold text-ink-soft transition peer-checked:bg-card peer-checked:text-wine peer-checked:shadow-soft peer-focus-visible:outline peer-focus-visible:outline-3 peer-focus-visible:outline-gold">{L.once}</span></label>
+        <label><input type="radio" name="frequency" value="monthly" class={radio} /><span class="block cursor-pointer rounded-full px-5 py-2 text-center font-semibold text-ink-soft transition peer-checked:bg-card peer-checked:text-wine peer-checked:shadow-soft peer-focus-visible:outline peer-focus-visible:outline-3 peer-focus-visible:outline-gold">{L.monthly}</span></label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend class="mb-3 text-sm font-semibold uppercase tracking-wider text-ink-mute">{L.amount}</legend>
+      <div class="grid grid-cols-2 gap-2 sm:grid-cols-3" data-presets="once">
+        {once.map((a) => (
+          <label class="relative">
+            <input type="radio" name="amount" value={a} checked={a === 100} class={radio} />
+            <span class={chip + ' flex-col gap-0.5'}>
+              <span class="tabular text-lg" dir="ltr">{formatEuro(a)}</span>
+              {a % sqm === 0 && <span class="text-xs font-medium opacity-75" dir="ltr">= {a / sqm} m²</span>}
+            </span>
+            {a === 250 && <span class="pill absolute -top-2.5 end-2 !py-0 text-[0.7rem]">{L.popular}</span>}
+          </label>
+        ))}
+      </div>
+      <div class="hidden grid-cols-2 gap-2 sm:grid-cols-3" data-presets="monthly">
+        {monthly.map((a) => (
+          <label class="relative">
+            <input type="radio" name="amount" value={a} disabled class={radio} />
+            <span class={chip}><span class="tabular text-lg" dir="ltr">{formatEuro(a)}</span><span class="ms-1 text-xs font-medium opacity-75">{L.perMonth}</span></span>
+          </label>
+        ))}
+      </div>
+      <label class="mt-3 flex items-center gap-3 rounded-xl border-[1.5px] border-line bg-card px-4 focus-within:border-wine">
+        <span class="shrink-0 text-sm font-semibold text-ink-soft">{L.other}</span>
+        <input type="number" name="custom" min="5" max="50000" step="1" inputmode="numeric" placeholder="0" class="tabular h-12 w-full bg-transparent text-end text-lg font-semibold outline-none" data-custom />
+        <span class="font-semibold text-ink-soft">€</span>
+      </label>
+      <p class="mt-3 flex items-center gap-2 text-sm text-ink-soft" data-sqm-row>
+        <Icon name="area" size={16} class="text-gold" />
+        <span><bdi>{L.sqmInfo}</bdi>. {L.sqmYour} <strong class="tabular text-wine" dir="ltr" data-sqm-out>0,28 m²</strong>.</span>
+      </p>
+    </fieldset>
+
+    <div class="space-y-4">
+      <label class="block">
+        <span class="mb-1.5 block text-sm font-semibold text-ink">{L.dedication}</span>
+        <input type="text" name="dedication" maxlength="120" placeholder={L.dedicationHint} class="h-12 w-full rounded-xl border-[1.5px] border-line bg-card px-4 outline-none placeholder:text-ink-mute focus:border-wine" />
+      </label>
+      <label class="flex cursor-pointer gap-3">
+        <input type="checkbox" name="receipt" value="1" class="mt-1 size-5 shrink-0 accent-wine" />
+        <span><span class="font-semibold">{L.receipt}</span><span class="block text-sm text-ink-soft">{L.receiptHint}</span></span>
+      </label>
+      <label class="flex cursor-pointer gap-3">
+        <input type="checkbox" name="coverFees" value="1" class="mt-1 size-5 shrink-0 accent-wine" />
+        <span class="text-[0.98rem]">{L.fees}</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="border-t border-line bg-paper-2/60 p-6 md:p-8">
+    <div class="mb-4 flex items-baseline justify-between gap-4">
+      <span class="font-semibold text-ink-soft">{L.total}</span>
+      <span class="font-display text-3xl font-semibold tabular text-wine"><span data-total dir="ltr" class="inline-block">{formatEuro(100)}</span> <span class="hidden text-base font-sans text-ink-soft" data-monthly-suffix>{L.perMonth}</span></span>
+    </div>
+    <button type="submit" class="btn btn-primary w-full !min-h-14 text-lg" data-cta="donate-submit">
+      <Icon name="heart" size={20} /> {L.submit}
+    </button>
+    <p class="mt-3 flex items-center justify-center gap-2 text-center text-xs text-ink-soft"><Icon name="shield" size={14} class="text-sage" /> {L.secure}</p>
+    <p class="mt-1 hidden text-center text-xs text-ink-mute" data-monthly-note>{L.monthlyNote}</p>
+  </div>
+</form>
+
+<script>
+  const fmt = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2, minimumFractionDigits: 0 });
+  const fmtSqm = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 });
+  document.querySelectorAll<HTMLFormElement>('[data-donation-form]').forEach((form) => {
+    const sqm = Number(form.dataset.sqm);
+    const custom = form.querySelector<HTMLInputElement>('[data-custom]')!;
+    const params = new URLSearchParams(location.search);
+    if (params.has('fehler')) form.querySelector('[data-msg="error"]')?.classList.remove('hidden');
+    if (params.has('abgebrochen')) form.querySelector('[data-msg="canceled"]')?.classList.remove('hidden');
+    const fundParam = params.get('fund');
+    if (fundParam) form.querySelector<HTMLInputElement>(`input[name="fund"][value="${CSS.escape(fundParam)}"]`)?.click();
+    const amountParam = Number(params.get('betrag'));
+    if (amountParam >= 5) custom.value = String(Math.round(amountParam));
+
+    const update = () => {
+      const monthly = form.querySelector<HTMLInputElement>('input[name="frequency"]:checked')?.value === 'monthly';
+      form.querySelectorAll<HTMLElement>('[data-presets]').forEach((g) => {
+        const active = g.dataset.presets === (monthly ? 'monthly' : 'once');
+        g.classList.toggle('hidden', !active);
+        g.classList.toggle('grid', active);
+        g.querySelectorAll<HTMLInputElement>('input').forEach((i) => (i.disabled = !active));
+      });
+      if (monthly && !form.querySelector('[data-presets="monthly"] input:checked')) form.querySelector<HTMLInputElement>('[data-presets="monthly"] input[value="30"]')!.checked = true;
+      if (!monthly && !form.querySelector('[data-presets="once"] input:checked')) form.querySelector<HTMLInputElement>('[data-presets="once"] input[value="100"]')!.checked = true;
+      const preset = Number(form.querySelector<HTMLInputElement>('input[name="amount"]:checked:not(:disabled)')?.value ?? 0);
+      let amount = Number(custom.value) >= 1 ? Number(custom.value) : preset;
+      if (form.querySelector<HTMLInputElement>('input[name="coverFees"]')?.checked) amount = Math.round((amount * 1.015 + 0.25) * 100) / 100;
+      form.querySelector('[data-total]')!.textContent = fmt.format(amount);
+      form.querySelector('[data-monthly-suffix]')!.classList.toggle('hidden', !monthly);
+      form.querySelector('[data-monthly-note]')!.classList.toggle('hidden', !monthly);
+      const isKauf = form.querySelector<HTMLInputElement>('input[name="fund"]:checked')?.value === 'kauf';
+      form.querySelector('[data-sqm-row]')!.classList.toggle('hidden', !isKauf);
+      form.querySelector('[data-sqm-out]')!.textContent = `${fmtSqm.format(amount / sqm)} m²`;
+    };
+    form.addEventListener('change', (e) => {
+      if ((e.target as HTMLInputElement).name === 'amount') custom.value = '';
+      update();
+    });
+    custom.addEventListener('input', update);
+    update();
+  });
+</script>

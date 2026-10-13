@@ -1,0 +1,23 @@
+---
+import mark from '../assets/brand/mark.svg?raw';
+import type { Lang } from '../i18n/ui';
+interface Props { lang: Lang; tone?: 'dark' | 'light'; class?: string }
+const { lang, tone = 'dark', class: cls = '' } = Astro.props;
+const markSvg = mark.replace('<svg', '<svg aria-hidden="true" class="h-full w-auto"');
+---
+<span class:list={['inline-flex items-center gap-3', cls]}>
+  <span class:list={['h-8 shrink-0 sm:h-9 md:h-10', tone === 'dark' ? 'text-wine' : 'text-gold-soft']} set:html={markSvg} />
+  <span class="flex flex-col leading-none">
+    {lang === 'ar' ? (
+      <>
+        <span class:list={['whitespace-nowrap font-arabic text-[1.2rem] font-bold leading-tight sm:text-[1.35rem]', tone === 'dark' ? 'text-ink' : 'text-white']}>مسجد محمد الأمين</span>
+        <span class:list={['whitespace-nowrap text-[0.62rem] font-medium tracking-wide sm:text-[0.7rem]', tone === 'dark' ? 'text-ink-mute' : 'text-white/70']}>Mohammad Al-Amien Moschee · هانوفر</span>
+      </>
+    ) : (
+      <>
+        <span class:list={['whitespace-nowrap font-display text-[0.98rem] font-semibold tracking-tight sm:text-[1.15rem] md:text-[1.25rem]', tone === 'dark' ? 'text-ink' : 'text-white']}>Mohammad Al-Amien</span>
+        <span class:list={['mt-1 whitespace-nowrap text-[0.6rem] font-semibold uppercase tracking-[0.14em] sm:text-[0.68rem] sm:tracking-[0.18em]', tone === 'dark' ? 'text-gold' : 'text-gold-soft']}>Moschee · Hannover</span>
+      </>
+    )}
+  </span>
+</span>
