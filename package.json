@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "start": "node ./dist/server/entry.mjs",
-    "check": "astro check"
+    "check": "astro check",
+    "build:pages": "SITE_URL=https://karimemiraa.github.io SITE_BASE=/al_amin PUBLIC_DEMO=1 astro build"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.7",

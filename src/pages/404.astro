@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Icon from '../components/Icon.astro';
 import Ornament from '../components/Ornament.astro';
+import { withBase } from '../i18n/ui';
 ---
 <BaseLayout lang="de" title="Seite nicht gefunden" description="Die gesuchte Seite wurde nicht gefunden. Zur Startseite der Mohammad Al-Amien Moschee Hannover." noindex>
   <section class="bg-paper-grain">
@@ -14,28 +15,28 @@ import Ornament from '../components/Ornament.astro';
         schnell weiter:
       </p>
       <p class="mt-5 max-w-xl text-xl text-wine-ink" lang="ar" dir="rtl" style="font-family: var(--font-arabic); line-height: 1.9;">
-        عذراً، الصفحة التي تبحث عنها غير موجودة. <a href="/ar" class="font-semibold text-wine underline underline-offset-4">الانتقال إلى الصفحة الرئيسية</a>
+        عذراً، الصفحة التي تبحث عنها غير موجودة. <a href={withBase('/ar')} class="font-semibold text-wine underline underline-offset-4">الانتقال إلى الصفحة الرئيسية</a>
       </p>
 
       <Ornament class="my-10" />
 
       <ul class="grid w-full max-w-3xl gap-3 sm:grid-cols-3">
         <li>
-          <a href="/" class="card group flex h-full flex-col items-center gap-3 p-6 transition hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-lift">
+          <a href={withBase('/')} class="card group flex h-full flex-col items-center gap-3 p-6 transition hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-lift">
             <span class="grid size-12 place-items-center rounded-full bg-gold-pale text-wine"><Icon name="moon" size={22} /></span>
             <span class="text-lg font-semibold text-ink group-hover:text-wine">Startseite</span>
             <span class="text-sm text-ink-mute" lang="ar" dir="rtl">الصفحة الرئيسية</span>
           </a>
         </li>
         <li>
-          <a href="/gebetszeiten" class="card group flex h-full flex-col items-center gap-3 p-6 transition hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-lift">
+          <a href={withBase('/gebetszeiten')} class="card group flex h-full flex-col items-center gap-3 p-6 transition hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-lift">
             <span class="grid size-12 place-items-center rounded-full bg-gold-pale text-wine"><Icon name="clock" size={22} /></span>
             <span class="text-lg font-semibold text-ink group-hover:text-wine">Gebetszeiten</span>
             <span class="text-sm text-ink-mute" lang="ar" dir="rtl">مواقيت الصلاة</span>
           </a>
         </li>
         <li>
-          <a href="/spenden" class="card group flex h-full flex-col items-center gap-3 p-6 transition hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-lift">
+          <a href={withBase('/spenden')} class="card group flex h-full flex-col items-center gap-3 p-6 transition hover:-translate-y-0.5 hover:border-gold-soft hover:shadow-lift">
             <span class="grid size-12 place-items-center rounded-full bg-wine text-white"><Icon name="heart" size={22} /></span>
             <span class="text-lg font-semibold text-ink group-hover:text-wine">Spenden</span>
             <span class="text-sm text-ink-mute" lang="ar" dir="rtl">تبرّع</span>

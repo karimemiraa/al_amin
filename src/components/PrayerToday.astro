@@ -73,7 +73,7 @@ const labels: Record<string, string> = { ...Object.fromEntries(rows.map((r) => [
   async function lookup(widget: HTMLElement, date: string): Promise<Entry | undefined> {
     const inline = JSON.parse(widget.querySelector('[data-prayer-data]')!.textContent!);
     if (inline[date]) return inline[date];
-    if (!full) full = await fetch('/prayer-times.json').then((r) => r.json()).catch(() => ({}));
+    if (!full) full = await fetch(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/prayer-times.json`).then((r) => r.json()).catch(() => ({}));
     return full![date];
   }
 

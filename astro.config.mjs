@@ -4,8 +4,13 @@ import node from '@astrojs/node';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
 
+// GitHub Pages test build: SITE_URL=https://karimemiraa.github.io SITE_BASE=/al_amin PUBLIC_DEMO=1
+const site = process.env.SITE_URL || 'https://www.igh-hannover.de';
+const base = process.env.SITE_BASE || '/';
+
 export default defineConfig({
-  site: 'https://www.igh-hannover.de',
+  site,
+  base,
   // Pages are prerendered (static HTML); only /api/* routes run on the server.
   output: 'static',
   adapter: node({ mode: 'standalone' }),

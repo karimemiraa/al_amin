@@ -8,7 +8,7 @@ import SectionHeading from '../components/SectionHeading.astro';
 import Icon from '../components/Icon.astro';
 import prayerSettings from '../content/settings/prayer.json';
 import { berlinToday, getMonth, publishedYears, jumuah, iqamaOffsets, PRAYERS, isoDate } from '../lib/prayer';
-import { localizePath, intlLocale, useTranslations, type Lang } from '../i18n/ui';
+import { localizePath, withBase, intlLocale, useTranslations, type Lang } from '../i18n/ui';
 import hall from '../assets/photos/gebetsraum-2.jpg';
 
 interface Props { lang: Lang }
@@ -139,7 +139,7 @@ const schema = [
     <div class="mt-8 flex flex-wrap gap-3">
       <a href="#monatsuebersicht" class="btn btn-light"><Icon name="calendar" size={18} class="text-wine" /> {c.toMonth}</a>
       {pdfs.at(-1) && (
-        <a href={pdfs.at(-1)!.href} class="btn btn-ghost-light" download><Icon name="download" size={18} /> <span>{c.pdfLabel(pdfs.at(-1)!.year)} <span class="text-white/70">(PDF)</span></span></a>
+        <a href={withBase(pdfs.at(-1)!.href)} class="btn btn-ghost-light" download><Icon name="download" size={18} /> <span>{c.pdfLabel(pdfs.at(-1)!.year)} <span class="text-white/70">(PDF)</span></span></a>
       )}
     </div>
   </PageHero>
@@ -262,7 +262,7 @@ const schema = [
         </div>
         <div class="flex flex-wrap gap-2">
           {pdfs.map((p) => (
-            <a href={p.href} class="btn btn-primary" download><Icon name="download" size={18} /> {c.pdfLabel(p.year)} <span class="font-normal opacity-80">PDF</span></a>
+            <a href={withBase(p.href)} class="btn btn-primary" download><Icon name="download" size={18} /> {c.pdfLabel(p.year)} <span class="font-normal opacity-80">PDF</span></a>
           ))}
         </div>
       </div>

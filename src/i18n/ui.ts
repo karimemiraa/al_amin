@@ -4,21 +4,29 @@ export const defaultLang: Lang = 'de';
 
 export const dir = (lang: Lang) => (lang === 'ar' ? 'rtl' : 'ltr');
 
-/** Prefix a German path with the locale (German has no prefix). */
+/** Deployment sub-path (e.g. "/al_amin" on GitHub Pages), empty on the real domain. */
+export const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+/** Prefix a root-relative path with the deployment base. */
+export const withBase = (path: string) => `${BASE}${path}` || '/';
+
+/** Prefix a German path with the locale (German has no prefix) and the deployment base. */
 export function localizePath(path: string, lang: Lang): string {
   const clean = path.startsWith('/') ? path : `/${path}`;
-  if (lang === defaultLang) return clean;
-  return clean === '/' ? `/${lang}` : `/${lang}${clean}`;
+  if (lang === defaultLang) return withBase(clean);
+  return withBase(clean === '/' ? `/${lang}` : `/${lang}${clean}`);
 }
 
-/** Strip any locale prefix, returning the German path. */
+/** Strip the deployment base and any locale prefix, returning the German path. */
 export function basePath(pathname: string): string {
-  const stripped = pathname.replace(/^\/ar(?=\/|$)/, '');
+  const withoutBase = BASE && pathname.startsWith(BASE) ? pathname.slice(BASE.length) || '/' : pathname;
+  const stripped = withoutBase.replace(/^\/ar(?=\/|$)/, '');
   return stripped === '' ? '/' : stripped.replace(/\.html$/, '');
 }
 
 export function getLangFromUrl(url: URL): Lang {
-  return url.pathname === '/ar' || url.pathname.startsWith('/ar/') ? 'ar' : 'de';
+  const p = BASE && url.pathname.startsWith(BASE) ? url.pathname.slice(BASE.length) : url.pathname;
+  return p === '/ar' || p.startsWith('/ar/') ? 'ar' : 'de';
 }
 
 /** Pick the localized field of a content entry, falling back to German. */

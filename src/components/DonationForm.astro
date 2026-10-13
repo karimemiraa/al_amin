@@ -5,7 +5,7 @@
  */
 import Icon from './Icon.astro';
 import campaign from '../content/settings/campaign.json';
-import { formatEuro, localizePath, type Lang } from '../i18n/ui';
+import { formatEuro, withBase, type Lang } from '../i18n/ui';
 
 interface Props { lang: Lang; fund?: 'kauf' | 'allgemein' | 'zakat' }
 const { lang, fund = 'kauf' } = Astro.props;
@@ -47,7 +47,7 @@ const funds = [
 const radio = 'peer sr-only';
 const chip = 'flex min-h-[3.25rem] cursor-pointer items-center justify-center rounded-xl border-[1.5px] border-line bg-card px-3 py-2 text-center font-semibold transition hover:border-wine/50 peer-checked:border-wine peer-checked:bg-wine peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-3 peer-focus-visible:outline-gold';
 ---
-<form method="post" action="/api/checkout" class="card overflow-hidden" id="spenden-form" data-donation-form data-sqm={sqm}>
+<form method="post" action={withBase('/api/checkout')} class="card overflow-hidden" id="spenden-form" data-donation-form data-sqm={sqm}>
   <input type="hidden" name="lang" value={lang} />
   <div class="space-y-7 p-6 md:p-8">
     <div class="hidden rounded-xl border border-rose/40 bg-rose-soft px-4 py-3 text-[0.95rem] text-wine-ink" role="alert" data-msg="error">{L.error}</div>

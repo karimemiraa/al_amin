@@ -6,7 +6,7 @@ import Footer from '../components/Footer.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
 import site from '../content/settings/site.json';
 import ogDefault from '../assets/photos/neues-gebaeude.jpg';
-import { dir, localizePath, basePath, useTranslations, type Lang } from '../i18n/ui';
+import { dir, localizePath, basePath, withBase, useTranslations, type Lang } from '../i18n/ui';
 
 interface Props {
   lang: Lang;
@@ -31,6 +31,7 @@ const og = await getImage({ src: image, width: 1200, height: 630, fit: 'cover', 
 const plausibleDomain = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 const plausibleSrc = import.meta.env.PUBLIC_PLAUSIBLE_SRC || 'https://plausible.io/js/script.js';
 const googleAdsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID;
+const demo = import.meta.env.PUBLIC_DEMO === '1';
 
 const orgSchema = {
   '@context': 'https://schema.org',
@@ -58,11 +59,11 @@ const orgSchema = {
     <link rel="alternate" hreflang="de" href={altDe} />
     <link rel="alternate" hreflang="ar" href={altAr} />
     <link rel="alternate" hreflang="x-default" href={altDe} />
-    {noindex && <meta name="robots" content="noindex" />}
+    {(noindex || demo) && <meta name="robots" content="noindex, nofollow" />}
     <meta name="theme-color" content="#6b1f2f" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="icon" href={withBase('/favicon.svg')} type="image/svg+xml" />
+    <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
+    <link rel="sitemap" href={withBase('/sitemap-index.xml')} />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={brand} />
@@ -81,11 +82,23 @@ const orgSchema = {
   </head>
   <body class="min-h-dvh">
     <a href="#main" class="sr-only z-[60] rounded-full bg-wine px-4 py-2 text-white focus:not-sr-only focus:fixed focus:start-4 focus:top-4">{t('nav.skip')}</a>
+    {demo && (
+      <div class="bg-gold-soft px-4 py-2 text-center text-sm font-semibold text-wine-ink" role="note">
+        {lang === 'ar' ? 'نسخة تجريبية – المحتوى أولي والدفع الإلكتروني ونموذج التواصل غير مفعّلين.' : 'Testversion – Inhalte vorläufig, Online-Zahlung und Kontaktformular sind deaktiviert.'}
+      </div>
+    )}
     <Header lang={lang} />
     <main id="main">
       <slot />
     </main>
     <Footer lang={lang} />
     {googleAdsId && <ConsentBanner lang={lang} adsId={googleAdsId} />}
+    {demo && (
+      <script is:inline define:vars={{ msg: lang === 'ar' ? 'هذه نسخة تجريبية: الدفع الإلكتروني ونموذج التواصل غير مفعّلين. يمكنك التبرع عبر التحويل البنكي.' : 'Testversion: Online-Zahlung und Kontaktformular sind hier deaktiviert. Spenden Sie gerne per Überweisung.' }}>
+        document.addEventListener('submit', function (e) {
+          if ((e.target.getAttribute('action') || '').indexOf('/api/') !== -1) { e.preventDefault(); alert(msg); }
+        });
+      </script>
+    )}
   </body>
 </html>
