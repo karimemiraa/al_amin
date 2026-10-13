@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **DRAFT – awaiting sign-off** |
+| Status | **Approved 2026-10-13** (VPS hosting, German + Arabic at launch, deadline 01.02.2027) – Phase 1 built |
 | Date | 2026-10-12 |
 | Owner | IGH Hannover e.V. |
 | Research | [`research/01-current-site-audit.md`](research/01-current-site-audit.md) · [`research/02-mosque-website-benchmark.md`](research/02-mosque-website-benchmark.md) · [`research/03-legal-donations-adgrants.md`](research/03-legal-donations-adgrants.md) |
@@ -176,4 +176,8 @@ The current web presence works against this goal:
 
 ## 11. Open questions (blocking sign-off)
 
-See the chat summary. Answers will be recorded here once given.
+Answered on 2026-10-13:
+- **Q1 Tech**: deploy on own VPS → Astro + Sveltia CMS + Docker/Caddy (see `DEPLOYMENT.md`).
+- **Q2 Deadline**: 01.02.2027 confirmed.
+- **Q4 Languages**: German + Arabic at launch (entire site, not only campaign pages).
+- **All other inputs**: build with what exists, edit later → tracked in [`CONTENT-TODO.md`](CONTENT-TODO.md).

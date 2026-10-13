@@ -31,6 +31,11 @@ Die Website wurde mit den vorhandenen Informationen gebaut. Folgende Punkte sind
 | 18 | **Vereinfachter Zuwendungsnachweis** als PDF zum Download (für Spenden ≤ 300 €) | Erst nach Punkt 4 möglich |
 | 19 | WhatsApp-Kanal / Instagram (falls vorhanden) | `site.json` → `social` |
 | 20 | Unterricht für Kinder/Frauen (falls es bereits Angebote gibt) | CMS → Programm |
+| 21 | Schreibweise **Mohammad** vs. **Mohamad** Kobbani (Impressum vs. Kontaktperson) | `site.json` |
+| 22 | Datenschutz: Hosting-Anbieter + Auftragsverarbeitungsvertrag, Log-Löschung nach 14 Tagen auf dem Server einstellen, ggf. Datenschutzbeauftragter | `DatenschutzPage.astro`, Server |
+| 23 | Adresse der Übersetzungsseite im Moschee-WLAN (alte Seite: `igh-hannover.live`) noch gültig? | `BesuchPage.astro` |
+| 24 | Ablauf der Moscheeführung & Hinweise (Waschraum, Gebetsnische, Schuhregal) bestätigen | `BesuchPage.astro` |
+| 25 | Satzung als PDF für den Transparenz-Bereich | `public/downloads/` + `UeberUnsPage.astro` |
 
 ## Inhalte, die aus der alten Website übernommen wurden
 

@@ -59,7 +59,7 @@ const L = (p: string) => localizePath(p, lang);
 
   <div class="border-t border-white/10">
     <div class="container-x flex flex-col gap-3 py-6 text-sm text-white/60 md:flex-row md:items-center md:justify-between">
-      <p>© {year} {site.orgName}</p>
+      <p>© {year} <bdi>{site.orgName}</bdi></p>
       <ul class="flex flex-wrap gap-x-5 gap-y-2">
         <li><a href={L('/ueber-uns') + '#transparenz'} class="hover:text-white">{t('footer.transparency')}</a></li>
         <li><a href={L('/impressum')} class="hover:text-white">{t('footer.imprint')}</a></li>

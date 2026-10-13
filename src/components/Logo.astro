@@ -15,8 +15,8 @@ const markSvg = mark.replace('<svg', '<svg aria-hidden="true" class="h-full w-au
       </>
     ) : (
       <>
-        <span class:list={['whitespace-nowrap font-display text-[0.98rem] font-semibold tracking-tight sm:text-[1.15rem] md:text-[1.25rem]', tone === 'dark' ? 'text-ink' : 'text-white']}>Mohammad Al-Amien</span>
-        <span class:list={['mt-1 whitespace-nowrap text-[0.6rem] font-semibold uppercase tracking-[0.14em] sm:text-[0.68rem] sm:tracking-[0.18em]', tone === 'dark' ? 'text-gold' : 'text-gold-soft']}>Moschee · Hannover</span>
+        <span class:list={['font-display text-[1rem] font-semibold leading-[1.05] tracking-tight sm:whitespace-nowrap sm:text-[1.15rem] md:text-[1.25rem]', tone === 'dark' ? 'text-ink' : 'text-white']}>Mohammad <br class="sm:hidden" />Al-Amien</span>
+        <span class:list={['mt-1 hidden whitespace-nowrap text-[0.68rem] font-semibold uppercase tracking-[0.18em] sm:block', tone === 'dark' ? 'text-gold' : 'text-gold-soft']}>Moschee · Hannover</span>
       </>
     )}
   </span>

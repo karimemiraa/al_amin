@@ -13,7 +13,7 @@ export default defineConfig({
   devToolbar: { enabled: false },
   // Behind Caddy: trust forwarded host/proto only for our own domain.
   security: { allowedDomains: [{ hostname: 'www.igh-hannover.de', protocol: 'https' }] },
-  build: { format: 'file' },
+  build: { format: 'preserve' },
   i18n: {
     locales: ['de', 'ar'],
     defaultLocale: 'de',

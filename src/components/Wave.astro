@@ -3,7 +3,7 @@
 interface Props { fill?: string; flip?: boolean; class?: string }
 const { fill = 'var(--color-paper)', flip = false, class: cls = '' } = Astro.props;
 ---
-<div class:list={['pointer-events-none relative z-10 -mb-px leading-[0]', cls]} aria-hidden="true" style={flip ? 'transform:rotate(180deg)' : ''}>
+<div class:list={['pointer-events-none z-10 -mb-px block leading-[0]', cls]} aria-hidden="true" style={flip ? 'transform:rotate(180deg)' : ''}>
   <svg viewBox="0 0 1440 90" preserveAspectRatio="none" class="h-[42px] w-full md:h-[70px]">
     <path d="M0 60C180 20 360 10 560 34s380 52 560 30 260-50 320-46v72H0z" fill={fill} />
     <path d="M0 60C180 20 360 10 560 34s380 52 560 30 260-50 320-46" fill="none" stroke="var(--color-gold-soft)" stroke-width="2" vector-effect="non-scaling-stroke" opacity=".9" />

@@ -10,7 +10,7 @@ const window = getRange(berlinToday(), 21);
 const today = window[0];
 const rows: PrayerKey[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const inline = Object.fromEntries(window.map((d) => [d.date, [d.times, d.iqama, d.provisional ? 1 : 0]]));
-const labels = { ...Object.fromEntries(rows.map((r) => [r, t(`prayer.${r}`)])), _h: lang === 'ar' ? 'س' : 'h', _m: lang === 'ar' ? 'د' : 'min' };
+const labels: Record<string, string> = { ...Object.fromEntries(rows.map((r) => [r, t(`prayer.${r}`)])), _h: lang === 'ar' ? 'س' : 'h', _m: lang === 'ar' ? 'د' : 'min' };
 ---
 <div class:list={['card overflow-hidden', variant === 'compact' && 'text-[0.95rem]']} data-prayer-widget data-lang={lang}>
   <div class="bg-wine-pattern relative px-6 py-5 text-white">
