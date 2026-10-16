@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Verwaltung – Mockup</title>
+<style>
+@font-face { font-family: 'Fraunces'; src: url(/home/user/al_amin/node_modules/@fontsource-variable/fraunces/files/fraunces-latin-soft-normal.woff2) format('woff2-variations'); font-weight: 100 900; }
+@font-face { font-family: 'Source Sans'; src: url(/home/user/al_amin/node_modules/@fontsource-variable/source-sans-3/files/source-sans-3-latin-wght-normal.woff2) format('woff2-variations'); font-weight: 200 900; }
+@font-face { font-family: 'Amiri'; src: url(/home/user/al_amin/node_modules/@fontsource/amiri/files/amiri-arabic-700-normal.woff2) format('woff2'); font-weight: 700; }
+:root {
+  --paper: #f7f2ea; --card: #fffcf7; --line: #e6dccd; --line-2: #efe7db;
+  --ink: #2a2420; --soft: #5d524a; --mute: #8a7f75;
+  --brand: #2f7d3e; --brand-deep: #23622f; --brand-ink: #15391c; --brand-soft: #e4f1e3; --leaf: #69b86b;
+  --gold: #a8844f; --gold-soft: #d9c39d; --gold-pale: #f1e6d2;
+  --warn: #b7791f; --warn-soft: #fbf0dc; --ok: #2f7d3e;
+}
+* { box-sizing: border-box; margin: 0; }
+body { font: 14px/1.5 'Source Sans', system-ui, sans-serif; color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; }
+.app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+/* Sidebar */
+.side { background: var(--brand-ink); color: #dfe9df; display: flex; flex-direction: column; padding: 18px 12px; position: sticky; top: 0; height: 100vh;
+  background-image: radial-gradient(140% 60% at 0% 0%, rgb(105 184 107 / .22), transparent 60%); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
+.brand svg { height: 26px; color: var(--leaf); }
+.brand b { font-family: 'Fraunces'; font-weight: 600; font-size: 15px; color: #fff; display: block; line-height: 1.1; }
+.brand small { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold-soft); }
+.search { display: flex; align-items: center; gap: 8px; margin: 0 4px 14px; padding: 7px 10px; border-radius: 10px; background: rgb(255 255 255 / .07); border: 1px solid rgb(255 255 255 / .08); color: rgb(255 255 255 / .6); font-size: 13px; }
+.search kbd { margin-left: auto; font: 600 10px 'Source Sans'; padding: 1px 6px; border-radius: 5px; border: 1px solid rgb(255 255 255 / .2); color: rgb(255 255 255 / .7); }
+.nav { display: grid; gap: 1px; }
+.nav .grp { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgb(255 255 255 / .38); padding: 14px 10px 6px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; color: rgb(255 255 255 / .78); text-decoration: none; font-weight: 500; }
+.nav a svg { width: 17px; height: 17px; opacity: .85; }
+.nav a.on { background: rgb(255 255 255 / .1); color: #fff; box-shadow: inset 2px 0 0 var(--leaf); }
+.nav a .n { margin-left: auto; font-size: 11px; background: rgb(255 255 255 / .12); padding: 0 7px; border-radius: 999px; }
+.nav a .lock { margin-left: auto; opacity: .5; width: 13px; height: 13px; }
+.side-foot { margin-top: auto; padding: 12px 8px 2px; border-top: 1px solid rgb(255 255 255 / .08); display: flex; align-items: center; gap: 10px; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--gold-soft); color: var(--brand-ink); display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.side-foot b { color: #fff; font-weight: 600; display: block; font-size: 13px; line-height: 1.2; }
+.side-foot small { color: rgb(255 255 255 / .5); font-size: 11px; display: flex; align-items: center; gap: 4px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--leaf); display: inline-block; }
+/* Main */
+main { padding: 22px 28px 40px; max-width: 1240px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.top h1 { font-family: 'Fraunces'; font-weight: 600; font-size: 24px; letter-spacing: -.01em; }
+.top p { color: var(--mute); font-size: 13px; }
+.actions { display: flex; gap: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 999px; font: 600 13px 'Source Sans'; border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; white-space: nowrap; }
+.btn svg { width: 15px; height: 15px; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 6px 16px -8px rgb(47 125 62 / .7); }
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; box-shadow: 0 1px 2px rgb(21 57 28 / .04), 0 8px 24px -14px rgb(21 57 28 / .14); }
+.card h2 { font: 600 11px 'Source Sans'; letter-spacing: .13em; text-transform: uppercase; color: var(--mute); display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.card h2 a { color: var(--brand); text-transform: none; letter-spacing: 0; font-size: 12px; text-decoration: none; }
+.c-campaign { grid-column: span 7; background: linear-gradient(135deg, var(--brand-ink), #1d4a25); color: #fff; border: 0; position: relative; overflow: hidden; }
+.c-campaign::after { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23d9c39d' stroke-opacity='.12'%3E%3Cpath d='M40 4l10.6 25.4L76 40 50.6 50.6 40 76 29.4 50.6 4 40l25.4-10.6z'/%3E%3Ccircle cx='40' cy='40' r='13'/%3E%3C/g%3E%3C/svg%3E"); pointer-events: none; }
+.c-campaign h2 { color: var(--gold-soft); }
+.c-campaign > * { position: relative; z-index: 1; }
+.big { font-family: 'Fraunces'; font-weight: 600; font-size: 38px; line-height: 1; letter-spacing: -.02em; }
+.big small { font: 400 14px 'Source Sans'; color: rgb(255 255 255 / .65); margin-left: 6px; letter-spacing: 0; }
+.bar { height: 10px; border-radius: 999px; background: rgb(255 255 255 / .14); margin: 14px 0 10px; overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; }
+.bar .bank { background: linear-gradient(90deg, var(--gold), var(--gold-soft)); width: 4.2%; }
+.bar .online { background: var(--leaf); width: 1.3%; }
+.legend { display: flex; gap: 16px; font-size: 12px; color: rgb(255 255 255 / .75); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.quick { margin-top: 14px; display: flex; gap: 8px; align-items: center; padding: 8px; border-radius: 12px; background: rgb(255 255 255 / .08); border: 1px solid rgb(255 255 255 / .1); }
+.quick label { font-size: 12px; color: rgb(255 255 255 / .7); padding-left: 6px; white-space: nowrap; }
+.quick input { flex: 1; min-width: 0; height: 32px; border-radius: 8px; border: 1px solid rgb(255 255 255 / .18); background: rgb(0 0 0 / .15); color: #fff; padding: 0 10px; font: 600 14px 'Source Sans'; }
+.quick .btn { height: 32px; background: var(--gold-soft); border: 0; color: var(--brand-ink); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+.stats div { background: rgb(255 255 255 / .06); border-radius: 10px; padding: 8px 10px; }
+.stats b { font-family: 'Fraunces'; font-size: 18px; display: block; }
+.stats small { font-size: 11px; color: rgb(255 255 255 / .6); }
+.c-check { grid-column: span 5; }
+.ring { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.ring svg { width: 54px; height: 54px; }
+.ring b { font-family: 'Fraunces'; font-size: 18px; display: block; line-height: 1.2; }
+.ring small { color: var(--mute); font-size: 12px; }
+.checks { list-style: none; padding: 0; display: grid; gap: 2px; }
+.checks li { display: flex; align-items: center; gap: 9px; padding: 5px 6px; border-radius: 8px; font-size: 13px; }
+.checks li:hover { background: var(--paper); }
+.checks .ic { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+.checks .done .ic { background: var(--brand-soft); color: var(--brand); }
+.checks .done span { color: var(--mute); text-decoration: line-through; text-decoration-color: var(--line); }
+.checks .todo .ic { border: 1.5px dashed var(--gold-soft); }
+.checks .todo a { margin-left: auto; font-size: 12px; color: var(--brand); text-decoration: none; font-weight: 600; }
+.checks .crit .ic { border-color: var(--warn); }
+.tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--warn-soft); color: var(--warn); letter-spacing: .04em; }
+.c-quick { grid-column: span 12; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 12px; }
+.qa { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-2); text-decoration: none; color: var(--ink); background: linear-gradient(180deg, #fff, var(--card)); }
+.qa .ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); flex: none; }
+.qa b { display: block; font-weight: 600; font-size: 13.5px; }
+.qa small { color: var(--mute); font-size: 12px; }
+.c-news { grid-column: span 5; }
+.c-prog { grid-column: span 4; }
+.c-prayer { grid-column: span 3; }
+.row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-2); }
+.row:first-of-type { border-top: 0; padding-top: 0; }
+.chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.live { background: var(--brand-soft); color: var(--brand); }
+.chip.plan { background: var(--gold-pale); color: #7a5a2c; }
+.chip.draft { background: var(--line-2); color: var(--soft); }
+.row .t { flex: 1; min-width: 0; }
+.row .t b { font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .t small { color: var(--mute); font-size: 12px; }
+.ar { font-family: 'Amiri'; font-weight: 700; font-size: 13px; color: var(--soft); direction: rtl; }
+.day { width: 40px; flex: none; text-align: center; border-radius: 9px; background: var(--gold-pale); padding: 4px 0; font-size: 10px; font-weight: 700; color: #6b4f2a; line-height: 1.2; }
+.day span { display: block; font-weight: 500; font-size: 10px; }
+.lang { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--soft); }
+.pt { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pt td { padding: 5px 0; border-top: 1px solid var(--line-2); }
+.pt tr:first-child td { border-top: 0; }
+.pt td:last-child { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pt tr.next td { color: var(--brand); }
+.pt tr.next td:first-child::after { content: ' · in 1 h 12'; font-weight: 500; font-size: 11px; color: var(--mute); }
+.c-log { grid-column: span 7; }
+.c-theme { grid-column: span 5; }
+.log .row { font-size: 13px; }
+.log .who { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--gold-pale); color: #6b4f2a; flex: none; }
+.log .when { color: var(--mute); font-size: 12px; white-space: nowrap; }
+.log .sens { color: var(--warn); }
+.themes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.th { border-radius: 12px; border: 1.5px solid var(--line); overflow: hidden; background: var(--card); font-size: 11.5px; font-weight: 600; text-align: center; }
+.th .pv { height: 58px; position: relative; }
+.th .pv i { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 10px; border-radius: 3px; background: rgb(255 255 255 / .85); }
+.th .pv i::after { content: ''; position: absolute; right: 4px; top: 2px; width: 18px; height: 6px; border-radius: 2px; background: var(--c); }
+.th p { padding: 6px 4px; }
+.th.on { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.th.on p::before { content: '✓ '; color: var(--brand); }
+.sched { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--soft); padding: 8px 10px; border-radius: 10px; background: var(--paper); }
+.toggle { width: 30px; height: 18px; border-radius: 999px; background: var(--brand); position: relative; flex: none; }
+.toggle::after { content: ''; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+.toast { position: fixed; right: 24px; bottom: 24px; background: var(--brand-ink); color: #fff; padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; box-shadow: 0 16px 40px -12px rgb(0 0 0 / .4); }
+.toast .ok { width: 20px; height: 20px; border-radius: 50%; background: var(--leaf); display: grid; place-items: center; }
+.toast a { color: var(--gold-soft); font-weight: 600; text-decoration: none; margin-left: 6px; }
+svg { flex: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <svg viewBox="0 0 217 171" fill="currentColor"><circle cx="14.5" cy="38" r="14"/><rect x="5.5" y="65.5" width="18" height="70.5"/><circle cx="202.5" cy="38" r="14"/><rect x="194" y="65.5" width="18" height="70.5"/><rect x="5.5" y="152" width="206.5" height="19"/><rect x="99.5" y="102.5" width="18" height="33.5"/><path d="M41 136V80c0-24 14-38 34-53L108 0l33 27c20 15 34 29 34 53v56h-18V82c0-15-9-25-24-37l-19-15c-4-3-8-3-12 0L83 45C68 57 59 67 59 82v54z"/></svg>
+      <div><b>Al-Amien</b><small>Verwaltung</small></div>
+    </div>
+    <div class="search"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Suchen & springen<kbd>⌘ K</kbd></div>
+    <nav class="nav">
+      <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Übersicht</a>
+      <div class="grp">Inhalte</div>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10v4l12 5V5L4 10zM16 9a3 3 0 0 1 0 6"/></svg>Ankündigungen<span class="n">3</span></a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5"/></svg>Programm<span class="n">7</span></a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 5.5v13l11-6.5z"/></svg>Mediathek</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>Gebetszeiten</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.4-9.2-8.6C1.3 8.3 3 5 6.2 5c2 0 3.3 1.1 3.8 2.2C10.5 6.1 11.8 5 13.8 5 17 5 18.7 8.3 17.2 11.4 15 15.6 12 20 12 20z"/></svg>Kampagne</a>
+      <div class="grp">Einstellungen</div>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Verein & Kontakt</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18v12H3zM3 10h18"/></svg>Zahlungen<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18M3 12h9"/></svg>Design</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/></svg>Benutzer & Sicherheit</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg>Protokoll</a>
+    </nav>
+    <div class="side-foot">
+      <span class="avatar">KE</span>
+      <div><b>Karim E.</b><small><span class="dot"></span> Inhaber · 2FA aktiv</small></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="top">
+      <div>
+        <h1>As-salamu alaikum, Karim</h1>
+        <p>Freitag, 16. Oktober 2026 · 5. Dschumada I 1448 · Freitagsgebet 14:00</p>
+      </div>
+      <div class="actions">
+        <a class="btn" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>Website ansehen</a>
+        <a class="btn primary" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Neu</a>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card c-campaign">
+        <h2>Kaufprojekt · Spendenstand <a href="#" style="color:var(--gold-soft)">Kampagne öffnen →</a></h2>
+        <div class="big">71.240 €<small>von 1.300.000 € · 5,5 %</small></div>
+        <div class="bar"><i class="bank"></i><i class="online"></i></div>
+        <div class="legend"><span><i style="background:var(--gold-soft)"></i>Überweisung & bar 54.800 €</span><span><i style="background:var(--leaf)"></i>Online (Stripe, automatisch) 16.440 €</span></div>
+        <div class="stats">
+          <div><b>203 m²</b><small>von 3.700 m² gesichert</small></div>
+          <div><b>148</b><small>Spender:innen</small></div>
+          <div><b>108 Tage</b><small>bis 01.02.2027</small></div>
+        </div>
+        <form class="quick"><label>Banküberweisungen gesamt</label><input value="54.800 €" /><button class="btn" type="button">Stand speichern</button></form>
+      </section>
+
+      <section class="card c-check">
+        <h2>Bereit für den Start <a href="#">Alle anzeigen</a></h2>
+        <div class="ring">
+          <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--line-2)" stroke-width="4"/><circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--brand)" stroke-width="4" stroke-linecap="round" stroke-dasharray="58.4 97.4" transform="rotate(-90 18 18)"/></svg>
+          <div><b>7 von 12 erledigt</b><small>Noch 2 Pflichtpunkte vor dem Go-live</small></div>
+        </div>
+        <ul class="checks">
+          <li class="done"><span class="ic"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>Stripe verbunden (Live-Modus)</span></li>
+          <li class="done"><span class="ic"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span>E-Mail-Versand (SMTP) getestet</span></li>
+          <li class="todo crit"><span class="ic"></span><span>Registernummer im Impressum</span> <span class="tag">PFLICHT</span><a href="#">Eintragen</a></li>
+          <li class="todo crit"><span class="ic"></span><span>Freistellungsbescheid hinterlegen</span> <span class="tag">PFLICHT</span><a href="#">Eintragen</a></li>
+          <li class="todo"><span class="ic"></span><span>2FA für alle Benutzer aktivieren</span><a href="#">Aktivieren</a></li>
+        </ul>
+      </section>
+
+      <section class="card c-quick">
+        <a class="qa" href="#"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10v4l12 5V5L4 10zM16 9a3 3 0 0 1 0 6"/></svg></span><span><b>Ankündigung schreiben</b><small>Deutsch & Arabisch, mit Bild</small></span></a>
+        <a class="qa" href="#"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M12 7v6M9 10h6"/></svg></span><span><b>Unterricht hinzufügen</b><small>Tag, nach welchem Gebet, Sprache</small></span></a>
+        <a class="qa" href="#"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 5.5v13l11-6.5z"/></svg></span><span><b>Video einfügen</b><small>YouTube-Link einfügen – fertig</small></span></a>
+        <a class="qa" href="#"><span class="ico" style="background:var(--gold-pale);color:#7a5a2c"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M3 6v4h18V6M7 14h10"/></svg></span><span><b>Hinweisleiste</b><small>z. B. „Eid-Gebet am Sonntag 8:00“</small></span></a>
+      </section>
+
+      <section class="card c-news">
+        <h2>Ankündigungen <a href="#">Alle (5)</a></h2>
+        <div class="row"><span class="chip live">Live</span><div class="t"><b>Kaufprojekt gestartet: Unsere neue Moschee</b><small>Angeheftet · seit 13. Okt.</small></div></div>
+        <div class="row"><span class="chip plan">Geplant</span><div class="t"><b>Elternabend Koranschule</b><small>erscheint Mo. 19. Okt., 08:00 · läuft ab 25. Okt.</small></div></div>
+        <div class="row"><span class="chip live">Live</span><div class="t"><b>Freitagsgebet mit Simultanübersetzung</b><small class="ar">صلاة الجمعة مع ترجمة فورية</small></div></div>
+        <div class="row"><span class="chip draft">Entwurf</span><div class="t"><b>Ramadan 1448 – Vorbereitung</b><small>Arabische Übersetzung fehlt</small></div></div>
+      </section>
+
+      <section class="card c-prog">
+        <h2>Nächster Unterricht <a href="#">Wochenplan</a></h2>
+        <div class="row"><span class="day">FR<span>Maghrib</span></span><div class="t"><b>Koranstunde – Tajweed</b><small><span class="lang">AR</span> heute</small></div></div>
+        <div class="row"><span class="day">SA<span>Fadschr</span></span><div class="t"><b>Quran-Tadabbur</b><small><span class="lang">AR</span> morgen</small></div></div>
+        <div class="row"><span class="day">SA<span>Asr</span></span><div class="t"><b>Die Sirah des Propheten ﷺ</b><small><span class="lang">DE</span> morgen</small></div></div>
+        <div class="row"><span class="day">SO<span>Fadschr</span></span><div class="t"><b>Fajr der Veränderung</b><small><span class="lang">AR</span> So. · mit Frühstück</small></div></div>
+      </section>
+
+      <section class="card c-prayer">
+        <h2>Heute <a href="#">Iqama</a></h2>
+        <table class="pt">
+          <tr><td>Fadschr</td><td>05:55</td></tr>
+          <tr><td>Dhuhr</td><td>13:12</td></tr>
+          <tr class="next"><td>Asr</td><td>15:56</td></tr>
+          <tr><td>Maghrib</td><td>18:33</td></tr>
+          <tr><td>Ischa</td><td>20:06</td></tr>
+          <tr><td>Dschumu'a</td><td>14:00</td></tr>
+        </table>
+      </section>
+
+      <section class="card c-log">
+        <h2>Letzte Änderungen <a href="#">Protokoll</a></h2>
+        <div class="log">
+          <div class="row"><span class="who">AE</span><div class="t">Abu Elias hat den <b style="display:inline">Spendenstand</b> auf 54.800 € gesetzt</div><span class="when">vor 12 Min.</span></div>
+          <div class="row"><span class="who">KE</span><div class="t sens">Karim hat das <b style="display:inline">Design</b> auf „Grün (Logo)“ umgestellt</div><span class="when">vor 2 Std.</span></div>
+          <div class="row"><span class="who">SA</span><div class="t">Sara hat „Elternabend Koranschule“ geplant</div><span class="when">gestern</span></div>
+          <div class="row"><span class="who">KE</span><div class="t sens">Karim hat die <b style="display:inline">Stripe-Schlüssel</b> geändert · 2FA bestätigt</div><span class="when">Mi., 14:20</span></div>
+        </div>
+      </section>
+
+      <section class="card c-theme">
+        <h2>Design der Website <a href="#">Vorschau</a></h2>
+        <div class="themes">
+          <div class="th"><div class="pv" style="background:linear-gradient(135deg,#4a1520,#8e2c3f);--c:#8e2c3f"><i></i></div><p>Weinrot</p></div>
+          <div class="th on"><div class="pv" style="background:linear-gradient(135deg,#15391c,#2f7d3e);--c:#2f7d3e"><i></i></div><p>Grün</p></div>
+          <div class="th"><div class="pv" style="background:linear-gradient(135deg,#0f1b33,#24365e);--c:#c9a45c"><i></i></div><p>Nachtblau</p></div>
+          <div class="th"><div class="pv" style="background:radial-gradient(circle at 75% 30%,#f3d58a 0 7px,transparent 8px),linear-gradient(135deg,#101a2e,#3b2f63);--c:#e1b84f"><i></i></div><p>Ramadan</p></div>
+        </div>
+        <div class="sched"><span class="toggle"></span>Ramadan-Design automatisch vom 8. Feb. bis Eid aktivieren</div>
+      </section>
+    </div>
+  </main>
+</div>
+<div class="toast"><span class="ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Gespeichert – ist jetzt live auf der Website.<a href="#">Ansehen</a></div>
+</body>
+</html>
