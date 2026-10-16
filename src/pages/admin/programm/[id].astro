@@ -83,7 +83,7 @@ const isTimeMode = l.after === 'time';
     {!isNew && !existing?.data.active && <span class="a-chip a-chip-draft"><AIcon name="pause" size={11} />{t('prog.paused')}</span>}
   </PageHead>
 
-  <form method="post" data-track class="grid gap-4 xl:grid-cols-[1fr_320px]" id="lesson-form">
+  <form method="post" data-track class="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_320px]" id="lesson-form">
     <button type="submit" name="action" value="save" class="sr-only" tabindex="-1" aria-hidden="true">{t('common.save')}</button>
     <div class="grid content-start gap-4">
       <section class="a-card grid gap-5">

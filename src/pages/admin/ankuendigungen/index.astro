@@ -53,7 +53,7 @@ const fmt = (d: Date | string, o: Intl.DateTimeFormatOptions = { day: 'numeric',
     <a href="/admin/ankuendigungen/neu" class="a-btn a-btn-primary"><AIcon name="plus" size={15} />{t('ann.new')}</a>
   </PageHead>
 
-  <div class="grid gap-4 xl:grid-cols-[1fr_360px]">
+  <div class="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
     <section class="a-card !p-0">
       <nav class="flex flex-wrap gap-1 border-b border-line px-3 py-2.5" aria-label={t('common.status')}>
         {(['all', 'live', 'scheduled', 'draft', 'expired'] as const).map((s) => (

@@ -68,7 +68,7 @@ const dateValue = v.date instanceof Date && !Number.isNaN(v.date.getTime()) ? v.
     {existing.data.featured && <span class="a-chip a-chip-scheduled"><AIcon name="star" size={11} />{t('media.isFeatured')}</span>}
   </PageHead>
 
-  <form method="post" data-track class="grid gap-4 xl:grid-cols-[1fr_320px]">
+  <form method="post" data-track class="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
     <button type="submit" name="action" value="save" class="sr-only" tabindex="-1" aria-hidden="true">{t('common.save')}</button>
     <div class="grid content-start gap-4">
       <section class="a-card grid gap-5">

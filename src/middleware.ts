@@ -28,6 +28,11 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
   startBackupScheduler(); // once per process: first backup 2 min after start, then every 24 h
   const { pathname } = ctx.url;
 
+  // trailingSlash is 'never': send hand-typed or old links like /admin/ or /spenden/ to the canonical URL.
+  if (pathname.length > 1 && pathname.endsWith('/')) {
+    return ctx.redirect(pathname.replace(/\/+$/, '').replace(/^\/+/, '/') + ctx.url.search, 301); // never '//host'
+  }
+
   // --- Admin ---------------------------------------------------------------------------
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     const { getSession, userCount, twoFactorRequired, SESSION_COOKIE } = await import('./lib/server/auth');

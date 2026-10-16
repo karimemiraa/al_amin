@@ -85,7 +85,7 @@ const dateValue = a.date instanceof Date && !Number.isNaN(a.date.getTime()) ? a.
     {!isNew && <span class={`a-chip a-chip-${status}`}><span class="a-dot"></span>{t(`ann.status.${status}`)}</span>}
   </PageHead>
 
-  <form method="post" enctype="multipart/form-data" data-track class="grid gap-4 xl:grid-cols-[1fr_340px]" id="ann-form">
+  <form method="post" enctype="multipart/form-data" data-track class="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]" id="ann-form">
     <div class="grid content-start gap-4">
       <section class="a-card grid gap-5">
         <BiField t={t} name="title" label={t('ann.fieldTitle')} de={a.title_de} ar={a.title_ar} required error={errors.title} />
