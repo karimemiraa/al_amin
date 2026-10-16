@@ -120,8 +120,8 @@ const sqm = Math.floor(campaign.raised / campaign.pricePerSqm);
       {can(user, 'campaign') && (
         <form method="post" class="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.08] p-2">
           <input type="hidden" name="action" value="total" />
-          <label class="ps-1.5 text-[12px] text-white/70" for="raised">{t('dash.manualLabel')}</label>
-          <input id="raised" name="raised" inputmode="numeric" value={campaign.manualRaised.toLocaleString('de-DE')} class="h-8 min-w-0 flex-1 rounded-lg border border-white/20 bg-black/15 px-2.5 font-semibold text-white outline-none focus:border-gold-soft" dir="ltr" />
+          <label class="w-full ps-1.5 text-[12px] text-white/70 sm:w-auto" for="raised">{t('dash.manualLabel')}</label>
+          <input id="raised" name="raised" inputmode="numeric" value={campaign.manualRaised.toLocaleString('de-DE')} class="h-8 min-w-[7rem] flex-1 rounded-lg border border-white/20 bg-black/15 px-2.5 font-semibold text-white outline-none focus:border-gold-soft" dir="ltr" />
           <input type="hidden" name="donors" value={getSetting('campaign').donors} />
           <button class="a-btn a-btn-sm !h-8 !border-0 !bg-gold-soft !text-wine-ink">{t('dash.saveTotal')}</button>
         </form>
