@@ -1,0 +1,25 @@
+---
+/** Single labelled input with hint and error, used by the settings forms. */
+import type { T } from '../../../admin/i18n';
+interface Props {
+  t: T; name: string; label: string; value?: string | number; type?: string; hint?: string; error?: string;
+  optional?: boolean; maxlength?: number; placeholder?: string; dir?: 'ltr' | 'rtl' | 'auto'; inputmode?: string;
+  autocomplete?: string; class?: string; mono?: boolean; required?: boolean; min?: string | number; max?: string | number;
+}
+const {
+  t, name, label, value = '', type = 'text', hint, error, optional = false, maxlength = 200, placeholder, dir = 'auto',
+  inputmode, autocomplete = 'off', class: cls, mono = false, required = false, min, max,
+} = Astro.props;
+const id = `f-${name.replace(/[^\w-]/g, '-')}`;
+---
+<label class:list={['a-field', cls]} for={id}>
+  <span class="a-label">{label}{optional && <span class="a-opt">({t('common.optional')})</span>}</span>
+  <input
+    id={id} class:list={['a-input', mono && 'font-mono text-[13.5px] tracking-wide']} type={type} name={name} value={value}
+    maxlength={type === 'number' || type === 'date' ? undefined : maxlength} placeholder={placeholder} dir={dir}
+    inputmode={inputmode as 'text'} autocomplete={autocomplete} required={required} min={min} max={max}
+    aria-invalid={error ? 'true' : undefined} aria-describedby={hint ? `${id}-hint` : undefined}
+  />
+  {hint && <span class="a-hint" id={`${id}-hint`}>{hint}</span>}
+  {error && <span class="a-error-text">{error}</span>}
+</label>

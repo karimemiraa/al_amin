@@ -1,0 +1,38 @@
+---
+/** List of a user's active sessions with a per-device "Abmelden" button. */
+import AIcon from '../AIcon.astro';
+import type { T, AdminLang } from '../../../admin/i18n';
+import type { Session } from '../../../lib/server/auth';
+import { deviceName, isMobileUa, relTime, sessionRef } from './helpers';
+interface Props { t: T; lang: AdminLang; sessions: Session[]; currentId?: string; userId?: number; action?: string }
+const { t, lang, sessions, currentId, userId, action = 'revokeSession' } = Astro.props;
+---
+{sessions.length === 0
+  ? <p class="py-2 text-[13px] a-muted">{t('users.noSessions')}</p>
+  : (
+    <ul class="a-list">
+      {sessions.map((s) => (
+        <li class="a-row !py-2">
+          <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-soft"><AIcon name={isMobileUa(s.userAgent) ? 'device' : 'globe'} size={16} /></span>
+          <span class="min-w-0 flex-1 leading-tight">
+            <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13.5px] font-semibold">
+              {deviceName(s.userAgent, lang)}
+              {s.id === currentId && <span class="a-chip a-chip-live">{t('users.thisDevice')}</span>}
+              {!s.mfaOk && <span class="a-chip a-chip-warn">2FA …</span>}
+            </span>
+            <small class="block truncate a-muted">
+              <span dir="ltr">{s.ip ?? '—'}</span> · {t('users.lastSeen', { time: relTime(lang, s.lastSeen) })} · {t('users.since', { time: relTime(lang, s.createdAt) })}
+            </small>
+          </span>
+          {s.id !== currentId && (
+            <form method="post" class="shrink-0">
+              <input type="hidden" name="action" value={action} />
+              {userId !== undefined && <input type="hidden" name="id" value={userId} />}
+              <input type="hidden" name="sid" value={sessionRef(s.id)} />
+              <button class="a-btn a-btn-sm a-btn-ghost a-btn-danger" title={t('users.revoke')}><AIcon name="logout" size={14} /><span class="max-sm:sr-only">{t('users.revoke')}</span></button>
+            </form>
+          )}
+        </li>
+      ))}
+    </ul>
+  )}

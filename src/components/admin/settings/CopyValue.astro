@@ -1,0 +1,29 @@
+---
+/** Read-only value (URL, event name …) with a copy button. */
+import AIcon from '../AIcon.astro';
+import type { T } from '../../../admin/i18n';
+interface Props { t: T; value: string; mono?: boolean }
+const { t, value, mono = true } = Astro.props;
+---
+<div class="flex min-w-0 items-center gap-1 rounded-[10px] border border-line bg-white ps-3 pe-1 py-1">
+  <code dir="ltr" class:list={['min-w-0 flex-1 truncate text-[12.5px] text-ink', mono && 'font-mono']} title={value}>{value}</code>
+  <button type="button" class="a-btn a-btn-sm a-btn-ghost !h-7 !px-2" data-copy-value={value} data-copied={t('common.copied')} aria-label={`${t('common.copy')}: ${value}`}>
+    <AIcon name="copy" size={14} /><span data-copy-label>{t('common.copy')}</span>
+  </button>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('[data-copy-value]').forEach((btn) => {
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', async () => {
+      const label = btn.querySelector('[data-copy-label]');
+      const original = label?.textContent;
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copyValue!);
+        if (label) label.textContent = btn.dataset.copied ?? '✓';
+        setTimeout(() => { if (label && original) label.textContent = original; }, 1800);
+      } catch { /* clipboard blocked: the value can still be selected */ }
+    });
+  });
+</script>

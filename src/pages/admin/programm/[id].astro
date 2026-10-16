@@ -1,0 +1,189 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import BiField from '../../../components/admin/BiField.astro';
+import SaveBar from '../../../components/admin/SaveBar.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, bool, isTime } from '../../../admin/util';
+import { getEntry, saveEntry, deleteEntry, newId, type Lesson } from '../../../lib/content';
+import { audit } from '../../../lib/server/auth';
+
+const denied = guardArea(Astro, 'content');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+const id = Astro.params.id!;
+const isNew = id === 'neu';
+const existing = isNew ? undefined : getEntry('program', id);
+if (!isNew && !existing) return Astro.redirect('/admin/programm', 302);
+
+const AFTER = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'time'] as const;
+const LANGS = ['de', 'ar', 'de-ar'] as const;
+const AUDIENCES = ['all', 'men', 'women', 'kids', 'youth'] as const;
+const WEEK = [6, 0, 1, 2, 3, 4, 5];
+
+const tag = Number(Astro.url.searchParams.get('tag'));
+let l: Lesson = existing?.data ?? {
+  weekday: Number.isInteger(tag) && tag >= 0 && tag <= 6 && Astro.url.searchParams.has('tag') ? tag : 6,
+  after: 'maghrib', time: '', title_de: '', title_ar: '', desc_de: '', desc_ar: '',
+  language: 'de', audience: 'all', teacher: '', active: true,
+};
+const errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  if (fd.get('action') === 'delete' && existing) {
+    deleteEntry('program', id);
+    audit(user, 'program.delete', existing.data.title_de);
+    setFlash(Astro, { type: 'ok', key: 'flash.deleted' });
+    return Astro.redirect('/admin/programm', 303);
+  }
+  const weekday = Number(str(fd, 'weekday', 1));
+  const after = str(fd, 'after', 10) as Lesson['after'];
+  const language = str(fd, 'language', 5) as Lesson['language'];
+  const audience = str(fd, 'audience', 5) as Lesson['audience'];
+  l = {
+    weekday: Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : 6,
+    after: AFTER.includes(after) ? after : 'maghrib',
+    time: str(fd, 'time', 5),
+    title_de: str(fd, 'title_de', 160),
+    title_ar: str(fd, 'title_ar', 160),
+    desc_de: str(fd, 'desc_de', 600),
+    desc_ar: str(fd, 'desc_ar', 600),
+    language: LANGS.includes(language) ? language : 'de',
+    audience: AUDIENCES.includes(audience) ? audience : 'all',
+    teacher: str(fd, 'teacher', 120),
+    active: bool(fd, 'active'),
+  };
+  if (!l.title_de) errors.title = t('common.required');
+  if (l.after === 'time' && !isTime(l.time ?? '')) errors.time = t('prog.timeInvalid');
+  if (l.after !== 'time') delete l.time;
+  if (!Object.keys(errors).length) {
+    const saveId = isNew ? newId('unterricht') : id;
+    const data: Record<string, unknown> = { ...l };
+    for (const k of ['desc_de', 'desc_ar', 'teacher']) if (!data[k]) delete data[k];
+    saveEntry('program', saveId, data, user.id);
+    audit(user, isNew ? 'program.create' : 'program.update', l.title_de);
+    setFlash(Astro, { type: 'ok', key: isNew ? 'flash.created' : 'flash.saved', link: l.active ? '/programm' : undefined });
+    return Astro.redirect(`/admin/programm/${saveId}`, 303);
+  }
+  setFlash(Astro, { type: 'error', key: 'flash.error' });
+}
+
+const wdName = (wd: number) => new Intl.DateTimeFormat(ar ? 'ar' : 'de-DE', { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, 7 + wd)));
+const isTimeMode = l.after === 'time';
+---
+<AdminLayout title={isNew ? t('prog.new') : t('prog.edit')} active="program">
+  <PageHead title={isNew ? t('prog.new') : l.title_de || t('prog.edit')} back={{ href: '/admin/programm', label: t('prog.title') }}>
+    {!isNew && !existing?.data.active && <span class="a-chip a-chip-draft"><AIcon name="pause" size={11} />{t('prog.paused')}</span>}
+  </PageHead>
+
+  <form method="post" data-track class="grid gap-4 xl:grid-cols-[1fr_320px]" id="lesson-form">
+    <div class="grid content-start gap-4">
+      <section class="a-card grid gap-5">
+        <BiField t={t} name="title" label={t('prog.fieldTitle')} de={l.title_de} ar={l.title_ar} required error={errors.title} placeholderDe="Die Sirah des Propheten ﷺ" placeholderAr="السيرة النبوية" />
+        <BiField t={t} name="desc" label={t('prog.fieldDesc')} de={l.desc_de} ar={l.desc_ar} multiline rows={3} maxlength={600} />
+      </section>
+
+      <section class="a-card grid gap-4">
+        <div class="a-card-title !mb-0"><span>{t('prog.when')}</span></div>
+        <div class="grid gap-3.5 sm:grid-cols-3">
+          <label class="a-field"><span class="a-label">{t('prog.weekday')}</span>
+            <select class="a-select" name="weekday" data-weekday>{WEEK.map((wd) => <option value={wd} selected={l.weekday === wd}>{wdName(wd)}</option>)}</select>
+          </label>
+          <label class="a-field"><span class="a-label">{t('prog.afterLabel')}</span>
+            <select class="a-select" name="after" data-after>{AFTER.map((a) => <option value={a} selected={l.after === a}>{t(`prog.after.${a}`)}</option>)}</select>
+          </label>
+          <label class="a-field" hidden={!isTimeMode} data-time-field>
+            <span class="a-label">{t('prog.time')}</span>
+            <input class="a-input" type="time" name="time" value={l.time ?? ''} dir="ltr" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="18:30" aria-invalid={errors.time ? 'true' : undefined} />
+            {errors.time && <span class="a-error-text">{errors.time}</span>}
+          </label>
+        </div>
+      </section>
+
+      <section class="a-card grid gap-4">
+        <div class="a-card-title !mb-0"><span>{t('prog.who')}</span></div>
+        <div class="grid gap-3.5 sm:grid-cols-3">
+          <label class="a-field"><span class="a-label">{t('prog.language')}</span>
+            <select class="a-select" name="language">{LANGS.map((v) => <option value={v} selected={l.language === v}>{t(`prog.lang.${v}`)}</option>)}</select>
+          </label>
+          <label class="a-field"><span class="a-label">{t('prog.audience')}</span>
+            <select class="a-select" name="audience">{AUDIENCES.map((v) => <option value={v} selected={l.audience === v}>{t(`prog.aud.${v}`)}</option>)}</select>
+          </label>
+          <label class="a-field"><span class="a-label">{t('prog.teacher')} <span class="a-opt">({t('common.optional')})</span></span>
+            <input class="a-input" name="teacher" value={l.teacher ?? ''} maxlength="120" dir="auto" placeholder={t('prog.teacherPh')} />
+          </label>
+        </div>
+      </section>
+    </div>
+
+    <aside class="grid content-start gap-4">
+      <section class="a-card grid gap-3">
+        <div class="a-card-title !mb-0"><span>{t('prog.visibility')}</span></div>
+        <label class="a-check items-center"><input type="checkbox" name="active" class="a-switch" checked={l.active} data-active /><span class="font-semibold">{t('prog.active')}</span></label>
+        <p class="a-hint">{t('prog.activeHint')}</p>
+      </section>
+      <section class="a-card">
+        <div class="a-card-title"><span>{t('prog.preview')}</span></div>
+        <article class="rounded-xl border border-line bg-white p-3.5" data-preview>
+          <p class="flex flex-wrap items-center gap-1.5 text-[12px]">
+            <span class="inline-flex items-center gap-1 rounded-full bg-wine px-2.5 py-0.5 font-semibold text-white"><AIcon name="clock" size={12} /><span data-pv-when></span></span>
+            <span class="rounded-full bg-paper-2 px-2.5 py-0.5 font-semibold text-ink-soft" data-pv-lang></span>
+            <span class="rounded-full bg-rose-soft px-2.5 py-0.5 font-semibold text-wine-deep" data-pv-aud></span>
+          </p>
+          <p class="mt-1 text-[11.5px] font-semibold uppercase tracking-wide a-muted" data-pv-day></p>
+          <h3 class="mt-0.5 font-display text-[1.05rem] font-semibold leading-snug" dir="auto" data-pv-title></h3>
+          <p class="mt-1 text-[13px] text-ink-soft" dir="auto" data-pv-desc></p>
+        </article>
+      </section>
+    </aside>
+
+    <div class="xl:col-span-2">
+      <SaveBar t={t} canDelete={!isNew} />
+    </div>
+  </form>
+
+  <script is:inline type="application/json" id="lesson-i18n" set:html={JSON.stringify({
+    after: Object.fromEntries(AFTER.map((a) => [a, t(`prog.after.${a}`)])),
+    at: t('prog.at', { time: '{time}' }),
+    lang: Object.fromEntries(LANGS.map((v) => [v, t(`prog.lang.${v}`)])),
+    aud: Object.fromEntries(AUDIENCES.map((v) => [v, t(`prog.aud.${v}`)])),
+    paused: t('prog.paused'),
+    ar,
+  }).replace(/</g, '\\u003c')} />
+
+  <script>
+    const form = document.querySelector<HTMLFormElement>('#lesson-form')!;
+    const i18n = JSON.parse(document.getElementById('lesson-i18n')!.textContent!);
+    const timeField = form.querySelector<HTMLElement>('[data-time-field]')!;
+    const timeInput = timeField.querySelector('input')!;
+    const val = (n: string) => (form.elements.namedItem(n) as HTMLInputElement | null)?.value.trim() ?? '';
+    const render = () => {
+      const after = val('after');
+      const fixed = after === 'time';
+      timeField.hidden = !fixed;
+      timeInput.required = fixed;
+      const $ = (s: string) => form.querySelector<HTMLElement>(s)!;
+      $('[data-pv-when]').textContent = fixed ? i18n.at.replace('{time}', val('time') || '––:––') : i18n.after[after];
+      $('[data-pv-lang]').textContent = i18n.lang[val('language')];
+      const aud = val('audience');
+      $('[data-pv-aud]').textContent = i18n.aud[aud];
+      $('[data-pv-aud]').hidden = aud === 'all';
+      const sel = form.querySelector<HTMLSelectElement>('[data-weekday]')!;
+      const active = form.querySelector<HTMLInputElement>('[data-active]')!.checked;
+      $('[data-pv-day]').textContent = sel.options[sel.selectedIndex].text + (active ? '' : ` · ${i18n.paused}`);
+      const title = (i18n.ar && val('title_ar')) || val('title_de');
+      const desc = (i18n.ar && val('desc_ar')) || val('desc_de');
+      $('[data-pv-title]').textContent = title || '…';
+      $('[data-pv-desc]').textContent = desc;
+      $('[data-preview]').style.opacity = active ? '1' : '.55';
+    };
+    form.addEventListener('input', render);
+    form.addEventListener('change', render);
+    render();
+  </script>
+</AdminLayout>

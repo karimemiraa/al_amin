@@ -1,0 +1,131 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str } from '../../../admin/util';
+import { getEntries, getEntry, saveEntry, deleteEntry, newId } from '../../../lib/content';
+import { getJumuah } from '../../../lib/prayer';
+import { audit } from '../../../lib/server/auth';
+
+const denied = guardArea(Astro, 'content');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const action = str(fd, 'action', 20);
+  const id = str(fd, 'id', 80);
+  const entry = getEntry('program', id);
+  if (!entry) return Astro.redirect('/admin/programm', 303);
+  const title = entry.data.title_de;
+
+  if (action === 'toggle') {
+    const active = !entry.data.active;
+    saveEntry('program', id, { ...entry.data, active }, user.id);
+    audit(user, 'program.toggle', title, { active });
+    setFlash(Astro, { type: 'ok', key: active ? 'prog.flashActivated' : 'prog.flashPaused', link: active ? '/programm' : undefined });
+    return Astro.redirect(`/admin/programm#${id}`, 303);
+  }
+  if (action === 'duplicate') {
+    const copyId = newId('unterricht');
+    const deSuffix = adminT('de')('prog.copySuffix');
+    const arSuffix = adminT('ar')('prog.copySuffix');
+    saveEntry('program', copyId, {
+      ...entry.data,
+      title_de: (entry.data.title_de + deSuffix).slice(0, 160),
+      title_ar: entry.data.title_ar ? (entry.data.title_ar + arSuffix).slice(0, 160) : '',
+      active: false,
+    }, user.id);
+    audit(user, 'program.create', entry.data.title_de + deSuffix, { copyOf: id });
+    setFlash(Astro, { type: 'info', key: 'prog.flashDuplicated' });
+    return Astro.redirect(`/admin/programm/${copyId}`, 303);
+  }
+  if (action === 'delete') {
+    deleteEntry('program', id);
+    audit(user, 'program.delete', title);
+    setFlash(Astro, { type: 'ok', key: 'flash.deleted' });
+    return Astro.redirect('/admin/programm', 303);
+  }
+  return Astro.redirect('/admin/programm', 303);
+}
+
+const rank = { fajr: 0, dhuhr: 1, asr: 2, maghrib: 3, isha: 4, time: 9 } as const;
+const toMin = (hm = '') => { const [h, m] = hm.split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+// Fixed times are sorted in between the prayers by a rough clock position.
+const order = (after: keyof typeof rank, time?: string) =>
+  after === 'time' ? (toMin(time) < 9 * 60 ? 0.5 : toMin(time) < 14 * 60 ? 1.5 : toMin(time) < 17 * 60 ? 2.5 : toMin(time) < 20 * 60 ? 3.5 : 4.5) : rank[after];
+
+const entries = getEntries('program');
+const activeCount = entries.filter((e) => e.data.active).length;
+const wdName = (wd: number) => new Intl.DateTimeFormat(ar ? 'ar' : 'de-DE', { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, 7 + wd)));
+// Islamic week order: Saturday → Friday.
+const week = [6, 0, 1, 2, 3, 4, 5].map((wd) => ({
+  wd,
+  name: wdName(wd),
+  items: entries
+    .filter((e) => e.data.weekday === wd)
+    .sort((a, b) => order(a.data.after, a.data.time) - order(b.data.after, b.data.time) || a.data.title_de.localeCompare(b.data.title_de)),
+}));
+const jumuah = getJumuah() ?? [];
+const timing = (after: string, time?: string) => (after === 'time' ? t('prog.at', { time: time ?? '' }) : t(`prog.after.${after}`));
+---
+<AdminLayout title={t('prog.title')} active="program">
+  <PageHead title={t('prog.title')} intro={t('prog.intro')}>
+    <a href="/programm" target="_blank" rel="noopener" class="a-btn"><AIcon name="external" size={15} />{t('flash.view')}</a>
+    <a href="/admin/programm/neu" class="a-btn a-btn-primary"><AIcon name="plus" size={15} />{t('prog.new')}</a>
+  </PageHead>
+
+  <section class="a-card !p-0">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5 text-[13px]">
+      <span class="font-semibold">{t('prog.summary', { active: activeCount, paused: entries.length - activeCount })}</span>
+      <span class="a-muted inline-flex items-center gap-1.5"><AIcon name="info" size={14} />{t('prog.jumuahNote')}</span>
+    </div>
+    <ol class="a-list">
+      {week.map((day) => (
+        <li class="grid gap-2 px-4 py-3 md:grid-cols-[132px_minmax(0,1fr)] md:gap-4">
+          <div class="flex items-center justify-between gap-2 md:block md:pt-1.5">
+            <h2 class="font-display text-[1.02rem] font-semibold text-wine-ink">{day.name}</h2>
+            <a href={`/admin/programm/neu?tag=${day.wd}`} class="inline-flex items-center gap-1 text-[12px] font-semibold text-wine no-underline opacity-80 hover:opacity-100 md:mt-1"><AIcon name="plus" size={12} />{t('prog.addHere')}</a>
+          </div>
+          <ul class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {day.wd === 5 && jumuah.map((j) => (
+              <li class="flex items-center gap-2 rounded-xl border border-dashed border-gold-soft bg-gold-pale/50 px-3 py-2 text-[12.5px] text-[#7a5a2c]">
+                <AIcon name="star" size={14} />
+                <span class="font-semibold">{t('prayer.jumuah')} <span dir="ltr">{j.time}</span></span>
+                <a href="/admin/gebetszeiten#freitagsgebet" class="ms-auto text-[12px] font-semibold text-wine">{t('common.edit')}</a>
+              </li>
+            ))}
+            {day.items.length === 0 && day.wd !== 5 && <li class="self-center text-[12.5px] a-muted md:pt-1.5">{t('prog.noLesson')}</li>}
+            {day.items.map((l) => (
+              <li id={l.id} class:list={['group relative flex min-w-0 flex-col rounded-xl border bg-white px-3 py-2.5 transition-shadow hover:shadow-[var(--shadow-soft)]', l.data.active ? 'border-line' : 'border-dashed border-line bg-paper/60']}>
+                <div class:list={['flex flex-wrap items-center gap-1.5 text-[11.5px]', !l.data.active && 'opacity-60']}>
+                  <span class="a-chip a-chip-brand !px-2"><AIcon name="clock" size={11} /><span dir={l.data.after === 'time' ? 'ltr' : undefined}>{timing(l.data.after, l.data.time)}</span></span>
+                  <span class="a-lang-tag">{l.data.language === 'de-ar' ? 'DE · AR' : l.data.language.toUpperCase()}</span>
+                  {l.data.audience !== 'all' && <span class="a-chip a-chip-scheduled !px-2">{t(`prog.aud.${l.data.audience}`)}</span>}
+                  {!l.data.active && <span class="a-chip a-chip-draft !px-2"><AIcon name="pause" size={10} />{t('prog.paused')}</span>}
+                </div>
+                <a href={`/admin/programm/${l.id}`} class:list={['mt-1.5 block min-w-0 no-underline', !l.data.active && 'opacity-60']}>
+                  <span class="block truncate text-[13.5px] font-semibold text-ink group-hover:text-wine" dir="ltr" lang="de" style="text-align:start">{l.data.title_de}</span>
+                  {l.data.title_ar && <span class="block truncate text-[12.5px] a-muted" dir="rtl" lang="ar" style="text-align:start">{l.data.title_ar}</span>}
+                </a>
+                <form method="post" class="mt-2 flex items-center gap-0.5 border-t border-paper-2 pt-1.5">
+                  <input type="hidden" name="id" value={l.id} />
+                  <a href={`/admin/programm/${l.id}`} class="a-btn a-btn-icon a-btn-ghost !size-7" title={t('common.edit')} aria-label={t('common.edit')}><AIcon name="edit" size={14} /></a>
+                  <button name="action" value="duplicate" class="a-btn a-btn-icon a-btn-ghost !size-7" title={t('common.duplicate')} aria-label={t('common.duplicate')}><AIcon name="copy" size={14} /></button>
+                  <button name="action" value="toggle" class="a-btn a-btn-sm a-btn-ghost !h-7 !px-2 !text-[12px]" title={l.data.active ? t('prog.pause') : t('prog.activate')}>
+                    <AIcon name={l.data.active ? 'pause' : 'play'} size={13} />{l.data.active ? t('prog.pause') : t('prog.activate')}
+                  </button>
+                  <button name="action" value="delete" class="a-btn a-btn-icon a-btn-ghost a-btn-danger ms-auto !size-7" title={t('common.delete')} aria-label={t('common.delete')} data-confirm={t('common.confirmDelete')}><AIcon name="trash" size={14} /></button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ol>
+  </section>
+</AdminLayout>

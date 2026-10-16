@@ -1,0 +1,42 @@
+---
+/** Shows a freshly issued invite/reset link once, with copy button and e-mail status. */
+import AIcon from '../AIcon.astro';
+import type { T } from '../../../admin/i18n';
+import type { AdminLang } from '../../../admin/i18n';
+import { fmtDate, type IssuedLink } from './helpers';
+interface Props { t: T; lang: AdminLang; issued: IssuedLink }
+const { t, lang, issued } = Astro.props;
+const mailKey = issued.mail === 'sent' ? 'invite.linkMailed' : issued.mail === 'failed' ? 'invite.linkMailFailed' : 'invite.linkNoMail';
+---
+<section class="a-card mb-4 border-wine/40 !bg-rose-soft/40" data-link-panel role="status">
+  <div class="flex items-start gap-3">
+    <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-wine text-white"><AIcon name={issued.kind === 'invite' ? 'mail' : 'key'} /></span>
+    <div class="min-w-0 flex-1">
+      <h2 class="a-section-title">{t(issued.kind === 'invite' ? 'invite.linkTitleInvite' : 'invite.linkTitleReset', { name: issued.name })}</h2>
+      <p class="mt-0.5 text-[13px] a-muted">{t('invite.linkOnce')} {t('invite.linkValid', { date: fmtDate(lang, issued.expires) })}</p>
+      <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+        <input class="a-input min-w-0 flex-1 font-mono !text-[12.5px]" value={issued.link} readonly dir="ltr" data-link-input aria-label={t(issued.kind === 'invite' ? 'invite.linkTitleInvite' : 'invite.linkTitleReset', { name: issued.name })} />
+        <button type="button" class="a-btn a-btn-primary" data-copy data-copied={t('common.copied')}><AIcon name="copy" size={15} /><span>{t('common.copy')}</span></button>
+      </div>
+      <p class:list={['mt-2.5 flex items-start gap-1.5 text-[13px]', issued.mail === 'sent' ? 'text-[#2f6d39]' : 'text-[#8a5a1a]']}>
+        <AIcon name={issued.mail === 'sent' ? 'check' : 'info'} size={15} class="mt-0.5" />
+        <span>{t(mailKey, { email: '⁨' + issued.email + '⁩' })}</span>
+      </p>
+    </div>
+  </div>
+</section>
+<script>
+  document.querySelectorAll<HTMLElement>('[data-link-panel]').forEach((panel) => {
+    const input = panel.querySelector<HTMLInputElement>('[data-link-input]')!;
+    const btn = panel.querySelector<HTMLButtonElement>('[data-copy]')!;
+    input.addEventListener('focus', () => input.select());
+    btn.addEventListener('click', async () => {
+      input.select();
+      try { await navigator.clipboard.writeText(input.value); } catch { document.execCommand('copy'); }
+      const label = btn.querySelector('span')!;
+      const before = label.textContent;
+      label.textContent = btn.dataset.copied ?? '✓';
+      setTimeout(() => (label.textContent = before), 2000);
+    });
+  });
+</script>
