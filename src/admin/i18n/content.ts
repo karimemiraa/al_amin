@@ -2,15 +2,15 @@
 // Kampagne (camp.*) and their audit lines (audit.*). Both languages.
 const de: Record<string, string> = {
   // --- Shared labels ---------------------------------------------------------------------
-  'pr.fajr': 'Fadschr',
-  'pr.sunrise': 'Sonnenaufgang',
-  'pr.dhuhr': 'Dhuhr',
-  'pr.asr': 'Asr',
-  'pr.maghrib': 'Maghrib',
-  'pr.isha': 'Ischa',
-  'lang.de': 'Deutsch',
-  'lang.ar': 'Arabisch',
-  'lang.de-ar': 'Deutsch & Arabisch',
+  'prayer.name.fajr': 'Fadschr',
+  'prayer.name.sunrise': 'Sonnenaufgang',
+  'prayer.name.dhuhr': 'Dhuhr',
+  'prayer.name.asr': 'Asr',
+  'prayer.name.maghrib': 'Maghrib',
+  'prayer.name.isha': 'Ischa',
+  'prog.lang.de': 'Deutsch',
+  'prog.lang.ar': 'Arabisch',
+  'prog.lang.de-ar': 'Deutsch & Arabisch',
 
   // --- Programm ------------------------------------------------------------------------------
   'prog.title': 'Programm',
@@ -210,15 +210,15 @@ const de: Record<string, string> = {
 };
 
 const ar: Record<string, string> = {
-  'pr.fajr': 'الفجر',
-  'pr.sunrise': 'الشروق',
-  'pr.dhuhr': 'الظهر',
-  'pr.asr': 'العصر',
-  'pr.maghrib': 'المغرب',
-  'pr.isha': 'العشاء',
-  'lang.de': 'الألمانية',
-  'lang.ar': 'العربية',
-  'lang.de-ar': 'الألمانية والعربية',
+  'prayer.name.fajr': 'الفجر',
+  'prayer.name.sunrise': 'الشروق',
+  'prayer.name.dhuhr': 'الظهر',
+  'prayer.name.asr': 'العصر',
+  'prayer.name.maghrib': 'المغرب',
+  'prayer.name.isha': 'العشاء',
+  'prog.lang.de': 'الألمانية',
+  'prog.lang.ar': 'العربية',
+  'prog.lang.de-ar': 'الألمانية والعربية',
 
   'prog.title': 'البرنامج',
   'prog.intro': 'الدروس الأسبوعية – تظهر التعديلات فوراً في صفحة «البرنامج».',
