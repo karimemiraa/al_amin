@@ -1,0 +1,350 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import SaveBar from '../../../components/admin/SaveBar.astro';
+import MilestoneRow from '../../../components/admin/content/MilestoneRow.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, isDate } from '../../../admin/util';
+import { getSetting, saveSetting, getCampaign, onlineDonations, type Campaign, type Milestone } from '../../../lib/content';
+import { audit, can } from '../../../lib/server/auth';
+
+const denied = guardArea(Astro, 'campaign');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+
+const NUMBERS = ['goal', 'raised', 'donors', 'pricePerSqm', 'totalSqm', 'floors', 'sqmPerFloor', 'outdoorSqm', 'distanceToCurrentKm', 'minutesToTransit'] as const;
+type NumKey = (typeof NUMBERS)[number];
+const DECIMAL: NumKey[] = ['distanceToCurrentKm'];
+const MAX_MILESTONES = 20;
+
+/** German number input: "1.300.000", "1300000", "1,5", "351 €". A dot followed by exactly three digits is a thousands separator. */
+function parseNumber(raw: string): number | null {
+  const s = raw.replace(/[\s €]|m²|km/g, '');
+  if (!s) return null;
+  let norm: string;
+  if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) norm = s.replace(/\./g, '').replace(',', '.');
+  else if (/^\d+(,\d+)?$/.test(s)) norm = s.replace(',', '.');
+  else if (/^\d+\.\d+$/.test(s)) norm = s;
+  else return null;
+  const n = Number(norm);
+  return Number.isFinite(n) && n >= 0 && n < 1e12 ? n : null;
+}
+const de = (n: number, max = 0) => n.toLocaleString('de-DE', { maximumFractionDigits: max });
+const pct = (part: number, whole: number) => ((part / Math.max(whole, 1)) * 100).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+const stored = getSetting('campaign');
+const values: Record<NumKey, string> = Object.fromEntries(NUMBERS.map((k) => [k, de(Number(stored[k] ?? 0), DECIMAL.includes(k) ? 1 : 0)])) as Record<NumKey, string>;
+let asOf = stored.asOf ?? today;
+let deadline = stored.deadline ?? '';
+type Row = Milestone & { key: string };
+let milestones: Row[] = (stored.milestones ?? []).map((m, i) => ({ ...m, key: `m${i}` }));
+const errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const action = str(fd, 'action', 30);
+  for (const k of NUMBERS) values[k] = str(fd, k, 30);
+  asOf = str(fd, 'asOf', 10);
+  deadline = str(fd, 'deadline', 10);
+  const keys = fd.getAll('ms_key').map((v) => String(v).slice(0, 20));
+  const dates = fd.getAll('ms_date').map((v) => String(v).trim().slice(0, 10));
+  const titlesDe = fd.getAll('ms_title_de').map((v) => String(v).trim().slice(0, 160));
+  const titlesAr = fd.getAll('ms_title_ar').map((v) => String(v).trim().slice(0, 160));
+  const done = new Set(fd.getAll('ms_done').map(String));
+  milestones = keys.slice(0, MAX_MILESTONES + 1).map((key, i) => ({ key, date: dates[i] ?? '', done: done.has(key), titleDe: titlesDe[i] ?? '', titleAr: titlesAr[i] ?? '' }));
+
+  // Without JavaScript the milestone buttons submit the form: apply them and show the form again.
+  const ms = action.match(/^ms:(add|up|down|remove)(?::(\d+))?$/);
+  if (ms) {
+    const i = Number(ms[2] ?? -1);
+    if (ms[1] === 'add' && milestones.length < MAX_MILESTONES) milestones.push({ key: `n${Date.now()}`, date: '', done: false, titleDe: '', titleAr: '' });
+    if (ms[1] === 'remove') milestones.splice(i, 1);
+    if (ms[1] === 'up' && i > 0) [milestones[i - 1], milestones[i]] = [milestones[i], milestones[i - 1]];
+    if (ms[1] === 'down' && i < milestones.length - 1) [milestones[i + 1], milestones[i]] = [milestones[i], milestones[i + 1]];
+  } else {
+    const parsed = {} as Record<NumKey, number>;
+    for (const k of NUMBERS) {
+      const n = parseNumber(values[k]);
+      if (n === null) errors[k] = t('camp.errNumber');
+      else parsed[k] = DECIMAL.includes(k) ? Math.round(n * 10) / 10 : Math.round(n);
+    }
+    if (!errors.goal && parsed.goal <= 0) errors.goal = t('camp.errGoal');
+    if (!isDate(deadline)) errors.deadline = t('camp.errDate');
+    if (asOf && !isDate(asOf)) errors.asOf = t('camp.errDate');
+    milestones = milestones.filter((m) => m.date || m.titleDe || m.titleAr).slice(0, MAX_MILESTONES);
+    milestones.forEach((m, i) => {
+      if (!/^\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?$/.test(m.date)) errors[`ms_date_${i}`] = t('camp.errMsDate');
+      if (!m.titleDe) errors[`ms_title_${i}`] = t('camp.errMsTitle');
+    });
+
+    if (!Object.keys(errors).length) {
+      // A new bank/cash total is "as of today" unless the date was changed by hand.
+      if (parsed.raised !== stored.raised && (asOf === stored.asOf || !asOf)) asOf = today;
+      const next: Campaign = {
+        ...stored,
+        ...parsed,
+        asOf: asOf || today,
+        deadline,
+        milestones: milestones.map(({ date, done, titleDe, titleAr }) => ({ date, done, titleDe, titleAr })),
+      };
+      const changed: Record<string, { from: unknown; to: unknown }> = {};
+      for (const k of [...NUMBERS, 'asOf', 'deadline'] as const) if (stored[k] !== next[k]) changed[k] = { from: stored[k], to: next[k] };
+      if (JSON.stringify(stored.milestones ?? []) !== JSON.stringify(next.milestones)) changed.milestones = { from: (stored.milestones ?? []).length, to: next.milestones.length };
+      if (!Object.keys(changed).length) {
+        setFlash(Astro, { type: 'info', key: 'camp.noChanges' });
+        return Astro.redirect('/admin/kampagne', 303);
+      }
+      saveSetting('campaign', next, user.id);
+      audit(user, 'campaign.update', Object.keys(changed).join(', '), changed);
+      setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/neue-moschee' });
+      return Astro.redirect('/admin/kampagne', 303);
+    }
+    Astro.locals.flash = { type: 'error', key: 'flash.error' };
+  }
+}
+
+const shown = getCampaign();
+const online = onlineDonations('kauf');
+const autoOnline = getSetting('payments').autoOnlineTotal !== false;
+const eur = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+const fields: Record<NumKey, { unit?: string; hint?: string }> = {
+  goal: { unit: '€' }, raised: { unit: '€' }, donors: {}, pricePerSqm: { unit: '€/m²' }, totalSqm: { unit: 'm²' }, floors: {},
+  sqmPerFloor: { unit: 'm²' }, outdoorSqm: { unit: 'm²' }, distanceToCurrentKm: { unit: 'km' }, minutesToTransit: { unit: t('camp.unitMin') },
+};
+const labels: Record<NumKey, string> = {
+  goal: t('camp.goal'), raised: t('camp.raised'), donors: t('camp.donors'), pricePerSqm: t('camp.pricePerSqm'), totalSqm: t('camp.totalSqm'),
+  floors: t('camp.floors'), sqmPerFloor: t('camp.sqmPerFloor'), outdoorSqm: t('camp.outdoorSqm'), distanceToCurrentKm: t('camp.distance'), minutesToTransit: t('camp.transit'),
+};
+const i18n = {
+  pct: t('camp.pctHint', { pct: '{pct}', sqm: '{sqm}' }),
+  price: t('camp.priceHint', { value: '{value}' }),
+  floors: t('camp.floorsHint', { floors: '{floors}', per: '{per}', sum: '{sum}' }),
+  days: t('camp.daysLeft', { n: '{n}' }),
+  past: t('camp.deadlinePast'),
+  shown: t('camp.shownText', { total: '{total}', pct: '{pct}', donors: '{donors}' }),
+  online: autoOnline ? shown.onlineRaised : 0,
+  onlineCount: autoOnline ? online.count : 0,
+  today,
+  storedAsOf: stored.asOf,
+};
+---
+<AdminLayout title={t('camp.title')} active="campaign">
+  <PageHead title={t('camp.title')} intro={t('camp.intro')}>
+    <a href="/neue-moschee" target="_blank" rel="noopener" class="a-btn"><AIcon name="external" size={15} />{t('flash.view')}</a>
+  </PageHead>
+
+  <form method="post" data-track class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]" id="campaign-form" novalidate>
+    <button type="submit" name="action" value="save" class="sr-only" tabindex="-1" aria-hidden="true">{t('common.save')}</button>
+    <div class="grid min-w-0 content-start gap-4">
+      <!-- Money -->
+      <section class="a-card">
+        <div class="a-card-title"><span>{t('camp.money')}</span></div>
+        <div class="grid gap-3.5 sm:grid-cols-2">
+          {(['goal', 'raised'] as const).map((k) => (
+            <label class="a-field">
+              <span class="a-label">{labels[k]}</span>
+              <span class="relative block">
+                <input class="a-input a-input-lg !pe-10 tabular-nums" name={k} value={values[k]} inputmode="decimal" dir="ltr" autocomplete="off" required aria-invalid={errors[k] ? 'true' : undefined} data-num={k} />
+                <span class="pointer-events-none absolute inset-y-0 end-3 grid place-items-center text-[13px] a-muted">€</span>
+              </span>
+              {errors[k] ? <span class="a-error-text">{errors[k]}</span> : <span class="a-hint" data-hint={k}>{k === 'raised' ? t('camp.raisedHint') : ''}</span>}
+            </label>
+          ))}
+          <label class="a-field">
+            <span class="a-label">{labels.donors}</span>
+            <input class="a-input tabular-nums" name="donors" value={values.donors} inputmode="numeric" dir="ltr" autocomplete="off" aria-invalid={errors.donors ? 'true' : undefined} data-num="donors" />
+            {errors.donors ? <span class="a-error-text">{errors.donors}</span> : <span class="a-hint">{t('camp.donorsHint')}</span>}
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="a-field">
+              <span class="a-label">{t('camp.asOf')}</span>
+              <input class="a-input" type="date" name="asOf" value={asOf} dir="ltr" aria-invalid={errors.asOf ? 'true' : undefined} data-asof />
+            </label>
+            <label class="a-field">
+              <span class="a-label">{t('camp.deadline')}</span>
+              <input class="a-input" type="date" name="deadline" value={deadline} dir="ltr" required aria-invalid={errors.deadline ? 'true' : undefined} data-deadline />
+            </label>
+            <span class="a-hint col-span-2 -mt-1.5">{errors.asOf || errors.deadline ? <span class="a-error-text">{errors.asOf || errors.deadline}</span> : <><span data-hint="deadline"></span> · {t('camp.asOfHint')}</>}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Building -->
+      <section class="a-card">
+        <div class="a-card-title"><span>{t('camp.building')}</span></div>
+        <div class="grid grid-cols-2 gap-3.5 md:grid-cols-3">
+          {(['pricePerSqm', 'totalSqm', 'outdoorSqm', 'floors', 'sqmPerFloor'] as const).map((k) => (
+            <label class:list={['a-field', k === 'pricePerSqm' && 'col-span-2 md:col-span-1']}>
+              <span class="a-label">{labels[k]}</span>
+              <span class="relative block">
+                <input class="a-input !pe-12 tabular-nums" name={k} value={values[k]} inputmode="numeric" dir="ltr" autocomplete="off" aria-invalid={errors[k] ? 'true' : undefined} data-num={k} />
+                {fields[k].unit && <span class="pointer-events-none absolute inset-y-0 end-3 grid place-items-center text-[12px] a-muted" dir="ltr">{fields[k].unit}</span>}
+              </span>
+              {errors[k] ? <span class="a-error-text">{errors[k]}</span> : <span class="a-hint" data-hint={k}></span>}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <!-- Location -->
+      <section class="a-card">
+        <div class="a-card-title"><span>{t('camp.location')}</span></div>
+        <div class="grid grid-cols-2 gap-3.5">
+          {(['distanceToCurrentKm', 'minutesToTransit'] as const).map((k) => (
+            <label class="a-field">
+              <span class="a-label">{labels[k]}</span>
+              <span class="relative block">
+                <input class="a-input !pe-12 tabular-nums" name={k} value={values[k]} inputmode="decimal" dir="ltr" autocomplete="off" aria-invalid={errors[k] ? 'true' : undefined} data-num={k} />
+                <span class="pointer-events-none absolute inset-y-0 end-3 grid place-items-center text-[12px] a-muted">{fields[k].unit}</span>
+              </span>
+              {errors[k] && <span class="a-error-text">{errors[k]}</span>}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <!-- Milestones -->
+      <section class="a-card" id="meilensteine">
+        <div class="a-card-title"><span>{t('camp.milestones')}</span></div>
+        <p class="-mt-1.5 mb-3 text-[12.5px] a-muted">{t('camp.milestonesText')} {t('camp.errMsDate')}</p>
+        <div class="mb-1.5 hidden grid-cols-[26px_112px_minmax(0,1fr)_minmax(0,1fr)_130px] gap-2 text-[11.5px] font-semibold text-ink-soft md:grid" aria-hidden="true">
+          <span></span><span>{t('camp.msDate')}</span>
+          <span class="flex items-center gap-1.5"><span class="a-lang-tag">DE</span>{t('prog.fieldTitle')}</span>
+          <span class="flex items-center gap-1.5"><span class="a-lang-tag">AR</span>{t('prog.fieldTitle')}</span>
+          <span>{t('camp.msDone')}</span>
+        </div>
+        <ol class="grid gap-2" data-ms-list>
+          {milestones.map((m, i) => <MilestoneRow t={t} i={i} m={m} dateError={errors[`ms_date_${i}`]} titleError={errors[`ms_title_${i}`]} />)}
+        </ol>
+        <p class:list={['text-[13px] a-muted', milestones.length && 'hidden']} data-ms-empty>{t('camp.msEmpty')}</p>
+        <button type="submit" name="action" value="ms:add" formnovalidate class="a-btn a-btn-sm mt-3" data-ms-add disabled={milestones.length >= MAX_MILESTONES}><AIcon name="plus" size={14} />{t('camp.msAdd')}</button>
+        <template data-ms-template><MilestoneRow t={t} i={0} /></template>
+      </section>
+    </div>
+
+    <aside class="grid content-start gap-4">
+      <section class="bg-wine-pattern overflow-hidden rounded-2xl p-[18px] text-white shadow-[var(--shadow-lift)]">
+        <div class="a-card-title !text-gold-soft"><span>{t('camp.shown')}</span></div>
+        <p class="font-display text-[1.9rem] font-semibold leading-none" dir="ltr" style="text-align:start" data-shown-total>{eur(shown.raised)}</p>
+        <p class="mt-1.5 text-[12.5px] text-white/70" data-shown-line>{t('camp.shownText', { total: eur(shown.goal), pct: pct(shown.raised, shown.goal), donors: de(shown.donors) })}</p>
+        <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-white/15">
+          <i class="block h-full bg-gradient-to-r from-gold to-gold-soft" style={`width:${Math.min(100, (shown.manualRaised / Math.max(shown.goal, 1)) * 100)}%`} data-bar-manual></i>
+          <i class="block h-full bg-[#69b86b]" style={`width:${Math.min(100, (shown.onlineRaised / Math.max(shown.goal, 1)) * 100)}%`} data-bar-online></i>
+        </div>
+      </section>
+
+      <section class="a-card grid gap-2">
+        <div class="a-card-title !mb-0"><span>{t('camp.online')}</span><AIcon name="lock" size={13} /></div>
+        <p class="font-display text-[1.4rem] font-semibold leading-none" dir="ltr" style="text-align:start">{eur(autoOnline ? shown.onlineRaised : online.amount)}</p>
+        <p class="text-[12.5px] a-muted">{t('camp.onlineCount', { n: online.count })} · {autoOnline ? t('camp.onlineText') : t('camp.onlineOff')}</p>
+        {can(user, 'payments') && <a href="/admin/zahlungen" class="inline-flex items-center gap-1 text-[12.5px] font-semibold text-wine">{t('camp.onlineLink')} <span class="flip-rtl inline-block">→</span></a>}
+      </section>
+    </aside>
+
+    <div class="xl:col-span-2">
+      <SaveBar t={t} />
+    </div>
+  </form>
+
+  <style>
+    #campaign-form :global(.a-field) { align-content: start; }
+  </style>
+
+  <script is:inline type="application/json" id="campaign-i18n" set:html={JSON.stringify(i18n).replace(/</g, '\\u003c')} />
+
+  <script>
+    const form = document.querySelector<HTMLFormElement>('#campaign-form')!;
+    const i18n = JSON.parse(document.getElementById('campaign-i18n')!.textContent!);
+    const fill = (s: string, vars: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+    const de = (n: number, max = 0) => n.toLocaleString('de-DE', { maximumFractionDigits: max });
+    const pct = (part: number, whole: number) => ((part / whole) * 100).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const eur = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+    const parse = (raw: string) => {
+      const s = raw.replace(/[\s €]|m²|km/g, '');
+      if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) return Number(s.replace(/\./g, '').replace(',', '.'));
+      if (/^\d+(,\d+)?$/.test(s)) return Number(s.replace(',', '.'));
+      if (/^\d+\.\d+$/.test(s)) return Number(s);
+      return NaN;
+    };
+    const num = (k: string) => parse(form.querySelector<HTMLInputElement>(`[data-num="${k}"]`)?.value ?? '');
+    const hint = (k: string, text: string) => { const el = form.querySelector<HTMLElement>(`[data-hint="${k}"]`); if (el) el.textContent = text; };
+    const raisedHintDefault = form.querySelector<HTMLElement>('[data-hint="raised"]')?.textContent ?? '';
+
+    const update = () => {
+      const goal = num('goal'), raised = num('raised'), price = num('pricePerSqm'), total = num('totalSqm'), floors = num('floors'), per = num('sqmPerFloor'), donors = num('donors');
+      const ok = (n: number) => Number.isFinite(n);
+      hint('raised', ok(raised) && ok(goal) && goal > 0 && ok(price) && price > 0 ? fill(i18n.pct, { pct: pct(raised, goal), sqm: de(Math.floor(raised / price)) }) : raisedHintDefault);
+      hint('pricePerSqm', ok(goal) && ok(total) && total > 0 ? fill(i18n.price, { value: de(Math.round(goal / total)) }) : '');
+      hint('sqmPerFloor', ok(floors) && ok(per) ? fill(i18n.floors, { floors: de(floors), per: de(per), sum: de(floors * per) }) : '');
+      const dl = form.querySelector<HTMLInputElement>('[data-deadline]')!.value;
+      if (dl) {
+        const days = Math.ceil((new Date(dl + 'T23:59:59').getTime() - Date.now()) / 86_400_000);
+        hint('deadline', days >= 0 ? fill(i18n.days, { n: de(days) }) : i18n.past);
+      }
+      if (ok(raised) && ok(goal) && goal > 0) {
+        const shownTotal = raised + i18n.online;
+        form.querySelector('[data-shown-total]')!.textContent = eur(shownTotal);
+        form.querySelector('[data-shown-line]')!.textContent = fill(i18n.shown, { total: eur(goal), pct: pct(shownTotal, goal), donors: de((ok(donors) ? donors : 0) + i18n.onlineCount) });
+        form.querySelector<HTMLElement>('[data-bar-manual]')!.style.width = `${Math.min(100, (raised / goal) * 100)}%`;
+        form.querySelector<HTMLElement>('[data-bar-online]')!.style.width = `${Math.min(100, (i18n.online / goal) * 100)}%`;
+      }
+    };
+
+    // A changed bank/cash total is "as of today" (still editable).
+    const asOf = form.querySelector<HTMLInputElement>('[data-asof]')!;
+    let asOfTouched = false;
+    asOf.addEventListener('input', () => (asOfTouched = true));
+    form.querySelector('[data-num="raised"]')!.addEventListener('input', () => { if (!asOfTouched) asOf.value = i18n.today; });
+    // Tidy German formatting when leaving a field: 1300000 → 1.300.000
+    form.querySelectorAll<HTMLInputElement>('[data-num]').forEach((input) => input.addEventListener('blur', () => {
+      const n = parse(input.value);
+      if (Number.isFinite(n)) input.value = de(n, input.dataset.num === 'distanceToCurrentKm' ? 1 : 0);
+    }));
+    form.addEventListener('input', update);
+    update();
+
+    // Milestones: add / remove / move without a round trip.
+    const list = form.querySelector<HTMLElement>('[data-ms-list]')!;
+    const tpl = form.querySelector<HTMLTemplateElement>('[data-ms-template]')!;
+    const addBtn = form.querySelector<HTMLButtonElement>('[data-ms-add]')!;
+    const renumber = () => {
+      const rows = [...list.querySelectorAll<HTMLElement>('[data-ms-row]')];
+      rows.forEach((row, i) => {
+        row.querySelector('[data-ms-num]')!.textContent = String(i + 1);
+        row.querySelector<HTMLButtonElement>('[data-ms="up"]')!.disabled = i === 0;
+        row.querySelector<HTMLButtonElement>('[data-ms="down"]')!.disabled = i === rows.length - 1;
+      });
+      addBtn.disabled = rows.length >= 20;
+      form.querySelector('[data-ms-empty]')!.classList.toggle('hidden', rows.length > 0);
+    };
+    let seq = 0;
+    addBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const frag = tpl.content.cloneNode(true) as DocumentFragment;
+      const key = `n${Date.now().toString(36)}${seq++}`;
+      frag.querySelector<HTMLInputElement>('[name="ms_key"]')!.value = key;
+      frag.querySelector<HTMLInputElement>('[name="ms_done"]')!.value = key;
+      list.append(frag);
+      list.querySelector<HTMLInputElement>('[data-ms-row]:last-child [name="ms_date"]')?.focus();
+      form.dataset.dirty = 'true';
+      renumber();
+    });
+    list.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-ms]');
+      if (!btn) return;
+      e.preventDefault();
+      const row = btn.closest<HTMLElement>('[data-ms-row]')!;
+      if (btn.dataset.ms === 'remove') row.remove();
+      if (btn.dataset.ms === 'up' && row.previousElementSibling) row.previousElementSibling.before(row);
+      if (btn.dataset.ms === 'down' && row.nextElementSibling) row.nextElementSibling.after(row);
+      form.dataset.dirty = 'true';
+      renumber();
+      if (btn.dataset.ms !== 'remove') btn.focus();
+    });
+    renumber();
+  </script>
+</AdminLayout>

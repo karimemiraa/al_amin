@@ -32,7 +32,7 @@ const mailKey = issued.mail === 'sent' ? 'invite.linkMailed' : issued.mail === '
     input.addEventListener('focus', () => input.select());
     btn.addEventListener('click', async () => {
       input.select();
-      try { await navigator.clipboard.writeText(input.value); } catch { document.execCommand('copy'); }
+      try { await navigator.clipboard.writeText(input.value); } catch { /* text stays selected for Ctrl+C */ }
       const label = btn.querySelector('span')!;
       const before = label.textContent;
       label.textContent = btn.dataset.copied ?? '✓';

@@ -1,0 +1,428 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AIcon from '../../components/admin/AIcon.astro';
+import PageHead from '../../components/admin/PageHead.astro';
+import Field from '../../components/admin/settings/Field.astro';
+import SecretField from '../../components/admin/settings/SecretField.astro';
+import CopyValue from '../../components/admin/settings/CopyValue.astro';
+import { isValidIban, formatIban, compactBic, isValidBic } from '../../components/admin/settings/bank';
+import { adminT } from '../../admin/i18n';
+import { currentUser, guardArea, guardSudo, setFlash, str, bool, isEmail, type Flash } from '../../admin/util';
+import { getSetting, getSite, saveSetting, type PaymentSettings, type MailSettings, type Site } from '../../lib/content';
+import { audit, ownerEmails } from '../../lib/server/auth';
+import { getSecret, setSecret, clearSecret, secretSource, maskSecret, type SecretKey } from '../../lib/server/secrets';
+import { alertOwners, mailConfigured, sendMail } from '../../lib/server/mail';
+import { keyMode, testStripeKey, syncDonations, donationTotals, FUNDS } from '../../lib/server/stripe';
+
+const denied = guardArea(Astro, 'payments');
+if (denied) return denied;
+const sudo = guardSudo(Astro);
+if (sudo) return sudo;
+const { user, session } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+
+const SECRETS: SecretKey[] = ['stripe_secret_key', 'stripe_webhook_secret', 'smtp_pass', 'anthropic_api_key'];
+const SECTION: Record<SecretKey, string> = { stripe_secret_key: 'stripe', stripe_webhook_secret: 'stripe', smtp_pass: 'email', anthropic_api_key: 'ki' };
+const siteBase = (import.meta.env.PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || Astro.url.origin).replace(/\/$/, '');
+const webhookUrl = `${siteBase}/api/stripe-webhook`;
+const berlinNow = () => new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Berlin' }).format(new Date());
+
+/** Security e-mail to all owners (best effort, not awaited so a slow SMTP server never blocks the save). */
+const notifyOwners = (what: string, lines: string[]) =>
+  void alertOwners(ownerEmails(), `${what} geändert`, [
+    `${user.name} (${user.email}) hat am ${berlinNow()} in der Verwaltung geändert: ${what}.`,
+    '',
+    ...lines,
+    '',
+    'Falls Sie das nicht waren: sofort anmelden, Passwort ändern und das Protokoll prüfen:',
+    `${siteBase}/admin/protokoll`,
+  ].join('\n'));
+
+/** Masked display of a stored secret. Passwords show no characters at all. */
+const mask = (k: SecretKey) => {
+  const v = getSecret(k);
+  if (!v) return '';
+  if (k === 'smtp_pass') return '••••••••';
+  return k === 'anthropic_api_key' ? `sk-ant-…${v.slice(-4)}` : maskSecret(v);
+};
+
+let payments: PaymentSettings = { stripeMode: 'test', autoOnlineTotal: true, paypalNote: '', ...(getSetting('payments') as Partial<PaymentSettings>) };
+let mail: MailSettings = { host: '', port: 587, user: '', from: '', to: '', ...(getSetting('mail') as Partial<MailSettings>) };
+let bank: Site['bank'] = { ...getSite().bank };
+let errors: Record<string, string> = {};
+let failed = '';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const form = str(fd, 'form', 20);
+  const back = (hash: string, flash: Flash) => { setFlash(Astro, flash); return Astro.redirect(`/admin/zahlungen#${hash}`, 303); };
+
+  // Remove a stored secret (falls back to .env).
+  const clear = str(fd, 'clear', 40) as SecretKey;
+  if (SECRETS.includes(clear)) {
+    const before = mask(clear);
+    clearSecret(clear);
+    audit(user, 'payments.secretRemoved', clear, { key: clear, before, fallback: secretSource(clear) }, true);
+    notifyOwners(clear, [`Gespeicherter Wert entfernt (${before}).`, `Jetzt aktiv: ${secretSource(clear) === 'env' ? 'Wert aus .env' : 'nichts'}.`]);
+    return back(SECTION[clear], { type: 'ok', key: 'pay.secret.removed' });
+  }
+
+  if (form === 'stripe') {
+    const mode = str(fd, 'stripeMode', 10) === 'live' ? 'live' : 'test';
+    const sk = str(fd, 'stripe_secret_key', 400);
+    const wh = str(fd, 'stripe_webhook_secret', 400);
+    if (sk && !/^(sk|rk)_(live|test)_[A-Za-z0-9]{8,}$/.test(sk)) errors.stripe_secret_key = t('pay.secretKeyError');
+    if (wh && !/^whsec_[A-Za-z0-9+/=_-]{8,}$/.test(wh)) errors.stripe_webhook_secret = t('pay.webhookSecretError');
+    const next: PaymentSettings = { ...payments, stripeMode: mode, autoOnlineTotal: bool(fd, 'autoOnlineTotal') };
+    if (!Object.keys(errors).length) {
+      const fields: string[] = [];
+      const masked: Record<string, string> = {};
+      if (next.stripeMode !== payments.stripeMode) fields.push('stripeMode');
+      if (next.autoOnlineTotal !== payments.autoOnlineTotal) fields.push('autoOnlineTotal');
+      if (sk && sk !== getSecret('stripe_secret_key')) { setSecret('stripe_secret_key', sk); fields.push('stripe_secret_key'); masked.stripe_secret_key = maskSecret(sk); }
+      if (wh && wh !== getSecret('stripe_webhook_secret')) { setSecret('stripe_webhook_secret', wh); fields.push('stripe_webhook_secret'); masked.stripe_webhook_secret = maskSecret(wh); }
+      if (!fields.length) return back('stripe', { type: 'info', key: 'pay.noChange' });
+      if (fields.some((f) => f === 'stripeMode' || f === 'autoOnlineTotal')) saveSetting('payments', next, user.id);
+      audit(user, 'payments.stripe', fields.join(', '), { fields, masked, mode: { from: payments.stripeMode, to: next.stripeMode }, autoOnlineTotal: next.autoOnlineTotal }, true);
+      notifyOwners('Stripe-Einstellungen', [
+        `Geänderte Felder: ${fields.join(', ')}`,
+        `Modus: ${next.stripeMode}`,
+        ...Object.entries(masked).map(([k, v]) => `${k}: ${v}`),
+      ]);
+      const km = keyMode(getSecret('stripe_secret_key'));
+      return back('stripe', { type: km && km !== next.stripeMode ? 'info' : 'ok', key: km && km !== next.stripeMode ? 'pay.savedMismatch' : 'pay.saved' });
+    }
+    payments = next;
+    failed = 'stripe';
+  }
+
+  if (form === 'stripeTest') {
+    const key = getSecret('stripe_secret_key');
+    if (!key) return back('stripe', { type: 'error', key: 'pay.testNoKey' });
+    const res = await testStripeKey(key);
+    if (!res.ok) return back('stripe', { type: 'error', key: 'pay.testFail', vars: { error: res.error } });
+    const live = res.livemode ? 'live' : 'test';
+    const modeLabel = t(live === 'live' ? 'pay.liveMode' : 'pay.testMode');
+    if (live !== payments.stripeMode) return back('stripe', { type: 'info', key: 'pay.testOkMismatch', vars: { mode: modeLabel, selected: t(`pay.mode.${payments.stripeMode}`) } });
+    return back('stripe', { type: 'ok', key: 'pay.testOk', vars: { mode: modeLabel } });
+  }
+
+  if (form === 'sync') {
+    try {
+      const res = await syncDonations(90);
+      audit(user, 'payments.sync', `${res.added}/${res.checked}`, res);
+      return back('spenden', { type: 'ok', key: 'pay.syncOk', vars: { added: String(res.added), checked: String(res.checked) } });
+    } catch (err) {
+      const msg = (err instanceof Error ? err.message : String(err)).replace(/\b(sk|rk)_(live|test)_[A-Za-z0-9*]+/g, '$1_$2_…').slice(0, 180);
+      return back('spenden', { type: 'error', key: 'pay.syncFail', vars: { error: msg } });
+    }
+  }
+
+  if (form === 'bank') {
+    const next: Site['bank'] = {
+      accountHolder: str(fd, 'accountHolder', 140),
+      iban: str(fd, 'iban', 60),
+      bic: compactBic(str(fd, 'bic', 20)),
+      bankName: str(fd, 'bankName', 120),
+      reference: str(fd, 'reference', 140),
+    };
+    if (!next.accountHolder) errors.accountHolder = t('common.required');
+    if (!next.iban) errors.iban = t('common.required');
+    else if (!isValidIban(next.iban)) errors.iban = t('pay.ibanError');
+    else next.iban = formatIban(next.iban);
+    if (next.bic && !isValidBic(next.bic)) errors.bic = t('pay.bicError');
+    if (!Object.keys(errors).length) {
+      const before = getSite();
+      const fields = (Object.keys(next) as (keyof Site['bank'])[]).filter((k) => next[k] !== (before.bank?.[k] ?? ''));
+      if (!fields.length) return back('bank', { type: 'info', key: 'pay.noChange' });
+      saveSetting('site', { ...before, bank: next }, user.id);
+      const diff = Object.fromEntries(fields.map((k) => [k, { from: before.bank?.[k] ?? '', to: next[k] }]));
+      audit(user, 'payments.bank', fields.join(', '), { fields, changes: diff }, true);
+      notifyOwners('Bankverbindung', [
+        ...fields.map((k) => `${k}: ${diff[k].from || '—'}  →  ${diff[k].to || '—'}`),
+        '',
+        'Diese Bankverbindung erscheint auf der Spendenseite, im GiroCode und im Impressum.',
+      ]);
+      return back('bank', { type: 'ok', key: 'pay.bankSaved', link: '/spenden#ueberweisung' });
+    }
+    bank = next;
+    failed = 'bank';
+  }
+
+  if (form === 'mail') {
+    const portRaw = str(fd, 'port', 5);
+    const next: MailSettings = {
+      host: str(fd, 'host', 200).toLowerCase(),
+      port: Number(portRaw || 587),
+      user: str(fd, 'user', 200),
+      from: str(fd, 'from', 200),
+      to: str(fd, 'to', 500).split(/[,;\s]+/).filter(Boolean).join(', '),
+    };
+    const pass = String(fd.get('smtp_pass') ?? '').slice(0, 500);
+    if (next.host && !/^(?=.{1,200}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(next.host)) errors.host = t('mail.hostError');
+    if (!Number.isInteger(next.port) || next.port < 1 || next.port > 65535) errors.port = t('mail.portError');
+    const fromAddr = next.from.match(/^[^<>\r\n]*<([^<>\s]+)>$/)?.[1] ?? next.from;
+    if (next.from && (!isEmail(fromAddr) || /[\r\n]/.test(next.from))) errors.from = t('mail.fromError');
+    if (next.to && !next.to.split(', ').every(isEmail)) errors.to = t('mail.toError');
+    if (pass.length >= 500) errors.smtp_pass = t('mail.passError');
+    if (!Object.keys(errors).length) {
+      const fields = (Object.keys(next) as (keyof MailSettings)[]).filter((k) => next[k] !== mail[k]);
+      const masked: Record<string, string> = {};
+      if (fields.length) saveSetting('mail', next, user.id);
+      if (pass && pass !== getSecret('smtp_pass')) { setSecret('smtp_pass', pass); fields.push('smtp_pass' as keyof MailSettings); masked.smtp_pass = '••••••••'; }
+      if (!fields.length) return back('email', { type: 'info', key: 'pay.noChange' });
+      audit(user, 'payments.mail', fields.join(', '), { fields, host: next.host, port: next.port, user: next.user, from: next.from, to: next.to, masked }, true);
+      notifyOwners('E-Mail-Einstellungen (SMTP)', [`Geänderte Felder: ${fields.join(', ')}`, `Server: ${next.host || '—'}:${next.port}`, `Absender: ${next.from || '—'}`, `Empfänger Kontaktformular: ${next.to || '—'}`]);
+      return back('email', { type: 'ok', key: 'pay.saved' });
+    }
+    mail = next;
+    failed = 'mail';
+  }
+
+  if (form === 'mailTest') {
+    if (!mailConfigured()) return back('email', { type: 'error', key: 'mail.testNotConfigured' });
+    try {
+      await sendMail({
+        to: user.email,
+        subject: 'Test-E-Mail der Verwaltung · رسالة تجريبية',
+        text: `Salam ${user.name},\n\ndiese Test-E-Mail bestätigt, dass der E-Mail-Versand der Website funktioniert (${berlinNow()}).\n\nهذه رسالة تجريبية تؤكد أن إرسال البريد من الموقع يعمل.\n\n${siteBase}/admin/zahlungen`,
+      });
+      return back('email', { type: 'ok', key: 'mail.testOk', vars: { email: user.email } });
+    } catch (err) {
+      const msg = (err instanceof Error ? err.message : String(err)).slice(0, 180);
+      return back('email', { type: 'error', key: 'mail.testFail', vars: { error: msg } });
+    }
+  }
+
+  if (form === 'ai') {
+    const key = str(fd, 'anthropic_api_key', 400);
+    if (key && !/^sk-ant-[\w-]{10,}$/.test(key)) errors.anthropic_api_key = t('pay.aiKeyError');
+    if (!Object.keys(errors).length) {
+      if (!key || key === getSecret('anthropic_api_key')) return back('ki', { type: 'info', key: 'pay.noChange' });
+      setSecret('anthropic_api_key', key);
+      const masked = `sk-ant-…${key.slice(-4)}`;
+      audit(user, 'payments.ai', 'anthropic_api_key', { fields: ['anthropic_api_key'], masked: { anthropic_api_key: masked } }, true);
+      notifyOwners('Übersetzungs-Schlüssel (Anthropic)', [`anthropic_api_key: ${masked}`]);
+      return back('ki', { type: 'ok', key: 'pay.saved' });
+    }
+    failed = 'ai';
+  }
+
+  if (!failed) return Astro.redirect('/admin/zahlungen', 303);
+  Astro.locals.flash = { type: 'error', key: 'flash.error' };
+}
+
+// --- View data ------------------------------------------------------------------------
+const sec = Object.fromEntries(SECRETS.map((k) => [k, { source: secretSource(k), masked: mask(k) }])) as Record<SecretKey, { source: 'admin' | 'env' | null; masked: string }>;
+const stripeKeyMode = keyMode(getSecret('stripe_secret_key'));
+const mismatch = Boolean(stripeKeyMode && stripeKeyMode !== payments.stripeMode);
+const totals = donationTotals();
+const sumCents = totals.reduce((s, r) => s + r.cents, 0);
+const sumCount = totals.reduce((s, r) => s + r.n, 0);
+const eur = (cents: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
+const fundLabel = (f: string) => (FUNDS.includes(f as (typeof FUNDS)[number]) ? t(`pay.fund.${f}`) : f);
+const smtpReady = mailConfigured();
+const count = (n: number) => t(n === 1 ? 'pay.count1' : n === 2 ? 'pay.count2' : n % 100 >= 3 && n % 100 <= 10 ? 'pay.countFew' : 'pay.count', { n });
+const sudoUntil = new Intl.DateTimeFormat(ar ? 'ar-u-nu-latn' : 'de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(new Date(session.sudoUntil));
+const events = [
+  { name: 'checkout.session.completed' },
+  { name: 'invoice.paid' },
+  { name: 'checkout.session.async_payment_succeeded', note: t('pay.eventAsync') },
+];
+const jump = [
+  { id: 'stripe', label: t('pay.jump.stripe'), icon: 'card' },
+  { id: 'bank', label: t('pay.jump.bank'), icon: 'bank' },
+  { id: 'email', label: t('pay.jump.mail'), icon: 'mail' },
+  { id: 'ki', label: t('pay.jump.ai'), icon: 'sparkles' },
+] as const;
+---
+<AdminLayout title={t('pay.title')} active="payments">
+  <PageHead title={t('pay.title')} intro={t('pay.intro')}>
+    <span class="a-chip a-chip-scheduled !py-1"><AIcon name="lock" size={12} />{t('pay.protected', { time: sudoUntil })}</span>
+  </PageHead>
+
+  <nav class="-mt-2 mb-4 flex w-0 min-w-full gap-1.5 overflow-x-auto pb-1" aria-label={t('pay.title')}>
+    {jump.map((j) => (
+      <a href={`#${j.id}`} class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-[13px] font-semibold text-ink-soft no-underline hover:border-wine hover:text-wine"><AIcon name={j.icon} size={14} />{j.label}</a>
+    ))}
+  </nav>
+
+  <!-- Action-only forms (buttons elsewhere point here via the form attribute) -->
+  <form id="f-stripe-test" method="post" hidden><input type="hidden" name="form" value="stripeTest" /></form>
+  <form id="f-sync" method="post" hidden><input type="hidden" name="form" value="sync" /></form>
+  <form id="f-mail-test" method="post" hidden><input type="hidden" name="form" value="mailTest" /></form>
+
+  <div class="grid grid-cols-12 items-start gap-3.5">
+    <!-- Stripe -->
+    <section id="stripe" class="a-card col-span-12 scroll-mt-6 xl:col-span-7">
+      <form method="post" data-track novalidate>
+        <input type="hidden" name="form" value="stripe" />
+        <header class="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+          <div class="flex min-w-0 flex-[1_1_16rem] items-start gap-3">
+            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-rose-soft text-wine"><AIcon name="card" /></span>
+            <div><h2 class="a-section-title">{t('pay.stripe')}</h2><p class="text-[12.5px] a-muted">{t('pay.stripeIntro')}</p></div>
+          </div>
+          {sec.stripe_secret_key.source
+            ? <span class:list={['a-chip shrink-0 max-sm:ms-[52px]', payments.stripeMode === 'live' ? 'a-chip-live' : 'a-chip-scheduled']}><span class="a-dot"></span>{t(`pay.mode.${payments.stripeMode}`)}</span>
+            : <span class="a-chip a-chip-warn shrink-0 max-sm:ms-[52px]"><AIcon name="alert" size={11} />{t('pay.notConnected')}</span>}
+        </header>
+
+        <div class="grid gap-4">
+          <fieldset class="a-field">
+            <legend class="a-label mb-1.5">{t('pay.mode')}</legend>
+            <div class="grid grid-cols-2 gap-2">
+              {(['test', 'live'] as const).map((m) => (
+                <label class="flex cursor-pointer items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-2 has-[:checked]:border-wine has-[:checked]:bg-rose-soft/50 has-[:checked]:shadow-[0_0_0_1px_var(--color-wine)]">
+                  <input type="radio" name="stripeMode" value={m} checked={payments.stripeMode === m} class="size-4 accent-[var(--color-wine)]" />
+                  <span class="leading-tight"><b class="block text-[13.5px]">{t(`pay.mode.${m}`)}</b><small class="a-muted text-[11.5px]">{t(`pay.mode.${m}Text`)}</small></span>
+                </label>
+              ))}
+            </div>
+            {mismatch && <p class="mt-1 flex items-start gap-2 rounded-lg bg-[#fbf0dc] px-3 py-2 text-[12.5px] font-semibold text-[#8a5a1a]"><AIcon name="alert" size={15} class="mt-0.5" />{t('pay.modeMismatch', { keyMode: t(`pay.mode.${stripeKeyMode}`), mode: t(`pay.mode.${payments.stripeMode}`) })}</p>}
+          </fieldset>
+
+          <SecretField t={t} name="stripe_secret_key" label={t('pay.secretKey')} source={sec.stripe_secret_key.source} masked={sec.stripe_secret_key.masked} hint={t('pay.secretKeyHint')} error={errors.stripe_secret_key} />
+          <SecretField t={t} name="stripe_webhook_secret" label={t('pay.webhookSecret')} source={sec.stripe_webhook_secret.source} masked={sec.stripe_webhook_secret.masked} hint={t('pay.webhookSecretHint')} error={errors.stripe_webhook_secret} />
+
+          <label class="a-check items-start rounded-xl bg-paper px-3 py-2.5">
+            <input type="checkbox" name="autoOnlineTotal" class="a-switch mt-0.5" checked={payments.autoOnlineTotal !== false} />
+            <span><b class="block text-[13.5px]">{t('pay.autoTotal')}</b><small class="a-muted text-[12px]">{t('pay.autoTotalHint')}</small></span>
+          </label>
+        </div>
+
+        <div class="a-savebar !static !mt-4 !rounded-none !border-x-0 !border-b-0 !border-paper-2 !bg-transparent !px-0 !pb-0 !pt-3 !shadow-none !backdrop-blur-none">
+          <span class="a-dirty"><span class="a-dot"></span>{t('common.unsaved')}</span>
+          <div class="ms-auto flex flex-wrap items-center gap-2">
+            <button type="submit" form="f-stripe-test" class="a-btn" disabled={!sec.stripe_secret_key.source}><AIcon name="refresh" size={15} />{t('pay.test')}</button>
+            <button type="submit" class="a-btn a-btn-primary"><AIcon name="check" size={15} />{t('common.save')}</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Webhook + online donations -->
+    <section id="spenden" class="a-card col-span-12 grid scroll-mt-6 gap-4 xl:col-span-5">
+      <div>
+        <h2 class="a-card-title"><span>{t('pay.webhook')}</span></h2>
+        <p class="text-[13px] text-ink-soft">{t('pay.webhookIntro')}</p>
+        <div class="mt-3 grid gap-2">
+          <span class="a-label">{t('pay.webhookUrl')}</span>
+          <CopyValue t={t} value={webhookUrl} />
+          <span class="a-label mt-1">{t('pay.events')}</span>
+          <ul class="grid gap-1.5">
+            {events.map((e) => (
+              <li class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <AIcon name="check" size={14} class="text-[#2f6d39]" />
+                <code dir="ltr" class="rounded-md bg-paper-2 px-1.5 py-0.5 font-mono text-[12px] text-ink">{e.name}</code>
+                {e.note && <small class="a-muted text-[11.5px]">({e.note})</small>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <div class="border-t border-paper-2 pt-4">
+        <h2 class="a-card-title"><span>{t('pay.recorded')}</span>{sumCount > 0 && <span class="normal-case tracking-normal text-ink">{count(sumCount)}</span>}</h2>
+        {totals.length === 0
+          ? <p class="rounded-xl bg-paper px-3 py-3 text-center text-[13px] a-muted">{t('pay.recordedEmpty')}</p>
+          : (
+            <ul class="a-list">
+              {totals.map((r) => (
+                <li class="flex items-center justify-between gap-3 py-2 text-[13.5px]">
+                  <span class="font-semibold">{fundLabel(r.fund)} <small class="font-normal a-muted">· {count(r.n)}</small></span>
+                  <b dir="ltr" class="tabular">{eur(r.cents)}</b>
+                </li>
+              ))}
+              <li class="flex items-center justify-between gap-3 py-2 text-[13.5px]"><span class="a-muted">{t('pay.total')}</span><b dir="ltr" class="tabular text-wine">{eur(sumCents)}</b></li>
+            </ul>
+          )}
+        <button type="submit" form="f-sync" class="a-btn mt-3 w-full" disabled={!sec.stripe_secret_key.source}><AIcon name="refresh" size={15} />{t('pay.sync')}</button>
+        <p class="mt-2 a-hint">{t('pay.syncHint')}</p>
+      </div>
+    </section>
+
+    <!-- Bank -->
+    <section id="bank" class="a-card col-span-12 scroll-mt-6 xl:col-span-5">
+      <form method="post" data-track novalidate>
+        <input type="hidden" name="form" value="bank" />
+        <header class="mb-3 flex items-start gap-3">
+          <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-pale text-[#7a5a2c]"><AIcon name="bank" /></span>
+          <div><h2 class="a-section-title">{t('pay.bank')}</h2><p class="text-[12.5px] a-muted">{t('pay.bankIntro')}</p></div>
+        </header>
+        <p class="mb-4 flex items-start gap-2 rounded-xl border border-[#ecd3a8] bg-[#fbf0dc] px-3 py-2.5 text-[12.5px] font-semibold text-[#7a4f14]"><AIcon name="alert" size={16} class="mt-0.5" />{t('pay.bankWarn')}</p>
+        <div class="grid gap-3.5">
+          <Field t={t} name="accountHolder" label={t('pay.accountHolder')} value={bank.accountHolder} maxlength={140} error={errors.accountHolder} />
+          <Field t={t} name="iban" label={t('pay.iban')} value={bank.iban} dir="ltr" maxlength={60} mono error={errors.iban} autocomplete="off" placeholder="DE00 0000 0000 0000 0000 00" />
+          <div class="grid items-start gap-3.5 sm:grid-cols-2">
+            <Field t={t} name="bic" label={t('pay.bic')} value={bank.bic} dir="ltr" maxlength={20} mono error={errors.bic} optional />
+            <Field t={t} name="bankName" label={t('pay.bankName')} value={bank.bankName} maxlength={120} optional />
+          </div>
+          <Field t={t} name="reference" label={t('pay.reference')} value={bank.reference} maxlength={140} hint={t('pay.referenceHint')} optional />
+        </div>
+        <div class="a-savebar !static !mt-4 !rounded-none !border-x-0 !border-b-0 !border-paper-2 !bg-transparent !px-0 !pb-0 !pt-3 !shadow-none !backdrop-blur-none">
+          <span class="a-dirty"><span class="a-dot"></span>{t('common.unsaved')}</span>
+          <button type="submit" class="a-btn a-btn-primary ms-auto" data-confirm={t('pay.bankConfirm')}><AIcon name="lock" size={15} />{t('pay.bankSave')}</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- E-Mail -->
+    <section id="email" class="a-card col-span-12 scroll-mt-6 xl:col-span-7">
+      <form method="post" data-track novalidate>
+        <input type="hidden" name="form" value="mail" />
+        <header class="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+          <div class="flex min-w-0 flex-[1_1_16rem] items-start gap-3">
+            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-paper-2 text-ink-soft"><AIcon name="mail" /></span>
+            <div><h2 class="a-section-title">{t('mail.title')}</h2><p class="text-[12.5px] a-muted">{t('mail.intro')}</p></div>
+          </div>
+          <span class:list={['a-chip shrink-0 max-sm:ms-[52px]', smtpReady ? 'a-chip-live' : 'a-chip-warn']}><span class="a-dot"></span>{t(smtpReady ? 'mail.configured' : 'mail.notConfigured')}</span>
+        </header>
+        <div class="grid gap-3.5">
+          <div class="grid items-start gap-3.5 sm:grid-cols-[1fr_9.5rem]">
+            <Field t={t} name="host" label={t('mail.host')} value={mail.host} dir="ltr" maxlength={200} error={errors.host} placeholder="smtp.example.de" />
+            <Field t={t} name="port" label={t('mail.port')} value={mail.port} type="number" min={1} max={65535} dir="ltr" error={errors.port} hint={t('mail.portHint')} />
+          </div>
+          <div class="grid items-start gap-3.5 sm:grid-cols-2">
+            <Field t={t} name="user" label={t('mail.user')} value={mail.user} dir="ltr" maxlength={200} hint={t('mail.userHint')} optional autocomplete="off" />
+            <SecretField t={t} name="smtp_pass" label={t('mail.pass')} source={sec.smtp_pass.source} masked={sec.smtp_pass.masked} error={errors.smtp_pass} maxlength={500} />
+          </div>
+          <div class="grid items-start gap-3.5 sm:grid-cols-2">
+            <Field t={t} name="from" label={t('mail.from')} value={mail.from} dir="ltr" maxlength={200} hint={t('mail.fromHint')} error={errors.from} />
+            <Field t={t} name="to" label={t('mail.to')} value={mail.to} dir="ltr" maxlength={500} hint={t('mail.toHint')} error={errors.to} />
+          </div>
+        </div>
+        <div class="a-savebar !static !mt-4 !rounded-none !border-x-0 !border-b-0 !border-paper-2 !bg-transparent !px-0 !pb-0 !pt-3 !shadow-none !backdrop-blur-none">
+          <span class="a-dirty"><span class="a-dot"></span>{t('common.unsaved')}</span>
+          <div class="ms-auto flex flex-wrap items-center justify-end gap-2">
+            <button type="submit" form="f-mail-test" class="a-btn" disabled={!smtpReady} title={t('mail.testHint', { email: `\u2068${user.email}\u2069` })}><AIcon name="mail" size={15} />{t('mail.test')}</button>
+            <button type="submit" class="a-btn a-btn-primary"><AIcon name="check" size={15} />{t('common.save')}</button>
+          </div>
+        </div>
+        <p class="mt-2 text-end a-hint">{t('mail.testHint', { email: `\u2068${user.email}\u2069` })}</p>
+      </form>
+    </section>
+
+    <!-- AI translation -->
+    <section id="ki" class="a-card col-span-12 scroll-mt-6 xl:col-span-5">
+      <form method="post" data-track novalidate>
+        <input type="hidden" name="form" value="ai" />
+        <header class="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+          <div class="flex min-w-0 flex-[1_1_16rem] items-start gap-3">
+            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-paper-2 text-ink-soft"><AIcon name="sparkles" /></span>
+            <div><h2 class="a-section-title">{t('pay.ai')}</h2><p class="text-[12.5px] a-muted">{t('pay.aiIntro')}</p></div>
+          </div>
+          <span class:list={['a-chip shrink-0 max-sm:ms-[52px]', sec.anthropic_api_key.source ? 'a-chip-live' : 'a-chip-draft']}>{t(sec.anthropic_api_key.source ? 'pay.active' : 'pay.inactive')}</span>
+        </header>
+        <SecretField t={t} name="anthropic_api_key" label={t('pay.aiKey')} source={sec.anthropic_api_key.source} masked={sec.anthropic_api_key.masked} hint={t('pay.aiKeyHint')} error={errors.anthropic_api_key} />
+        <div class="a-savebar !static !mt-4 !rounded-none !border-x-0 !border-b-0 !border-paper-2 !bg-transparent !px-0 !pb-0 !pt-3 !shadow-none !backdrop-blur-none">
+          <span class="a-dirty"><span class="a-dot"></span>{t('common.unsaved')}</span>
+          <button type="submit" class="a-btn a-btn-primary ms-auto"><AIcon name="check" size={15} />{t('common.save')}</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  {failed && <script is:inline define:vars={{ failed }}>document.getElementById(failed === 'mail' ? 'email' : failed === 'ai' ? 'ki' : failed)?.scrollIntoView({ block: 'start' });</script>}
+</AdminLayout>

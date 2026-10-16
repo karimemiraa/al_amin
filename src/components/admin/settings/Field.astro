@@ -15,7 +15,7 @@ const id = `f-${name.replace(/[^\w-]/g, '-')}`;
 <label class:list={['a-field', cls]} for={id}>
   <span class="a-label">{label}{optional && <span class="a-opt">({t('common.optional')})</span>}</span>
   <input
-    id={id} class:list={['a-input', mono && 'font-mono text-[13.5px] tracking-wide']} type={type} name={name} value={value}
+    id={id} class:list={['a-input', mono && 'font-mono text-[13.5px] tracking-wide']} type={type as 'text'} name={name} value={value}
     maxlength={type === 'number' || type === 'date' ? undefined : maxlength} placeholder={placeholder} dir={dir}
     inputmode={inputmode as 'text'} autocomplete={autocomplete} required={required} min={min} max={max}
     aria-invalid={error ? 'true' : undefined} aria-describedby={hint ? `${id}-hint` : undefined}

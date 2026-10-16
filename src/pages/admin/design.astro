@@ -1,0 +1,152 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AIcon from '../../components/admin/AIcon.astro';
+import PageHead from '../../components/admin/PageHead.astro';
+import ThemePreview from '../../components/admin/settings/ThemePreview.astro';
+import { adminT } from '../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, bool } from '../../admin/util';
+import { getSetting, saveSetting, getActiveTheme, THEMES, type ThemeId, type ThemeSettings } from '../../lib/content';
+import { audit } from '../../lib/server/auth';
+
+const denied = guardArea(Astro, 'design');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+const isTheme = (v: string): v is ThemeId => THEMES.some((th) => th.id === v);
+const themeName = (id: ThemeId, lang: 'de' | 'ar' = user.lang) => THEMES.find((th) => th.id === id)?.[lang] ?? id;
+
+const settings: ThemeSettings = { active: 'wine', autoRamadan: true, ramadanTheme: 'ramadan', ...(getSetting('theme') as Partial<ThemeSettings>) };
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const form = str(fd, 'form', 20);
+  if (form === 'activate') {
+    const id = str(fd, 'theme', 20);
+    if (isTheme(id) && id !== settings.active) {
+      saveSetting('theme', { ...settings, active: id }, user.id);
+      audit(user, 'design.theme', themeName(id, 'de'), { from: settings.active, to: id }, true);
+      setFlash(Astro, { type: 'ok', key: 'design.activated', vars: { name: themeName(id) }, link: '/' });
+    }
+    return Astro.redirect('/admin/design', 303);
+  }
+  if (form === 'ramadan') {
+    const rt = str(fd, 'ramadanTheme', 20);
+    const next: ThemeSettings = { ...settings, autoRamadan: bool(fd, 'autoRamadan'), ramadanTheme: isTheme(rt) ? rt : settings.ramadanTheme };
+    if (next.autoRamadan !== settings.autoRamadan || next.ramadanTheme !== settings.ramadanTheme) {
+      saveSetting('theme', next, user.id);
+      audit(user, 'design.update', next.autoRamadan ? `an · ${themeName(next.ramadanTheme, 'de')}` : 'aus', {
+        autoRamadan: { from: settings.autoRamadan, to: next.autoRamadan },
+        ramadanTheme: { from: settings.ramadanTheme, to: next.ramadanTheme },
+      });
+      setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/' });
+    }
+    return Astro.redirect('/admin/design#ramadan', 303);
+  }
+  return Astro.redirect('/admin/design', 303);
+}
+
+// --- Next Ramadan (Umm al-Qura), scanned day by day like isRamadanSeason() in content.ts -------------
+const hijri = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone: 'Europe/Berlin' });
+const partsOf = (d: Date) => {
+  const p = Object.fromEntries(hijri.formatToParts(d).map((x) => [x.type, x.value]));
+  return { y: Number.parseInt(p.year, 10), m: Number(p.month), d: Number(p.day) };
+};
+const inSeason = (h: { m: number; d: number }) => h.m === 9 || (h.m === 10 && h.d <= 3);
+const DAY = 86_400_000;
+const [ty, tm, td] = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date()).split('-').map(Number);
+const today = Date.UTC(ty, tm - 1, td, 12); // noon UTC = same calendar day in Berlin
+const ramadan = (() => {
+  try {
+    let i = 0;
+    const now = partsOf(new Date(today));
+    const running = inSeason(now);
+    // Running: walk back to 1 Ramadan (the season ends on 3 Shawwal, so months 9/10 are contiguous).
+    if (running) while (i > -40 && [9, 10].includes(partsOf(new Date(today + (i - 1) * DAY)).m)) i--;
+    else { while (i < 400 && partsOf(new Date(today + i * DAY)).m !== 9) i++; if (i >= 400) return null; }
+    const start = today + i * DAY;
+    let j = Math.max(i, 0);
+    while (j < i + 40 && inSeason(partsOf(new Date(today + (j + 1) * DAY)))) j++;
+    return { year: partsOf(new Date(start)).y, start: new Date(start), end: new Date(today + j * DAY), days: i, running };
+  } catch {
+    return null;
+  }
+})();
+const longDate = (d: Date) => new Intl.DateTimeFormat(ar ? 'ar-u-nu-latn' : 'de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(d);
+
+const showing = getActiveTheme();
+const overridden = showing !== settings.active;
+---
+<AdminLayout title={t('design.title')} active="design">
+  <PageHead title={t('design.title')} intro={t('design.intro')}>
+    <a class="a-btn" href="/" target="_blank" rel="noopener"><AIcon name="external" size={15} />{t('nav.viewSite')}</a>
+  </PageHead>
+
+  {overridden && (
+    <p class="mb-4 flex items-start gap-2.5 rounded-xl border border-[#e6d3a3] bg-gold-pale px-4 py-3 text-[13.5px] font-semibold text-[#6b4c17]">
+      <AIcon name="moon" size={17} class="mt-0.5" />{t('design.override', { current: themeName(showing), chosen: themeName(settings.active) })}
+    </p>
+  )}
+
+  <form method="post">
+    <input type="hidden" name="form" value="activate" />
+    <ul class="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      {THEMES.map((th) => {
+        const active = th.id === settings.active;
+        return (
+          <li class:list={['a-card flex flex-col gap-3 !p-3 transition', active && '!border-wine shadow-[0_0_0_1px_var(--color-wine),var(--shadow-soft)]']}>
+            <ThemePreview id={th.id} t={t} />
+            <div class="flex items-start justify-between gap-2 px-1">
+              <div class="min-w-0">
+                <h2 class="font-display text-[1.05rem] font-semibold leading-tight">{ar ? th.ar : th.de}</h2>
+                <p class="mt-0.5 text-[12.5px] a-muted">{t(`design.desc.${th.id}`)}</p>
+              </div>
+              <span class="mt-1 flex shrink-0 gap-1" aria-hidden="true">{th.swatch.map((c) => <i class="size-3.5 rounded-full border border-black/10" style={`background:${c}`}></i>)}</span>
+            </div>
+            <div class="mt-auto flex flex-wrap items-center justify-between gap-2 px-1 pb-0.5">
+              <span class="flex flex-wrap gap-1">
+                {active && <span class="a-chip a-chip-brand"><AIcon name="check" size={11} />{t('design.active')}</span>}
+                {showing === th.id && <span class="a-chip a-chip-live"><span class="a-dot"></span>{t('design.showing')}</span>}
+              </span>
+              {!active && <button type="submit" name="theme" value={th.id} class="a-btn a-btn-sm a-btn-primary">{t('design.activate')}</button>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  </form>
+
+  <section id="ramadan" class="a-card mt-3.5 scroll-mt-6">
+    <form method="post" data-track class="grid gap-4 lg:grid-cols-[1fr_minmax(0,22rem)] lg:gap-8">
+      <input type="hidden" name="form" value="ramadan" />
+      <div>
+        <div class="flex items-start gap-3">
+          <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-pale text-[#7a5a2c]"><AIcon name="moon" /></span>
+          <div><h2 class="a-section-title">{t('design.ramadan')}</h2><p class="text-[12.5px] a-muted">{t('design.ramadanIntro')}</p></div>
+        </div>
+        <div class="mt-4 grid gap-3.5">
+          <label class="a-check items-center"><input type="checkbox" name="autoRamadan" class="a-switch" checked={settings.autoRamadan} /><span class="font-semibold">{t('design.autoRamadan')}</span></label>
+          <label class="a-field max-w-xs">
+            <span class="a-label">{t('design.ramadanTheme')}</span>
+            <select class="a-select" name="ramadanTheme">
+              {THEMES.map((th) => <option value={th.id} selected={settings.ramadanTheme === th.id}>{ar ? th.ar : th.de}</option>)}
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="grid content-start gap-3">
+        {ramadan && (
+          <div class="rounded-xl bg-wine-pattern px-4 py-3.5 text-white">
+            <p class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-gold-soft rtl:tracking-normal rtl:text-[12.5px]"><AIcon name="calendar" size={14} />{t(ramadan.running ? 'design.nowLabel' : 'design.nextLabel', { year: ramadan.year })}</p>
+            <p class="mt-1 font-display text-[1.25rem] font-semibold leading-tight">{longDate(ramadan.start)}</p>
+            {!ramadan.running && <p class="text-[12.5px] text-white/70">{ramadan.days === 1 ? t('common.tomorrow') : t('design.inDays', { n: ramadan.days })}</p>}
+            <p class="mt-2 text-[12.5px] text-white/80">{t('design.until', { end: longDate(ramadan.end) })}</p>
+          </div>
+        )}
+        <p class="a-hint">{settings.autoRamadan ? t('design.calcNote') : t('design.offNote')}</p>
+        <button type="submit" class="a-btn a-btn-primary justify-self-end"><AIcon name="check" size={15} />{t('common.save')}</button>
+      </div>
+    </form>
+  </section>
+</AdminLayout>

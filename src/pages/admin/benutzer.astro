@@ -1,0 +1,316 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AIcon from '../../components/admin/AIcon.astro';
+import PageHead from '../../components/admin/PageHead.astro';
+import LinkPanel from '../../components/admin/people/LinkPanel.astro';
+import SessionList from '../../components/admin/people/SessionList.astro';
+import { adminT } from '../../admin/i18n';
+import { currentUser, guardArea, guardSudo, setFlash, str, bool, isEmail, clientIp } from '../../admin/util';
+import {
+  listUsers, getUser, findUserByEmail, createUser, updateUser, deleteUser, disableTotp, destroyUserSessions,
+  destroySessionById, listSessions, activeOwnerCount, ownerEmails, twoFactorRequired, audit, type Role, type User,
+} from '../../lib/server/auth';
+import { getSetting, saveSetting } from '../../lib/content';
+import { alertOwners, mailConfigured } from '../../lib/server/mail';
+import { setOnce, takeOnce, issueLink, initials, relTime, fmtDate, sessionRef, type IssuedLink } from '../../components/admin/people/helpers';
+
+const denied = guardArea(Astro, 'users');
+if (denied) return denied;
+const sudo = guardSudo(Astro);
+if (sudo) return sudo;
+const { user, session } = currentUser(Astro);
+const t = adminT(user.lang);
+const lang = user.lang;
+
+const LINK_COOKIE = 'igh_people_link';
+const BASE = '/admin/benutzer';
+const inviteValues = { name: '', email: '', role: 'editor' as Role, lang: 'de' as 'de' | 'ar' };
+const inviteErrors: Record<string, string> = {};
+let editError: { id: number; field: string; msg: string } | null = null;
+
+const back = (id?: number) => Astro.redirect(id ? `${BASE}?offen=${id}#benutzer-${id}` : BASE, 303);
+const alert = (subject: string, text: string) => void alertOwners(ownerEmails(), subject, text);
+const by = `${user.name} (${user.email})`;
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const action = str(fd, 'action', 30);
+  const ip = clientIp(Astro);
+  const target = Number(fd.get('id')) ? getUser(Number(fd.get('id'))) : undefined;
+  const isSelf = target?.id === user.id;
+  const ok = (key: string, name: string, id?: number) => { setFlash(Astro, { type: 'ok', key, vars: { name } }); return back(id); };
+  const fail = (key: string, id?: number) => { setFlash(Astro, { type: 'error', key }); return back(id); };
+  const lastOwner = (u: User) => u.role === 'owner' && u.active && activeOwnerCount() <= 1;
+
+  if (action === 'invite') {
+    inviteValues.name = str(fd, 'name', 80);
+    inviteValues.email = str(fd, 'email', 120).toLowerCase();
+    inviteValues.role = str(fd, 'role', 10) === 'owner' ? 'owner' : 'editor';
+    inviteValues.lang = str(fd, 'lang', 2) === 'ar' ? 'ar' : 'de';
+    if (!inviteValues.name) inviteErrors.name = t('common.required');
+    if (!isEmail(inviteValues.email)) inviteErrors.email = t('users.err.email');
+    else if (findUserByEmail(inviteValues.email)) inviteErrors.email = t('users.err.emailTaken');
+    if (!Object.keys(inviteErrors).length) {
+      const id = createUser({ email: inviteValues.email, name: inviteValues.name, role: inviteValues.role, lang: inviteValues.lang });
+      const invited = getUser(id)!;
+      const issued = await issueLink(invited, 'invite', Astro.url, user.name);
+      setOnce(Astro, LINK_COOKIE, issued, BASE);
+      audit(user, 'user.invite', invited.name, { email: invited.email, role: invited.role, lang: invited.lang, mail: issued.mail, ip }, true);
+      alert('Neue Person eingeladen', `${by} hat ${invited.name} (${invited.email}) als ${t(`role.${invited.role}`)} eingeladen.`);
+      return ok('users.flash.invited', invited.name, id);
+    }
+    Astro.locals.flash = { type: 'error', key: 'flash.error' };
+  } else if (action === 'policy') {
+    const before = getSetting('security').require2faForAll === true;
+    const after = bool(fd, 'require2fa');
+    if (before !== after) {
+      saveSetting('security', { ...getSetting('security'), require2faForAll: after }, user.id);
+      audit(user, 'security.policy', after ? 'on' : 'off', { require2faForAll: { from: before, to: after }, ip }, true);
+      alert('2FA-Pflicht geändert', `${by} hat die 2FA-Pflicht für alle Benutzer ${after ? 'eingeschaltet' : 'ausgeschaltet'}.`);
+    }
+    setFlash(Astro, { type: 'ok', key: 'users.flash.policy' });
+    return Astro.redirect(`${BASE}#sicherheit`, 303);
+  } else if (!target) {
+    return fail('flash.error');
+  } else if (action === 'update') {
+    const name = str(fd, 'name', 80);
+    const email = str(fd, 'email', 120).toLowerCase();
+    const ulang = str(fd, 'lang', 2) === 'ar' ? 'ar' : 'de';
+    const role: Role = isSelf ? target.role : str(fd, 'role', 10) === 'owner' ? 'owner' : 'editor';
+    const other = isEmail(email) ? findUserByEmail(email) : undefined;
+    if (!name) editError = { id: target.id, field: 'name', msg: t('common.required') };
+    else if (!isEmail(email)) editError = { id: target.id, field: 'email', msg: t('users.err.email') };
+    else if (other && other.id !== target.id) editError = { id: target.id, field: 'email', msg: t('users.err.emailTaken') };
+    else if (role !== target.role && lastOwner(target)) editError = { id: target.id, field: 'role', msg: t('users.err.lastOwner') };
+    if (!editError) {
+      updateUser(target.id, { name, email, lang: ulang, role });
+      const changes: Record<string, { from: string; to: string }> = {};
+      if (name !== target.name) changes.name = { from: target.name, to: name };
+      if (email !== target.email) changes.email = { from: target.email, to: email };
+      if (ulang !== target.lang) changes.lang = { from: target.lang, to: ulang };
+      if (Object.keys(changes).length) audit(user, 'user.update', name, { ...changes, ip }, true);
+      if (role !== target.role) {
+        audit(user, 'user.role', name, { role: { from: target.role, to: role }, ip }, true);
+        alert('Rolle geändert', `${by} hat die Rolle von ${name} (${email}) von ${t(`role.${target.role}`)} auf ${t(`role.${role}`)} geändert.`);
+      } else if (changes.email) {
+        alert('E-Mail-Adresse geändert', `${by} hat die E-Mail-Adresse von ${name} von ${target.email} auf ${email} geändert.`);
+      }
+      return ok('users.flash.saved', name, target.id);
+    }
+    Astro.locals.flash = { type: 'error', key: 'flash.error' };
+  } else if (action === 'revokeSession') {
+    const ref = str(fd, 'sid', 16);
+    const s = listSessions(target.id).find((x) => sessionRef(x.id) === ref);
+    if (!s || s.id === session.id) return fail('flash.error', target.id);
+    destroySessionById(s.id);
+    audit(user, 'user.sessionsRevoked', target.name, { sessions: 1, device: (s.userAgent ?? '').slice(0, 80), ip }, true);
+    if (!isSelf) alert('Gerät abgemeldet', `${by} hat ein Gerät von ${target.name} (${target.email}) abgemeldet.`);
+    return ok('users.flash.revoked', target.name, target.id);
+  } else if (isSelf) {
+    return fail('users.err.self', target.id);
+  } else if (action === 'deactivate' || action === 'activate') {
+    const active = action === 'activate';
+    if (!active && lastOwner(target)) return fail('users.err.lastOwner', target.id);
+    updateUser(target.id, { active });
+    audit(user, active ? 'user.activate' : 'user.deactivate', target.name, { email: target.email, ip }, true);
+    alert(active ? 'Konto wieder aktiviert' : 'Konto deaktiviert', `${by} hat ${target.name} (${target.email}) ${active ? 'wieder aktiviert' : 'deaktiviert'}.`);
+    return ok(active ? 'users.flash.activated' : 'users.flash.deactivated', target.name, target.id);
+  } else if (action === 'link') {
+    if (!target.active) return fail('flash.error', target.id);
+    const kind = target.hasPassword ? 'reset' : 'invite';
+    const issued = await issueLink(target, kind, Astro.url, user.name);
+    setOnce(Astro, LINK_COOKIE, issued, BASE);
+    audit(user, 'user.resetLink', target.name, { email: target.email, kind, mail: issued.mail, ip }, true);
+    alert('Neuer Zugangslink erstellt', `${by} hat einen neuen ${kind === 'invite' ? 'Einladungslink' : 'Link zum Zurücksetzen des Passworts'} für ${target.name} (${target.email}) erstellt.`);
+    return ok('users.flash.link', target.name, target.id);
+  } else if (action === 'reset2fa') {
+    disableTotp(target.id);
+    destroyUserSessions(target.id);
+    audit(user, 'user.reset2fa', target.name, { email: target.email, ip }, true);
+    alert('2FA zurückgesetzt', `${by} hat die Zwei-Faktor-Anmeldung von ${target.name} (${target.email}) zurückgesetzt.`);
+    return ok('users.flash.2faReset', target.name, target.id);
+  } else if (action === 'revokeAll') {
+    const n = listSessions(target.id).length;
+    destroyUserSessions(target.id);
+    audit(user, 'user.sessionsRevoked', target.name, { sessions: n, ip }, true);
+    alert('Überall abgemeldet', `${by} hat ${target.name} (${target.email}) auf allen Geräten abgemeldet.`);
+    return ok('users.flash.revoked', target.name, target.id);
+  } else if (action === 'delete') {
+    if (lastOwner(target)) return fail('users.err.lastOwner', target.id);
+    deleteUser(target.id);
+    audit(user, 'user.delete', target.name, { email: target.email, role: target.role, ip }, true);
+    alert('Benutzer gelöscht', `${by} hat ${target.name} (${target.email}, ${t(`role.${target.role}`)}) gelöscht.`);
+    return ok('users.flash.deleted', target.name);
+  } else {
+    return fail('flash.error');
+  }
+}
+
+const issued = Astro.request.method === 'GET' ? takeOnce<IssuedLink>(Astro, LINK_COOKIE, BASE) : null;
+const users = listUsers().sort((a, b) => Number(b.id === user.id) - Number(a.id === user.id) || Number(b.active) - Number(a.active) || (a.role === b.role ? a.name.localeCompare(b.name) : a.role === 'owner' ? -1 : 1));
+const openId = editError?.id ?? Number(Astro.url.searchParams.get('offen') ?? 0);
+const require2fa = getSetting('security').require2faForAll === true;
+const affected = users.filter((u) => u.active && u.role === 'editor' && !u.totpEnabled).length;
+const mailOn = mailConfigured();
+const inviteFailed = Object.keys(inviteErrors).length > 0;
+
+const statusChip = (u: User) => !u.active ? ['a-chip-expired', t('users.inactive')] : !u.hasPassword ? ['a-chip-scheduled', t('users.invited')] : ['a-chip-live', t('users.active')];
+const tfaChip = (u: User) => u.totpEnabled ? ['a-chip-live', t('users.2faOn')] : twoFactorRequired(u) ? ['a-chip-warn', t('users.2faMissing')] : ['a-chip-draft', t('users.2faOff')];
+---
+<AdminLayout title={t('users.title')} active="users">
+  <PageHead title={t('users.title')} intro={t('users.intro')}>
+    <a href="/admin/sicherung" class="a-btn"><AIcon name="download" size={15} />{t('users.backup')}</a>
+    <a href="#einladen" class="a-btn a-btn-primary" data-invite-jump><AIcon name="plus" size={15} />{t('users.invite')}</a>
+  </PageHead>
+
+  {issued && <LinkPanel t={t} lang={lang} issued={issued} />}
+
+  <div class="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <section class="a-card !p-0 self-start" aria-label={t('users.title')}>
+      <div class="hidden grid-cols-[minmax(0,1.6fr)_110px_110px_130px_110px_20px] items-center gap-3 border-b border-line px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[.1em] text-ink-mute md:grid rtl:text-[12.5px] rtl:tracking-normal">
+        <span>{t('users.colName')}</span><span>{t('users.colRole')}</span><span>{t('users.col2fa')}</span><span>{t('users.colLastLogin')}</span><span>{t('users.colStatus')}</span><span></span>
+      </div>
+      <div class="divide-y divide-paper-2">
+        {users.map((u) => {
+          const self = u.id === user.id;
+          const [sc, sl] = statusChip(u);
+          const [tc, tl] = tfaChip(u);
+          const sessions = listSessions(u.id);
+          const err = editError?.id === u.id ? editError : null;
+          return (
+            <details id={`benutzer-${u.id}`} class="group scroll-mt-20" open={openId === u.id}>
+              <summary class="grid cursor-pointer list-none grid-cols-[36px_minmax(0,1fr)_20px] items-center gap-x-3 gap-y-1.5 px-4 py-3 hover:bg-paper/60 md:grid-cols-[minmax(0,1.6fr)_110px_110px_130px_110px_20px] [&::-webkit-details-marker]:hidden">
+                <span class="flex min-w-0 items-center gap-3 max-md:contents">
+                  <span class:list={['grid size-9 shrink-0 place-items-center rounded-full text-[12px] font-bold', u.active ? 'bg-gold-pale text-[#6b4f2a]' : 'bg-paper-2 text-ink-mute']}>{initials(u.name)}</span>
+                  <span class="min-w-0 leading-tight">
+                    <span class:list={['flex items-center gap-1.5 font-semibold', !u.active && 'text-ink-mute']}><span class="truncate">{u.name}</span>{self && <span class="a-chip a-chip-draft !px-1.5 !py-0 !text-[10.5px]">{t('users.you')}</span>}</span>
+                    <small class="block truncate a-muted" dir="ltr" style="text-align: start">{u.email}</small>
+                  </span>
+                </span>
+                <span class="flex flex-wrap gap-1.5 max-md:col-start-2 max-md:row-start-2 md:contents">
+                  <span><span class:list={['a-chip', u.role === 'owner' ? 'a-chip-brand' : 'a-chip-draft']}>{u.role === 'owner' && <AIcon name="key" size={11} />}{t(`role.${u.role}`)}</span></span>
+                  <span><span class:list={['a-chip', tc]}><AIcon name={u.totpEnabled ? 'shieldCheck' : 'shield'} size={11} />{tl}</span></span>
+                  <span class="text-[12.5px] a-muted max-md:hidden">{u.lastLoginAt ? relTime(lang, u.lastLoginAt) : t('users.never')}</span>
+                  <span><span class:list={['a-chip', sc]}>{sl}</span></span>
+                </span>
+                <AIcon name="chevron" size={16} class="col-start-3 row-start-1 text-ink-mute transition-transform group-open:rotate-90 rtl:group-open:-rotate-90 md:col-start-auto md:row-start-auto" />
+              </summary>
+
+              <div class="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-paper-2 bg-paper/50 px-4 py-4 max-sm:px-2.5 lg:grid-cols-2">
+                <form method="post" class="a-card grid gap-3 !shadow-none" data-track>
+                  <input type="hidden" name="action" value="update" />
+                  <input type="hidden" name="id" value={u.id} />
+                  <h3 class="a-card-title font-sans !mb-0">{t('users.details')}</h3>
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="a-field"><span class="a-label">{t('users.name')}</span><input class="a-input" name="name" value={u.name} maxlength="80" required aria-invalid={err?.field === 'name' ? 'true' : undefined} />{err?.field === 'name' && <span class="a-error-text">{err.msg}</span>}</label>
+                    <label class="a-field"><span class="a-label">{t('users.email')}</span><input class="a-input" type="email" name="email" value={u.email} maxlength="120" required dir="ltr" aria-invalid={err?.field === 'email' ? 'true' : undefined} />{err?.field === 'email' && <span class="a-error-text">{err.msg}</span>}</label>
+                    <label class="a-field"><span class="a-label">{t('users.role')}</span>
+                      <select class="a-select" name="role" disabled={self} aria-invalid={err?.field === 'role' ? 'true' : undefined}>
+                        <option value="editor" selected={u.role === 'editor'}>{t('role.editor')}</option>
+                        <option value="owner" selected={u.role === 'owner'}>{t('role.owner')}</option>
+                      </select>
+                      {err?.field === 'role' && <span class="a-error-text">{err.msg}</span>}
+                    </label>
+                    <label class="a-field"><span class="a-label">{t('users.lang')}</span>
+                      <select class="a-select" name="lang"><option value="de" selected={u.lang === 'de'}>Deutsch</option><option value="ar" selected={u.lang === 'ar'}>العربية</option></select>
+                    </label>
+                  </div>
+                  <p class="a-hint">{self ? t('users.ownRoleHint') : t('users.roleHint')}</p>
+                  <button class="a-btn a-btn-primary justify-self-end"><AIcon name="check" size={15} />{t('users.save')}</button>
+                </form>
+
+                <div class="a-card grid content-start gap-3 !shadow-none">
+                  <h3 class="a-card-title font-sans !mb-0">{t('users.access')}</h3>
+                  {self ? (
+                    <p class="text-[13px] a-muted">{t('users.selfHint')} <a href="/admin/konto" class="font-semibold text-wine">{t('nav.account')} →</a></p>
+                  ) : (
+                    <ul class="a-list">
+                      {u.active && (
+                        <li class="flex items-start justify-between gap-3 py-2.5">
+                          <span class="text-[12.5px] a-muted"><b class="block text-[13.5px] text-ink">{u.hasPassword ? t('users.newReset') : t('users.newInvite')}</b>{u.hasPassword ? t('users.newResetHint') : t('users.newInviteHint')}</span>
+                          <form method="post" class="shrink-0"><input type="hidden" name="action" value="link" /><input type="hidden" name="id" value={u.id} /><button class="a-btn a-btn-sm"><AIcon name={u.hasPassword ? 'key' : 'mail'} size={14} />{t('common.new')}</button></form>
+                        </li>
+                      )}
+                      {u.totpEnabled && (
+                        <li class="flex items-start justify-between gap-3 py-2.5">
+                          <span class="text-[12.5px] a-muted"><b class="block text-[13.5px] text-ink">{t('users.reset2fa')}</b>{t('users.reset2faHint')}</span>
+                          <form method="post" class="shrink-0"><input type="hidden" name="action" value="reset2fa" /><input type="hidden" name="id" value={u.id} /><button class="a-btn a-btn-sm" data-confirm={t('users.reset2faConfirm', { name: u.name })}><AIcon name="refresh" size={14} />{t('users.reset2fa')}</button></form>
+                        </li>
+                      )}
+                      <li class="flex items-start justify-between gap-3 py-2.5">
+                        <span class="text-[12.5px] a-muted"><b class="block text-[13.5px] text-ink">{u.active ? t('users.deactivate') : t('users.activate')}</b>{u.active && t('users.deactivateHint')}</span>
+                        <form method="post" class="shrink-0"><input type="hidden" name="action" value={u.active ? 'deactivate' : 'activate'} /><input type="hidden" name="id" value={u.id} />
+                          {u.active
+                            ? <button class="a-btn a-btn-sm a-btn-danger" data-confirm={t('users.deactivateConfirm', { name: u.name })}><AIcon name="pause" size={14} />{t('users.deactivate')}</button>
+                            : <button class="a-btn a-btn-sm"><AIcon name="check" size={14} />{t('users.activate')}</button>}
+                        </form>
+                      </li>
+                      <li class="flex items-center justify-end gap-3 pt-2.5">
+                        <form method="post"><input type="hidden" name="action" value="delete" /><input type="hidden" name="id" value={u.id} /><button class="a-btn a-btn-sm a-btn-ghost a-btn-danger" data-confirm={t('users.deleteConfirm', { name: u.name })}><AIcon name="trash" size={14} />{t('users.delete')}</button></form>
+                      </li>
+                    </ul>
+                  )}
+                </div>
+
+                <div class="a-card !shadow-none lg:col-span-2">
+                  <div class="a-card-title !mb-1">
+                    <span>{t('users.sessions')} · {sessions.length}</span>
+                    {!self && sessions.length > 0 && (
+                      <form method="post"><input type="hidden" name="action" value="revokeAll" /><input type="hidden" name="id" value={u.id} /><button class="a-btn a-btn-sm a-btn-ghost a-btn-danger !normal-case !tracking-normal" data-confirm={t('users.revokeAllConfirm', { name: u.name })}><AIcon name="logout" size={14} />{t('users.revokeAll')}</button></form>
+                    )}
+                  </div>
+                  <SessionList t={t} lang={lang} sessions={sessions} currentId={session.id} userId={u.id} />
+                  {u.lastLoginAt && <p class="mt-1 text-[12px] a-muted">{t('users.colLastLogin')}: {fmtDate(lang, u.lastLoginAt)}</p>}
+                </div>
+              </div>
+            </details>
+          );
+        })}
+      </div>
+    </section>
+
+    <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+      <section id="einladen" class="a-card scroll-mt-20">
+        <div class="flex items-start gap-3">
+          <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-rose-soft text-wine"><AIcon name="mail" /></span>
+          <div><h2 class="a-section-title">{t('invite.title')}</h2><p class="text-[12.5px] a-muted">{t('invite.intro')}</p></div>
+        </div>
+        <form method="post" class="mt-4 grid gap-3">
+          <input type="hidden" name="action" value="invite" />
+          <label class="a-field"><span class="a-label">{t('users.name')}</span><input class="a-input" name="name" value={inviteValues.name} maxlength="80" required autocomplete="off" aria-invalid={inviteErrors.name ? 'true' : undefined} data-invite-first autofocus={inviteFailed} />{inviteErrors.name && <span class="a-error-text">{inviteErrors.name}</span>}</label>
+          <label class="a-field"><span class="a-label">{t('users.email')}</span><input class="a-input" type="email" name="email" value={inviteValues.email} maxlength="120" required dir="ltr" autocomplete="off" aria-invalid={inviteErrors.email ? 'true' : undefined} />{inviteErrors.email && <span class="a-error-text">{inviteErrors.email}</span>}</label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="a-field"><span class="a-label">{t('users.role')}</span>
+              <select class="a-select" name="role"><option value="editor" selected={inviteValues.role === 'editor'}>{t('role.editor')}</option><option value="owner" selected={inviteValues.role === 'owner'}>{t('role.owner')}</option></select>
+            </label>
+            <label class="a-field"><span class="a-label">{t('users.lang')}</span>
+              <select class="a-select" name="lang"><option value="de" selected={inviteValues.lang === 'de'}>Deutsch</option><option value="ar" selected={inviteValues.lang === 'ar'}>العربية</option></select>
+            </label>
+          </div>
+          <p class="flex items-start gap-1.5 text-[12px] a-muted"><AIcon name={mailOn ? 'mail' : 'info'} size={14} class="mt-0.5" />{mailOn ? t('invite.mailOn') : t('invite.mailOff')}</p>
+          <button class="a-btn a-btn-primary justify-self-end"><AIcon name="plus" size={15} />{t('invite.submit')}</button>
+        </form>
+      </section>
+
+      <section id="sicherheit" class="a-card scroll-mt-20">
+        <div class="flex items-start gap-3">
+          <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-pale text-[#7a5a2c]"><AIcon name="shieldCheck" /></span>
+          <div><h2 class="a-section-title">{t('users.secTitle')}</h2><p class="text-[12.5px] a-muted">{t('users.secHint')}</p></div>
+        </div>
+        <form method="post" class="mt-4 grid gap-3" data-track>
+          <input type="hidden" name="action" value="policy" />
+          <label class="a-check items-center"><input type="checkbox" name="require2fa" class="a-switch" checked={require2fa} /><span class="font-semibold">{t('users.secRequire')}</span></label>
+          <p class:list={['text-[12.5px]', affected ? 'text-[#8a5a1a]' : 'a-muted']}>{affected ? t('users.secAffected', { n: affected }) : t('users.secNoneAffected')}</p>
+          <button class="a-btn a-btn-primary justify-self-end"><AIcon name="check" size={15} />{t('users.secSave')}</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    document.querySelector('[data-invite-jump]')?.addEventListener('click', () => {
+      setTimeout(() => document.querySelector<HTMLInputElement>('[data-invite-first]')?.focus(), 50);
+    });
+  </script>
+</AdminLayout>

@@ -1,0 +1,121 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AIcon from '../../components/admin/AIcon.astro';
+import PageHead from '../../components/admin/PageHead.astro';
+import { adminT } from '../../admin/i18n';
+import { auditLabel } from '../../admin/audit-labels';
+import { currentUser, guardArea } from '../../admin/util';
+import { listAudit, type AuditRow } from '../../lib/server/auth';
+import { getDb } from '../../lib/server/db';
+import { initials, fmtDate, toDate, detailLines } from '../../components/admin/people/helpers';
+
+const denied = guardArea(Astro, 'audit');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const lang = user.lang;
+const isOwner = user.role === 'owner';
+
+const PER_PAGE = 50;
+const onlySensitive = isOwner && Astro.url.searchParams.get('filter') === 'sicherheit';
+const page = Math.max(1, Math.min(10_000, Math.floor(Number(Astro.url.searchParams.get('seite')) || 1)));
+const offset = (page - 1) * PER_PAGE;
+
+// Owners see everything; editors only see non-sensitive entries.
+const where = !isOwner ? 'WHERE sensitive = 0' : onlySensitive ? 'WHERE sensitive = 1' : '';
+const count = (w: string) => (getDb().prepare(`SELECT COUNT(*) AS n FROM audit ${w}`).get() as { n: number }).n;
+const total = count(where);
+const rows: AuditRow[] = isOwner
+  ? listAudit(PER_PAGE, offset, onlySensitive)
+  : (getDb().prepare('SELECT * FROM audit WHERE sensitive = 0 ORDER BY id DESC LIMIT ? OFFSET ?').all(PER_PAGE, offset) as AuditRow[]);
+const pages = Math.max(1, Math.ceil(total / PER_PAGE));
+const counts = isOwner ? { all: count(''), sec: count('WHERE sensitive = 1') } : null;
+
+const dayKey = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(d);
+const today = dayKey(new Date());
+const yesterday = dayKey(new Date(Date.now() - 86400_000));
+const dayLabel = (k: string, d: Date) => k === today ? t('log.today') : k === yesterday ? t('log.yesterday') : fmtDate(lang, d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+type Group = { key: string; label: string; items: (AuditRow & { date: Date })[] };
+const groups: Group[] = [];
+for (const r of rows) {
+  const date = toDate(r.at);
+  const key = dayKey(date);
+  let g = groups[groups.length - 1];
+  if (!g || g.key !== key) { g = { key, label: dayLabel(key, date), items: [] }; groups.push(g); }
+  g.items.push({ ...r, date });
+}
+const href = (p: number, sec = onlySensitive) => {
+  const q = new URLSearchParams();
+  if (sec) q.set('filter', 'sicherheit');
+  if (p > 1) q.set('seite', String(p));
+  const s = q.toString();
+  return s ? `?${s}` : '?';
+};
+---
+<AdminLayout title={t('log.title')} active="audit">
+  <PageHead title={t('log.title')} intro={isOwner ? t('log.intro') : t('log.introEditor')} />
+
+  <section class="a-card overflow-clip !p-0">
+    {counts && (
+      <nav class="flex flex-wrap gap-1 border-b border-line px-3 py-2.5" aria-label={t('log.title')}>
+        <a href={href(1, false)} aria-current={!onlySensitive ? 'page' : undefined} class="rounded-full px-3 py-1 text-[13px] font-semibold text-ink-soft no-underline hover:bg-paper aria-[current=page]:bg-wine aria-[current=page]:text-white">{t('log.filterAll')} <span class="opacity-60">{counts.all}</span></a>
+        <a href={href(1, true)} aria-current={onlySensitive ? 'page' : undefined} class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold text-ink-soft no-underline hover:bg-paper aria-[current=page]:bg-wine aria-[current=page]:text-white"><AIcon name="shield" size={13} />{t('log.filterSecurity')} <span class="opacity-60">{counts.sec}</span></a>
+      </nav>
+    )}
+
+    {rows.length === 0 && <p class="a-empty">{t('log.empty')}</p>}
+
+    {groups.map((g) => (
+      <div>
+        <h2 class="sticky top-0 z-[1] border-b border-paper-2 bg-paper-2/80 px-4 py-1.5 font-sans text-[11.5px] font-semibold uppercase tracking-[.1em] text-ink-mute backdrop-blur max-lg:top-[52px] rtl:text-[12.5px] rtl:tracking-normal">{g.label}</h2>
+        <ul class="divide-y divide-paper-2">
+          {g.items.map((r) => {
+            const lines = detailLines(r.details, t('log.hidden'));
+            const line = auditLabel(r, lang);
+            const head = (
+              <>
+                <span class:list={['grid size-[30px] shrink-0 place-items-center rounded-full text-[11px] font-bold', r.user_name ? 'bg-gold-pale text-[#6b4f2a]' : 'bg-paper-2 text-ink-mute']}>{r.user_name ? initials(r.user_name) : <AIcon name="globe" size={14} />}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="block break-words text-[13.5px]"><span dir="auto">{line}</span>{r.sensitive ? <span class="a-chip a-chip-warn ms-2 !px-1.5 !py-0 align-[1px] !text-[10.5px]" title={t('log.sensitive')}><AIcon name="shield" size={10} />{t('log.sensitive')}</span> : null}</span>
+                </span>
+                <time class="shrink-0 pt-0.5 text-[12px] tabular-nums a-muted" datetime={r.date.toISOString()} title={fmtDate(lang, r.date, { dateStyle: 'full', timeStyle: 'medium' })} dir="ltr">{fmtDate(lang, r.date, { hour: '2-digit', minute: '2-digit' })}</time>
+              </>
+            );
+            return (
+              <li>
+                {lines.length ? (
+                  <details class="group">
+                    <summary class="flex cursor-pointer list-none items-start gap-3 px-4 py-2.5 hover:bg-paper/60 [&::-webkit-details-marker]:hidden">
+                      {head}
+                      <AIcon name="chevron" size={14} class="mt-1 shrink-0 text-ink-mute transition-transform group-open:rotate-90 rtl:group-open:-rotate-90" />
+                    </summary>
+                    <dl class="mx-4 mb-3 ms-[58px] grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 rounded-xl bg-paper px-3.5 py-2.5 text-[12.5px]">
+                      {lines.map((l) => (
+                        <>
+                          <dt class="font-semibold text-ink-soft" dir="ltr">{l.key || t('log.details')}</dt>
+                          <dd class="min-w-0 break-words font-mono text-[12px]" dir="auto">{l.value}</dd>
+                        </>
+                      ))}
+                    </dl>
+                  </details>
+                ) : (
+                  <div class="flex items-start gap-3 px-4 py-2.5">{head}<span class="w-3.5 shrink-0"></span></div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    ))}
+
+    {pages > 1 && (
+      <nav class="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-[13px]" aria-label="Pagination">
+        {page > 1 ? <a href={href(page - 1)} class="a-btn a-btn-sm"><span class="flip-rtl inline-block">←</span>{t('log.newer')}</a> : <span></span>}
+        <span class="a-muted">{t('log.page', { n: page, total: pages })}</span>
+        {page < pages ? <a href={href(page + 1)} class="a-btn a-btn-sm">{t('log.older')}<span class="flip-rtl inline-block">→</span></a> : <span></span>}
+      </nav>
+    )}
+  </section>
+</AdminLayout>

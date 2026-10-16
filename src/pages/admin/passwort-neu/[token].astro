@@ -1,0 +1,62 @@
+---
+export const prerender = false;
+import AuthLayout from '../../../layouts/AuthLayout.astro';
+import { adminT } from '../../../admin/i18n';
+import { adminLang, clientIp, clearSessionCookie, LANG_COOKIE } from '../../../admin/util';
+import { peekToken, consumeToken, getUser, setPassword, passwordProblem, destroyUserSessions, destroySession, audit, SESSION_COOKIE } from '../../../lib/server/auth';
+import { mailConfigured, sendMail } from '../../../lib/server/mail';
+
+const token = String(Astro.params.token ?? '').slice(0, 100);
+const userId = /^[A-Za-z0-9_-]{20,64}$/.test(token) ? peekToken(token, 'reset') : null;
+const target = userId ? getUser(userId) : undefined;
+const valid = !!target && target.active;
+const lang = Astro.cookies.get(LANG_COOKIE) || !target ? adminLang(Astro) : target.lang;
+const t = adminT(lang);
+const errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST' && valid) {
+  const fd = await Astro.request.formData();
+  const password = String(fd.get('password') ?? '').slice(0, 200);
+  const pw = passwordProblem(password, target.email);
+  if (pw) errors.password = t(pw);
+  else if (password !== String(fd.get('repeat') ?? '')) errors.repeat = t('pw.mismatch');
+  if (!Object.keys(errors).length && consumeToken(token, 'reset') === target.id) {
+    setPassword(target.id, password);
+    destroyUserSessions(target.id);
+    const old = Astro.cookies.get(SESSION_COOKIE)?.value;
+    if (old) { destroySession(old); clearSessionCookie(Astro); }
+    audit(target, 'password.reset', target.email, { ip: clientIp(Astro) }, true);
+    if (mailConfigured()) {
+      const tu = adminT(target.lang);
+      sendMail({ to: target.email, subject: tu('reset.changedSubject'), text: tu('reset.changedText', { name: target.name, email: target.email }) })
+        .catch((err) => console.error('[mail] password notice failed', err));
+    }
+    return Astro.redirect('/admin/login?passwort=neu', 303);
+  }
+}
+---
+<AuthLayout title={valid ? t('reset.newTitle') : t('reset.invalidTitle')} lang={lang}>
+  {valid ? (
+    <div>
+      <span class="grid size-12 place-items-center rounded-2xl bg-rose-soft text-wine"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM13 12l8 8M17 16l2-2M19 18l2-2" /></svg></span>
+      <h1 class="mt-4 font-display text-[1.7rem] font-semibold leading-tight">{t('reset.newTitle')}</h1>
+      <p class="mt-2 a-muted">{t('reset.newText', { email: '⁨' + target.email + '⁩' })}</p>
+      <form method="post" class="mt-6 grid gap-4">
+        <input type="email" name="username" value={target.email} autocomplete="username" hidden />
+        <label class="a-field"><span class="a-label">{t('pw.new')}</span><input class="a-input !h-11" type="password" name="password" required minlength="10" autocomplete="new-password" autofocus aria-invalid={errors.password ? 'true' : undefined} /><span class="a-hint">{t('pw.hint')}</span>{errors.password && <span class="a-error-text">{errors.password}</span>}</label>
+        <label class="a-field"><span class="a-label">{t('pw.repeat')}</span><input class="a-input !h-11" type="password" name="repeat" required autocomplete="new-password" aria-invalid={errors.repeat ? 'true' : undefined} />{errors.repeat && <span class="a-error-text">{errors.repeat}</span>}</label>
+        <button class="a-btn a-btn-primary mt-1 !h-11 w-full text-[15px]">{t('reset.newSubmit')}</button>
+      </form>
+    </div>
+  ) : (
+    <div>
+      <span class="grid size-12 place-items-center rounded-2xl bg-gold-pale text-[#7a5a2c]"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" /></svg></span>
+      <h1 class="mt-4 font-display text-[1.6rem] font-semibold leading-tight">{t('reset.invalidTitle')}</h1>
+      <p class="mt-2 a-muted">{t('reset.invalidText')}</p>
+      <div class="mt-6 grid gap-2">
+        <a href="/admin/passwort-vergessen" class="a-btn a-btn-primary !h-11 w-full">{t('reset.again')}</a>
+        <a href="/admin/login" class="text-center text-[13px] font-semibold a-muted">{t('reset.back')}</a>
+      </div>
+    </div>
+  )}
+</AuthLayout>

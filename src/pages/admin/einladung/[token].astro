@@ -1,0 +1,66 @@
+---
+export const prerender = false;
+import AuthLayout from '../../../layouts/AuthLayout.astro';
+import { adminT } from '../../../admin/i18n';
+import { adminLang, setSessionCookie, clientIp, LANG_COOKIE } from '../../../admin/util';
+import {
+  peekToken, consumeToken, getUser, setPassword, passwordProblem, createSession, destroySession, twoFactorRequired,
+  markLogin, audit, ownerEmails, SESSION_COOKIE,
+} from '../../../lib/server/auth';
+import { alertOwners } from '../../../lib/server/mail';
+
+const token = String(Astro.params.token ?? '').slice(0, 100);
+const userId = /^[A-Za-z0-9_-]{20,64}$/.test(token) ? peekToken(token, 'invite') : null;
+const invited = userId ? getUser(userId) : undefined;
+const valid = !!invited && invited.active;
+// Language: the visitor's explicit choice, otherwise the language the owner picked for the invitee.
+const lang = Astro.cookies.get(LANG_COOKIE) || !invited ? adminLang(Astro) : invited.lang;
+const t = adminT(lang);
+const errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST' && valid) {
+  const fd = await Astro.request.formData();
+  const password = String(fd.get('password') ?? '').slice(0, 200);
+  const pw = passwordProblem(password, invited.email);
+  if (pw) errors.password = t(pw);
+  else if (password !== String(fd.get('repeat') ?? '')) errors.repeat = t('pw.mismatch');
+  if (!Object.keys(errors).length && consumeToken(token, 'invite') === invited.id) {
+    const ip = clientIp(Astro);
+    setPassword(invited.id, password);
+    // Replace any session this browser already had (e.g. an owner testing the link).
+    const old = Astro.cookies.get(SESSION_COOKIE)?.value;
+    if (old) destroySession(old);
+    const needsCode = invited.totpEnabled;
+    const mustEnroll = !invited.totpEnabled && twoFactorRequired(invited);
+    setSessionCookie(Astro, createSession(invited.id, !needsCode && !mustEnroll, ip, Astro.request.headers.get('user-agent')));
+    if (!needsCode) markLogin(invited.id);
+    audit(invited, 'invite.accepted', invited.email, { ip }, true);
+    void alertOwners(ownerEmails(), 'Einladung angenommen', `${invited.name} (${invited.email}) hat die Einladung angenommen und ein Passwort festgelegt.`);
+    return Astro.redirect(needsCode ? '/admin/login/2fa' : mustEnroll ? '/admin/2fa-einrichten' : '/admin', 303);
+  }
+}
+const willEnroll = valid && !invited.totpEnabled && twoFactorRequired(invited);
+---
+<AuthLayout title={valid ? t('invite.welcome', { name: invited.name }) : t('invite.invalidTitle')} lang={lang}>
+  {valid ? (
+    <div>
+      <span class="grid size-12 place-items-center rounded-2xl bg-rose-soft text-wine"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16v12H4zM4 7l8 6 8-6" /></svg></span>
+      <h1 class="mt-4 font-display text-[1.7rem] font-semibold leading-tight">{t('invite.welcome', { name: invited.name })}</h1>
+      <p class="mt-2 a-muted">{t('invite.welcomeText', { role: t(`role.${invited.role}`) })}</p>
+      <form method="post" class="mt-6 grid gap-4">
+        <label class="a-field"><span class="a-label">{t('auth.email')}</span><input class="a-input bg-paper" type="email" name="username" value={invited.email} readonly autocomplete="username" dir="ltr" /></label>
+        <label class="a-field"><span class="a-label">{t('pw.new')}</span><input class="a-input !h-11" type="password" name="password" required minlength="10" autocomplete="new-password" autofocus aria-invalid={errors.password ? 'true' : undefined} /><span class="a-hint">{t('pw.hint')}</span>{errors.password && <span class="a-error-text">{errors.password}</span>}</label>
+        <label class="a-field"><span class="a-label">{t('pw.repeat')}</span><input class="a-input !h-11" type="password" name="repeat" required autocomplete="new-password" aria-invalid={errors.repeat ? 'true' : undefined} />{errors.repeat && <span class="a-error-text">{errors.repeat}</span>}</label>
+        {willEnroll && <p class="rounded-xl bg-paper-2 px-4 py-3 text-[13px]">{t('invite.next2fa')}</p>}
+        <button class="a-btn a-btn-primary mt-1 !h-11 w-full text-[15px]">{t('invite.accept')}</button>
+      </form>
+    </div>
+  ) : (
+    <div>
+      <span class="grid size-12 place-items-center rounded-2xl bg-gold-pale text-[#7a5a2c]"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" /></svg></span>
+      <h1 class="mt-4 font-display text-[1.6rem] font-semibold leading-tight">{t('invite.invalidTitle')}</h1>
+      <p class="mt-2 a-muted">{t('invite.invalidText')}</p>
+      <a href="/admin/login" class="a-btn a-btn-primary mt-6 !h-11 w-full">{t('invite.toLogin')}</a>
+    </div>
+  )}
+</AuthLayout>

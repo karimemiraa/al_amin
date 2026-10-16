@@ -1,0 +1,116 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import BiField from '../../../components/admin/BiField.astro';
+import SaveBar from '../../../components/admin/SaveBar.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, bool, isDate } from '../../../admin/util';
+import { getEntries, getEntry, saveEntry, deleteEntry, type Video } from '../../../lib/content';
+import { audit } from '../../../lib/server/auth';
+import { youtubeId } from '../../../components/admin/content/youtube';
+import { SERIES, VIDEO_LANGS, serializeVideo, unfeatureOthers } from '../../../components/admin/content/videos';
+
+const denied = guardArea(Astro, 'content');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const id = Astro.params.id!;
+if (id === 'neu') return Astro.redirect('/admin/mediathek#neu', 302);
+const existing = getEntry('videos', id);
+if (!existing) return Astro.redirect('/admin/mediathek', 302);
+
+let v: Video = existing.data;
+let urlValue = `https://youtu.be/${v.youtubeId}`;
+const errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  if (fd.get('action') === 'delete') {
+    deleteEntry('videos', id);
+    audit(user, 'video.delete', existing.data.title_de, { youtubeId: existing.data.youtubeId });
+    setFlash(Astro, { type: 'ok', key: 'flash.deleted' });
+    return Astro.redirect('/admin/mediathek', 303);
+  }
+  urlValue = str(fd, 'url', 500);
+  const ytId = youtubeId(urlValue);
+  const series = str(fd, 'series', 20) as Video['series'];
+  const language = str(fd, 'language', 5) as Video['language'];
+  const date = str(fd, 'date', 10);
+  v = {
+    youtubeId: ytId ?? existing.data.youtubeId,
+    date: isDate(date) ? new Date(date) : existing.data.date,
+    title_de: str(fd, 'title_de', 200),
+    title_ar: str(fd, 'title_ar', 200),
+    series: SERIES.includes(series) ? series : 'other',
+    language: VIDEO_LANGS.includes(language) ? language : 'ar',
+    speaker: str(fd, 'speaker', 120),
+    featured: bool(fd, 'featured'),
+  };
+  if (!ytId) errors.url = t('media.urlInvalid');
+  else if (getEntries('videos').some((e) => e.id !== id && e.data.youtubeId === ytId)) errors.url = t('media.duplicate');
+  if (!v.title_de) errors.title = t('common.required');
+  if (!isDate(date)) errors.date = t('camp.errDate');
+  if (!Object.keys(errors).length) {
+    if (v.featured) unfeatureOthers(id, user.id);
+    saveEntry('videos', id, serializeVideo(v), user.id);
+    audit(user, 'video.update', v.title_de);
+    setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/mediathek' });
+    return Astro.redirect(`/admin/mediathek/${id}`, 303);
+  }
+  Astro.locals.flash = { type: 'error', key: 'flash.error' }; // shown on this re-render
+}
+const dateValue = v.date instanceof Date && !Number.isNaN(v.date.getTime()) ? v.date.toISOString().slice(0, 10) : '';
+---
+<AdminLayout title={t('media.edit')} active="media">
+  <PageHead title={t('media.edit')} back={{ href: '/admin/mediathek', label: t('media.title') }}>
+    {existing.data.featured && <span class="a-chip a-chip-scheduled"><AIcon name="star" size={11} />{t('media.isFeatured')}</span>}
+  </PageHead>
+
+  <form method="post" data-track class="grid gap-4 xl:grid-cols-[1fr_320px]">
+    <button type="submit" name="action" value="save" class="sr-only" tabindex="-1" aria-hidden="true">{t('common.save')}</button>
+    <div class="grid content-start gap-4">
+      <section class="a-card grid gap-5">
+        <BiField t={t} name="title" label={t('media.fieldTitle')} de={v.title_de} ar={v.title_ar} required maxlength={200} error={errors.title} />
+        <div class="grid gap-3.5 sm:grid-cols-2">
+          <label class="a-field"><span class="a-label">{t('media.series')}</span>
+            <select class="a-select" name="series">{SERIES.map((s) => <option value={s} selected={v.series === s}>{t(`media.series.${s}`)}</option>)}</select>
+          </label>
+          <label class="a-field"><span class="a-label">{t('media.language')}</span>
+            <select class="a-select" name="language">{VIDEO_LANGS.map((l) => <option value={l} selected={v.language === l}>{t(`prog.lang.${l}`)}</option>)}</select>
+          </label>
+          <label class="a-field"><span class="a-label">{t('media.speaker')} <span class="a-opt">({t('common.optional')})</span></span>
+            <input class="a-input" name="speaker" value={v.speaker ?? ''} maxlength="120" dir="auto" />
+          </label>
+          <label class="a-field"><span class="a-label">{t('media.date')}</span>
+            <input class="a-input" type="date" name="date" value={dateValue} required aria-invalid={errors.date ? 'true' : undefined} />
+            {errors.date && <span class="a-error-text">{errors.date}</span>}
+          </label>
+        </div>
+      </section>
+    </div>
+
+    <aside class="grid content-start gap-4">
+      <section class="a-card grid gap-3">
+        <a href={`https://www.youtube.com/watch?v=${existing.data.youtubeId}`} target="_blank" rel="noopener noreferrer" class="group relative block overflow-hidden rounded-xl bg-paper-2">
+          <img src={`https://i.ytimg.com/vi/${existing.data.youtubeId}/mqdefault.jpg`} alt="" width="320" height="180" referrerpolicy="no-referrer" class="aspect-video w-full object-cover" />
+          <span class="absolute inset-0 grid place-items-center bg-black/0 transition-colors group-hover:bg-black/25"><span class="grid size-11 place-items-center rounded-full bg-white/90 text-wine shadow"><AIcon name="play" size={18} /></span></span>
+        </a>
+        <a href={`https://www.youtube.com/watch?v=${existing.data.youtubeId}`} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-wine"><AIcon name="external" size={13} />{t('media.openYt')}</a>
+        <label class="a-field"><span class="a-label">{t('media.url')}</span>
+          <input class="a-input" name="url" value={urlValue} required maxlength="500" dir="ltr" inputmode="url" aria-invalid={errors.url ? 'true' : undefined} />
+          {errors.url && <span class="a-error-text">{errors.url}</span>}
+        </label>
+      </section>
+      <section class="a-card grid gap-2.5">
+        <label class="a-check items-center"><input type="checkbox" name="featured" class="a-switch" checked={v.featured} /><span class="font-semibold">{t('media.featured')}</span></label>
+        <p class="a-hint">{t('media.featuredHint')}</p>
+      </section>
+    </aside>
+
+    <div class="xl:col-span-2">
+      <SaveBar t={t} canDelete />
+    </div>
+  </form>
+</AdminLayout>

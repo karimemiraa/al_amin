@@ -73,7 +73,7 @@ if (Astro.request.method === 'POST') {
     setFlash(Astro, { type: 'ok', key: isNew ? 'flash.created' : 'flash.saved', link: live ? `/aktuelles#${saveId}` : undefined });
     return Astro.redirect(`/admin/ankuendigungen/${saveId}`, 303);
   }
-  setFlash(Astro, { type: 'error', key: 'flash.error' });
+  Astro.locals.flash = { type: 'error', key: 'flash.error' };
 }
 
 const status = announcementStatus(a);

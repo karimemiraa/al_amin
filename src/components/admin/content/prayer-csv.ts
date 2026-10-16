@@ -54,7 +54,11 @@ export function parsePrayerCsv(text: string, opts: { minYear: number; maxYear: n
     const cells = rawLine.split(sep).map((c) => c.trim().replace(/^"(.*)"$/, '$1').trim());
     while (cells.length > 7 && cells.at(-1) === '') cells.pop(); // trailing separators from Excel
     if (line === 1 && /date|datum/i.test(cells[0] ?? '')) return; // header row
-    if (cells.length !== 7) return fail({ key: 'prayer.err.columns', vars: { line, n: cells.length } });
+    if (cells.length !== 7) {
+      const d = normDate(cells[0] ?? '');
+      if (d && !firstLine.has(d)) firstLine.set(d, line); // reported once, not again as "missing"
+      return fail({ key: 'prayer.err.columns', vars: { line, n: cells.length } });
+    }
 
     const date = normDate(cells[0]);
     if (!date) return fail({ key: 'prayer.err.date', vars: { line, value: cells[0].slice(0, 20) } });

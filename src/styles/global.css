@@ -161,6 +161,7 @@
  * white-on-green buttons above WCAG AA contrast.
  */
 [data-theme='green'] {
+  --color-gold-pale: #f1e6d2;
   --color-wine: #2f7d3e;
   --color-wine-deep: #23622f;
   --color-wine-ink: #15391c;
@@ -180,6 +181,7 @@
 
 /* Colour variant "navy": Nachtblau & Gold. */
 [data-theme='navy'] {
+  --color-gold-pale: #f1e6d2;
   --color-wine: #24365e;
   --color-wine-deep: #1a2847;
   --color-wine-ink: #0f1b33;

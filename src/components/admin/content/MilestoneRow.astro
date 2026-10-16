@@ -1,0 +1,32 @@
+---
+/** One editable milestone row of the campaign page (also used, empty, as the JS template). */
+import AIcon from '../AIcon.astro';
+import type { T } from '../../../admin/i18n';
+interface Props { t: T; i: number; m?: { key: string; date: string; done: boolean; titleDe: string; titleAr: string }; dateError?: string; titleError?: string }
+const { t, i, m = { key: '', date: '', done: false, titleDe: '', titleAr: '' }, dateError, titleError } = Astro.props;
+const arrow = (d: string) => `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}" /></svg>`;
+---
+<li class="grid gap-2 rounded-xl border border-line bg-paper/50 p-2.5 md:grid-cols-[26px_112px_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-start md:gap-2 md:border-0 md:bg-transparent md:p-0" data-ms-row>
+  <input type="hidden" name="ms_key" value={m.key} />
+  <span class="hidden size-[26px] place-items-center self-center rounded-full bg-paper-2 font-display text-[12.5px] font-semibold text-wine md:mt-1.5 md:grid md:self-start" data-ms-num>{i + 1}</span>
+  <label class="a-field">
+    <span class="a-label text-[11.5px] md:sr-only">{t('camp.msDate')}</span>
+    <input class="a-input" name="ms_date" value={m.date} maxlength="10" dir="ltr" placeholder="2027-02" aria-invalid={dateError ? 'true' : undefined} />
+    {dateError && <span class="a-error-text">{dateError}</span>}
+  </label>
+  <label class="a-field">
+    <span class="a-label text-[11.5px] md:sr-only"><span class="a-lang-tag">DE</span>{t('prog.fieldTitle')}</span>
+    <input class="a-input" name="ms_title_de" value={m.titleDe} maxlength="160" dir="ltr" lang="de" aria-invalid={titleError ? 'true' : undefined} />
+    {titleError && <span class="a-error-text">{titleError}</span>}
+  </label>
+  <label class="a-field">
+    <span class="a-label text-[11.5px] md:sr-only"><span class="a-lang-tag">AR</span>{t('prog.fieldTitle')}</span>
+    <input class="a-input" name="ms_title_ar" value={m.titleAr} maxlength="160" dir="rtl" lang="ar" />
+  </label>
+  <div class="flex min-h-[38px] items-center gap-0.5">
+    <label class="a-check me-auto items-center pe-2 text-[13px]" title={t('camp.msDone')}><input type="checkbox" name="ms_done" value={m.key} class="a-switch" checked={m.done} /><span class="md:sr-only">{t('camp.msDone')}</span></label>
+    <button type="submit" name="action" value={`ms:up:${i}`} formnovalidate class="a-btn a-btn-icon a-btn-ghost !size-7" title={t('camp.msUp')} aria-label={t('camp.msUp')} data-ms="up" set:html={arrow('M12 19V5M6 11l6-6 6 6')} />
+    <button type="submit" name="action" value={`ms:down:${i}`} formnovalidate class="a-btn a-btn-icon a-btn-ghost !size-7" title={t('camp.msDown')} aria-label={t('camp.msDown')} data-ms="down" set:html={arrow('M12 5v14M6 13l6 6 6-6')} />
+    <button type="submit" name="action" value={`ms:remove:${i}`} formnovalidate class="a-btn a-btn-icon a-btn-ghost a-btn-danger !size-7" title={t('camp.msRemove')} aria-label={t('camp.msRemove')} data-ms="remove"><AIcon name="trash" size={14} /></button>
+  </div>
+</li>

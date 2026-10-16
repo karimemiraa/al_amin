@@ -1,0 +1,240 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AIcon from '../../components/admin/AIcon.astro';
+import PageHead from '../../components/admin/PageHead.astro';
+import SessionList from '../../components/admin/people/SessionList.astro';
+import { adminT } from '../../admin/i18n';
+import { currentUser, setFlash, str, clientIp, LANG_COOKIE } from '../../admin/util';
+import {
+  updateUser, checkPassword, passwordProblem, setPassword, destroyUserSessions, destroySessionById, listSessions,
+  verifySecondFactor, regenerateRecoveryCodes, recoveryCodesLeft, disableTotp, twoFactorRequired, ownerEmails, audit,
+} from '../../lib/server/auth';
+import { alertOwners, mailConfigured, sendMail } from '../../lib/server/mail';
+import { setOnce, takeOnce, sessionRef } from '../../components/admin/people/helpers';
+
+const { user, session } = currentUser(Astro);
+const t = adminT(user.lang);
+const lang = user.lang;
+const BASE = '/admin/konto';
+const CODES_COOKIE = 'igh_account_codes';
+const errors: Record<string, string> = {};
+let openForm = '';
+
+// Wrong current passwords / codes on this page: max. 5 per user within 15 minutes.
+const g = globalThis as unknown as { __ighAccountFails?: Map<number, number[]> };
+g.__ighAccountFails ??= new Map();
+const recentFails = () => (g.__ighAccountFails!.get(user.id) ?? []).filter((x) => Date.now() - x < 15 * 60_000);
+const noteFail = () => { console.error('[DBGFAIL]', user.id, Astro.request.headers.get('user-agent')?.slice(0, 60)); g.__ighAccountFails!.set(user.id, [...recentFails(), Date.now()]); };
+// (Per user, not per IP: the person is already signed in, and a shared IP must not lock them out.)
+const blocked = () => recentFails().length >= 5;
+
+const done = (key: string, hash = '') => { setFlash(Astro, { type: 'ok', key }); return Astro.redirect(BASE + hash, 303); };
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const action = str(fd, 'action', 30);
+  const ip = clientIp(Astro);
+
+  if (action === 'profile') {
+    const name = str(fd, 'name', 80);
+    const newLang = str(fd, 'lang', 2) === 'ar' ? 'ar' : 'de';
+    if (!name) errors.name = t('common.required');
+    else {
+      updateUser(user.id, { name, lang: newLang });
+      Astro.cookies.set(LANG_COOKIE, newLang, { path: '/admin', sameSite: 'strict', maxAge: 31536000 });
+      const changes: Record<string, { from: string; to: string }> = {};
+      if (name !== user.name) changes.name = { from: user.name, to: name };
+      if (newLang !== user.lang) changes.lang = { from: user.lang, to: newLang };
+      if (Object.keys(changes).length) audit({ id: user.id, name }, 'account.update', name, changes);
+      return done('account.flash.profile');
+    }
+  } else if (action === 'password') {
+    openForm = 'password';
+    const current = String(fd.get('current') ?? '');
+    const next = String(fd.get('password') ?? '');
+    if (blocked()) errors.current = t('account.rate');
+    else if (!checkPassword(user.id, current)) { noteFail(); errors.current = t('account.pwWrong'); }
+    else {
+      const pw = passwordProblem(next, user.email);
+      if (pw) errors.password = t(pw);
+      else if (next !== String(fd.get('repeat') ?? '')) errors.repeat = t('pw.mismatch');
+    }
+    if (!Object.keys(errors).length) {
+      setPassword(user.id, next);
+      destroyUserSessions(user.id, session.id);
+      audit(user, 'account.password', user.email, { ip }, true);
+      if (mailConfigured()) {
+        sendMail({ to: user.email, subject: t('reset.changedSubject'), text: t('reset.changedText', { name: user.name, email: user.email }) })
+          .catch((err) => console.error('[mail] password notice failed', err));
+      }
+      return done('account.flash.password', '#passwort');
+    }
+  } else if (action === 'codes' && user.totpEnabled) {
+    openForm = 'codes';
+    const code = String(fd.get('code') ?? '').replace(/\s/g, '');
+    if (blocked()) errors.codes = t('account.rate');
+    else if (!/^\d{6}$/.test(code) || verifySecondFactor(user.id, code) !== 'totp') { noteFail(); errors.codes = t('account.codeInvalid'); }
+    else {
+      const codes = regenerateRecoveryCodes(user.id);
+      setOnce(Astro, CODES_COOKIE, codes, BASE);
+      audit(user, 'account.recoveryCodes', user.email, { ip }, true);
+      return done('account.flash.codes');
+    }
+  } else if (action === 'disable2fa' && user.totpEnabled && !twoFactorRequired(user)) {
+    openForm = 'disable';
+    if (blocked()) errors.disable = t('account.rate');
+    else if (!checkPassword(user.id, String(fd.get('password') ?? '')) || !verifySecondFactor(user.id, String(fd.get('code') ?? ''))) { noteFail(); errors.disable = t('account.disableWrong'); }
+    else {
+      disableTotp(user.id);
+      audit(user, 'account.2faDisabled', user.email, { ip }, true);
+      void alertOwners(ownerEmails(), '2FA deaktiviert', `${user.name} (${user.email}) hat die eigene Zwei-Faktor-Anmeldung deaktiviert.`);
+      return done('account.flash.2faOff', '#zwei-faktor');
+    }
+  } else if (action === 'signOutOthers') {
+    const n = listSessions(user.id).length - 1;
+    destroyUserSessions(user.id, session.id);
+    audit(user, 'user.sessionsRevoked', user.name, { sessions: n, ip }, true);
+    return done('account.flash.signedOut', '#geraete');
+  } else if (action === 'revokeSession') {
+    const ref = str(fd, 'sid', 16);
+    const s = listSessions(user.id).find((x) => sessionRef(x.id) === ref);
+    if (s && s.id !== session.id) {
+      destroySessionById(s.id);
+      audit(user, 'user.sessionsRevoked', user.name, { sessions: 1, device: (s.userAgent ?? '').slice(0, 80), ip }, true);
+    }
+    return done('account.flash.revoked', '#geraete');
+  }
+  Astro.locals.flash = { type: 'error', key: 'flash.error' };
+}
+
+const codes = Astro.request.method === 'GET' ? takeOnce<string[]>(Astro, CODES_COOKIE, BASE) : null;
+const required = twoFactorRequired(user);
+const left = user.totpEnabled ? recoveryCodesLeft(user.id) : 0;
+const sessions = listSessions(user.id);
+---
+<AdminLayout title={t('account.title')} active="account">
+  <PageHead title={t('account.title')} intro={t('account.intro')} />
+
+  {codes && (
+    <section class="a-card mb-4 border-wine/40 !bg-rose-soft/40" role="status">
+      <div class="flex flex-wrap items-start gap-4">
+        <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-wine text-white"><AIcon name="key" /></span>
+        <div class="min-w-0 flex-1">
+          <h2 class="a-section-title">{t('enroll.codesTitle')}</h2>
+          <p class="mt-0.5 text-[13px] a-muted">{t('enroll.codesText')}</p>
+          <ol class="mt-3 grid grid-cols-2 gap-2 font-mono text-[14.5px] tracking-wider sm:grid-cols-5" dir="ltr">
+            {codes.map((c) => <li class="rounded-lg border border-line bg-card px-2 py-1.5 text-center">{c}</li>)}
+          </ol>
+          <div class="mt-3 flex gap-2"><button type="button" class="a-btn a-btn-sm" onclick="window.print()">{t('enroll.print')}</button></div>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <div class="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
+    <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+      <section class="a-card">
+        <h2 class="a-card-title font-sans">{t('account.profile')}</h2>
+        <form method="post" class="grid gap-3" data-track>
+          <input type="hidden" name="action" value="profile" />
+          <div class="flex items-center gap-3 pb-1">
+            <span class="grid size-11 shrink-0 place-items-center rounded-full bg-gold-pale text-[14px] font-bold text-[#6b4f2a]">{user.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}</span>
+            <span class="min-w-0 leading-tight"><b class="block truncate">{user.name}</b><small class="a-muted">{t(`role.${user.role}`)}</small></span>
+          </div>
+          <label class="a-field"><span class="a-label">{t('account.name')}</span><input class="a-input" name="name" value={user.name} maxlength="80" required autocomplete="name" aria-invalid={errors.name ? 'true' : undefined} />{errors.name && <span class="a-error-text">{errors.name}</span>}</label>
+          <label class="a-field"><span class="a-label">{t('account.email')}</span><input class="a-input bg-paper" value={user.email} readonly dir="ltr" /><span class="a-hint">{t('account.emailHint')}</span></label>
+          <label class="a-field"><span class="a-label">{t('account.lang')}</span>
+            <select class="a-select" name="lang"><option value="de" selected={lang === 'de'}>Deutsch</option><option value="ar" selected={lang === 'ar'}>العربية</option></select>
+          </label>
+          <button class="a-btn a-btn-primary justify-self-end"><AIcon name="check" size={15} />{t('common.save')}</button>
+        </form>
+      </section>
+
+      <section id="passwort" class="a-card scroll-mt-20">
+        <h2 class="a-card-title font-sans">{t('account.password')}</h2>
+        <form method="post" class="grid gap-3">
+          <input type="hidden" name="action" value="password" />
+          <input type="email" name="username" value={user.email} autocomplete="username" hidden />
+          <label class="a-field"><span class="a-label">{t('account.current')}</span><input class="a-input" type="password" name="current" required autocomplete="current-password" aria-invalid={errors.current ? 'true' : undefined} />{errors.current && <span class="a-error-text">{errors.current}</span>}</label>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="a-field"><span class="a-label">{t('pw.new')}</span><input class="a-input" type="password" name="password" required minlength="10" autocomplete="new-password" aria-invalid={errors.password ? 'true' : undefined} />{errors.password && <span class="a-error-text">{errors.password}</span>}</label>
+            <label class="a-field"><span class="a-label">{t('pw.repeat')}</span><input class="a-input" type="password" name="repeat" required autocomplete="new-password" aria-invalid={errors.repeat ? 'true' : undefined} />{errors.repeat && <span class="a-error-text">{errors.repeat}</span>}</label>
+          </div>
+          <p class="a-hint">{t('pw.hint')} {t('account.pwHint')}</p>
+          <button class="a-btn a-btn-primary justify-self-end"><AIcon name="key" size={15} />{t('account.pwSubmit')}</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+      <section id="zwei-faktor" class="a-card scroll-mt-20">
+        <h2 class="a-card-title font-sans">{t('account.2fa')}</h2>
+        <div class="flex items-start gap-3">
+          <span class:list={['grid size-11 shrink-0 place-items-center rounded-xl', user.totpEnabled ? 'bg-[#e4f1e3] text-[#2f6d39]' : 'bg-[#fbf0dc] text-[#8a5a1a]']}><AIcon name={user.totpEnabled ? 'shieldCheck' : 'shield'} size={20} /></span>
+          <div class="min-w-0 flex-1">
+            <p class="flex flex-wrap items-center gap-2">
+              <span class:list={['a-chip', user.totpEnabled ? 'a-chip-live' : 'a-chip-warn']}>{user.totpEnabled ? t('account.2faOn') : t('account.2faOff')}</span>
+              <span class="text-[12.5px] a-muted">{required ? t('account.2faRequired') : t('account.2faOptional')}</span>
+            </p>
+            <p class="mt-1.5 text-[13px] a-muted">{t('account.2faText')}</p>
+            {user.totpEnabled && (
+              <p class:list={['mt-2 text-[13px] font-semibold', left <= 3 ? 'text-[#8a5a1a]' : 'text-ink-soft']}>
+                {t('account.codesLeft', { n: left })}{left <= 3 && <span class="block font-normal">{t('account.codesLow')}</span>}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {user.totpEnabled ? (
+          <div class="mt-4 grid gap-2">
+            <details class="rounded-xl border border-line bg-paper/50 px-3.5 py-2.5" open={openForm === 'codes'}>
+              <summary class="cursor-pointer text-[13.5px] font-semibold text-wine">{t('account.newCodes')}</summary>
+              <form method="post" class="mt-2.5 grid gap-2.5">
+                <input type="hidden" name="action" value="codes" />
+                <p class="a-hint">{t('account.newCodesHint')}</p>
+                <div class="flex gap-2">
+                  <input class="a-input a-code-input !min-h-10 !text-[1.15rem] min-w-0 flex-1" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required dir="ltr" placeholder="000000" aria-label={t('account.code')} aria-invalid={errors.codes ? 'true' : undefined} />
+                  <button class="a-btn a-btn-primary !h-10">{t('account.newCodesSubmit')}</button>
+                </div>
+                {errors.codes && <span class="a-error-text">{errors.codes}</span>}
+              </form>
+            </details>
+            {!required && (
+              <details class="rounded-xl border border-line bg-paper/50 px-3.5 py-2.5" open={openForm === 'disable'}>
+                <summary class="cursor-pointer text-[13.5px] font-semibold text-[#a3262a]">{t('account.disable')}</summary>
+                <form method="post" class="mt-2.5 grid gap-2.5">
+                  <input type="hidden" name="action" value="disable2fa" />
+                  <p class="a-hint">{t('account.disableHint')}</p>
+                  <div class="grid gap-2 sm:grid-cols-2">
+                    <input class="a-input" type="password" name="password" required autocomplete="current-password" placeholder={t('auth.password')} aria-label={t('auth.password')} />
+                    <input class="a-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="11" required dir="ltr" placeholder="000000" aria-label={t('account.code')} />
+                  </div>
+                  {errors.disable && <span class="a-error-text">{errors.disable}</span>}
+                  <button class="a-btn a-btn-danger justify-self-end">{t('account.disableSubmit')}</button>
+                </form>
+              </details>
+            )}
+          </div>
+        ) : (
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-line px-3.5 py-3">
+            <span class="text-[13px] a-muted">{t('account.setupText')}</span>
+            <a href="/admin/2fa-einrichten" class="a-btn a-btn-primary"><AIcon name="shieldCheck" size={15} />{t('account.setup')}</a>
+          </div>
+        )}
+      </section>
+
+      <section id="geraete" class="a-card scroll-mt-20">
+        <div class="a-card-title"><span>{t('account.sessions')} · {sessions.length}</span></div>
+        <SessionList t={t} lang={lang} sessions={sessions} currentId={session.id} />
+        {sessions.length > 1 && (
+          <form method="post" class="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-paper-2 pt-3">
+            <input type="hidden" name="action" value="signOutOthers" />
+            <span class="min-w-0 flex-1 text-[12.5px] a-muted">{t('account.signOutOthersHint')}</span>
+            <button class="a-btn a-btn-sm a-btn-danger"><AIcon name="logout" size={14} />{t('account.signOutOthers')}</button>
+          </form>
+        )}
+      </section>
+    </div>
+  </div>
+</AdminLayout>

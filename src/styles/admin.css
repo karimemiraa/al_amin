@@ -9,7 +9,7 @@
   html[lang='ar'] .a-body { font-size: 15px; }
 
   .a-shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100dvh; }
-  @media (max-width: 1023px) { .a-shell { grid-template-columns: 1fr; } }
+  @media (max-width: 1023px) { .a-shell { grid-template-columns: minmax(0, 1fr); } }
 
   /* Sidebar */
   .a-side {

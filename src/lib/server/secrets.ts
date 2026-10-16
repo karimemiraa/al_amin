@@ -38,9 +38,9 @@ export function secretSource(key: SecretKey): 'admin' | 'env' | null {
   return process.env[ENV_FALLBACK[key]] ? 'env' : null;
 }
 
-/** Masked display: "sk_live_…a1B2". */
+/** Masked display: "sk_live_…a1B2" for API keys; passwords and unknown formats are fully hidden. */
 export function maskSecret(value: string | null) {
   if (!value) return '';
-  const prefix = value.match(/^(sk|rk|pk|whsec)_(live|test)?_?/)?.[0] ?? '';
-  return `${prefix}…${value.slice(-4)}`;
+  const prefix = value.match(/^(sk-ant-[a-z0-9]+-|(sk|rk|pk|whsec)_(live|test)?_?)/)?.[0];
+  return prefix ? `${prefix}…${value.slice(-4)}` : '••••••••';
 }

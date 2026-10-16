@@ -24,6 +24,8 @@ const AFTER = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'time'] as const;
 const LANGS = ['de', 'ar', 'de-ar'] as const;
 const AUDIENCES = ['all', 'men', 'women', 'kids', 'youth'] as const;
 const WEEK = [6, 0, 1, 2, 3, 4, 5];
+/** "18.30", "9:30", "1830" → "18:30" / "09:30"; anything else is kept for the error message. */
+const normTime = (v: string) => { const m = v.match(/^(\d{1,2})[:.]?(\d{2})$/); return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v; };
 
 const tag = Number(Astro.url.searchParams.get('tag'));
 let l: Lesson = existing?.data ?? {
@@ -48,7 +50,7 @@ if (Astro.request.method === 'POST') {
   l = {
     weekday: Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : 6,
     after: AFTER.includes(after) ? after : 'maghrib',
-    time: str(fd, 'time', 5),
+    time: normTime(str(fd, 'time', 8)),
     title_de: str(fd, 'title_de', 160),
     title_ar: str(fd, 'title_ar', 160),
     desc_de: str(fd, 'desc_de', 600),
@@ -70,7 +72,7 @@ if (Astro.request.method === 'POST') {
     setFlash(Astro, { type: 'ok', key: isNew ? 'flash.created' : 'flash.saved', link: l.active ? '/programm' : undefined });
     return Astro.redirect(`/admin/programm/${saveId}`, 303);
   }
-  setFlash(Astro, { type: 'error', key: 'flash.error' });
+  Astro.locals.flash = { type: 'error', key: 'flash.error' }; // shown on this re-render
 }
 
 const wdName = (wd: number) => new Intl.DateTimeFormat(ar ? 'ar' : 'de-DE', { weekday: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, 7 + wd)));
@@ -82,6 +84,7 @@ const isTimeMode = l.after === 'time';
   </PageHead>
 
   <form method="post" data-track class="grid gap-4 xl:grid-cols-[1fr_320px]" id="lesson-form">
+    <button type="submit" name="action" value="save" class="sr-only" tabindex="-1" aria-hidden="true">{t('common.save')}</button>
     <div class="grid content-start gap-4">
       <section class="a-card grid gap-5">
         <BiField t={t} name="title" label={t('prog.fieldTitle')} de={l.title_de} ar={l.title_ar} required error={errors.title} placeholderDe="Die Sirah des Propheten ﷺ" placeholderAr="السيرة النبوية" />
@@ -99,7 +102,7 @@ const isTimeMode = l.after === 'time';
           </label>
           <label class="a-field" hidden={!isTimeMode} data-time-field>
             <span class="a-label">{t('prog.time')}</span>
-            <input class="a-input" type="time" name="time" value={l.time ?? ''} dir="ltr" pattern="[0-2][0-9]:[0-5][0-9]" placeholder="18:30" aria-invalid={errors.time ? 'true' : undefined} />
+            <input class="a-input tabular-nums" name="time" value={l.time ?? ''} maxlength="5" inputmode="numeric" dir="ltr" placeholder="18:30" aria-invalid={errors.time ? 'true' : undefined} />
             {errors.time && <span class="a-error-text">{errors.time}</span>}
           </label>
         </div>

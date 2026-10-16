@@ -1,0 +1,221 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, bool, isDate } from '../../../admin/util';
+import { getEntries, getEntry, saveEntry, newId, type Video } from '../../../lib/content';
+import { audit } from '../../../lib/server/auth';
+import { youtubeId, fetchOEmbed } from '../../../components/admin/content/youtube';
+import { SERIES, VIDEO_LANGS, serializeVideo, unfeatureOthers } from '../../../components/admin/content/videos';
+
+const denied = guardArea(Astro, 'content');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+
+const form = { url: '', title_de: '', title_ar: '', speaker: '', series: 'khutbah' as Video['series'], language: 'ar' as Video['language'], date: today, featured: false };
+const errors: Record<string, string> = {};
+let duplicateOf = '';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const action = str(fd, 'action', 20);
+
+  if (action === 'feature') {
+    const id = str(fd, 'id', 80);
+    const e = getEntry('videos', id);
+    if (e) {
+      const featured = !e.data.featured;
+      if (featured) unfeatureOthers(id, user.id);
+      saveEntry('videos', id, serializeVideo({ ...e.data, featured }), user.id);
+      audit(user, 'video.update', e.data.title_de, { featured });
+      setFlash(Astro, { type: 'ok', key: featured ? 'media.flashFeatured' : 'media.flashUnfeatured', link: '/mediathek' });
+    }
+    return Astro.redirect('/admin/mediathek', 303);
+  }
+
+  if (action === 'create') {
+    const series = str(fd, 'series', 20) as Video['series'];
+    const language = str(fd, 'language', 5) as Video['language'];
+    Object.assign(form, {
+      url: str(fd, 'url', 500),
+      title_de: str(fd, 'title_de', 200),
+      title_ar: str(fd, 'title_ar', 200),
+      speaker: str(fd, 'speaker', 120),
+      series: SERIES.includes(series) ? series : 'other',
+      language: VIDEO_LANGS.includes(language) ? language : 'ar',
+      date: isDate(str(fd, 'date', 10)) ? str(fd, 'date', 10) : today,
+      featured: bool(fd, 'featured'),
+    });
+    const id = youtubeId(form.url);
+    if (!id) errors.url = t('media.urlInvalid');
+    else {
+      const dupe = getEntries('videos').find((v) => v.data.youtubeId === id);
+      if (dupe) { errors.url = t('media.duplicate'); duplicateOf = dupe.id; }
+    }
+    if (id && !errors.url && (!form.title_de || !form.speaker)) {
+      // No JavaScript (or the lookup failed in the browser): fetch the details now.
+      const meta = await fetchOEmbed(id);
+      if (meta) { form.title_de ||= meta.title; form.speaker ||= meta.author; }
+    }
+    if (!errors.url && !form.title_de) errors.title = t('media.fetchFail');
+    if (id && !Object.keys(errors).length) {
+      const saveId = newId('video');
+      const video: Video = { youtubeId: id, date: new Date(form.date), title_de: form.title_de, title_ar: form.title_ar, series: form.series, language: form.language, speaker: form.speaker, featured: form.featured };
+      if (video.featured) unfeatureOthers(saveId, user.id);
+      saveEntry('videos', saveId, serializeVideo(video), user.id);
+      audit(user, 'video.create', video.title_de, { youtubeId: id });
+      setFlash(Astro, { type: 'ok', key: 'flash.created', link: '/mediathek' });
+      return Astro.redirect(`/admin/mediathek#${saveId}`, 303);
+    }
+    Astro.locals.flash = { type: 'error', key: 'flash.error' }; // shown on this re-render
+  }
+}
+
+const videos = getEntries('videos').sort((a, b) => Number(b.data.featured) - Number(a.data.featured) || b.data.date.getTime() - a.data.date.getTime());
+const fmt = (d: Date) => new Intl.DateTimeFormat(ar ? 'ar-u-nu-latn' : 'de-DE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(d);
+const previewId = youtubeId(form.url);
+---
+<AdminLayout title={t('media.title')} active="media">
+  <PageHead title={t('media.title')} intro={t('media.intro')}>
+    <a href="/mediathek" target="_blank" rel="noopener" class="a-btn"><AIcon name="external" size={15} />{t('flash.view')}</a>
+  </PageHead>
+
+  <section id="neu" class="a-card mb-4 scroll-mt-6 !border-wine/25 bg-gradient-to-br from-white to-rose-soft/40">
+    <div class="flex items-start gap-3">
+      <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-wine text-white"><AIcon name="play" /></span>
+      <div><h2 class="a-section-title">{t('media.addTitle')}</h2><p class="text-[12.5px] a-muted">{t('media.addText')}</p></div>
+    </div>
+    <form method="post" class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]" data-track data-add-form>
+      <input type="hidden" name="action" value="create" />
+      <div class="grid min-w-0 content-start gap-3.5">
+        <label class="a-field">
+          <span class="a-label">{t('media.url')}</span>
+          <input class="a-input a-input-lg" name="url" value={form.url} required maxlength="500" dir="ltr" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" aria-invalid={errors.url ? 'true' : undefined} data-url />
+          <span class="a-hint" data-url-status>{t('media.urlHint')}</span>
+          {errors.url && <span class="a-error-text">{errors.url}{duplicateOf && <> · <a href={`/admin/mediathek/${duplicateOf}`} class="text-wine">{t('common.edit')}</a></>}</span>}
+        </label>
+        <div class="a-bilingual">
+          <label class="a-field">
+            <span class="a-label"><span class="a-lang-tag">DE</span>{t('media.fieldTitle')}</span>
+            <input class="a-input" name="title_de" value={form.title_de} maxlength="200" dir="ltr" lang="de" placeholder={t('media.titleAuto')} aria-invalid={errors.title ? 'true' : undefined} data-title />
+            {errors.title && <span class="a-error-text">{errors.title}</span>}
+          </label>
+          <label class="a-field">
+            <span class="a-label"><span class="a-lang-tag">AR</span>{t('media.fieldTitle')} <span class="a-opt">({t('common.optional')})</span></span>
+            <input class="a-input" name="title_ar" value={form.title_ar} maxlength="200" dir="rtl" lang="ar" />
+          </label>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <label class="a-field"><span class="a-label">{t('media.series')}</span>
+            <select class="a-select" name="series">{SERIES.map((s) => <option value={s} selected={form.series === s}>{t(`media.series.${s}`)}</option>)}</select>
+          </label>
+          <label class="a-field"><span class="a-label">{t('media.language')}</span>
+            <select class="a-select" name="language">{VIDEO_LANGS.map((v) => <option value={v} selected={form.language === v}>{t(`prog.lang.${v}`)}</option>)}</select>
+          </label>
+          <label class="a-field"><span class="a-label">{t('media.speaker')}</span>
+            <input class="a-input" name="speaker" value={form.speaker} maxlength="120" dir="auto" data-speaker />
+          </label>
+          <label class="a-field"><span class="a-label">{t('media.date')}</span>
+            <input class="a-input" type="date" name="date" value={form.date} max="2100-12-31" />
+          </label>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <label class="a-check items-center text-[13.5px]"><input type="checkbox" name="featured" class="a-switch" checked={form.featured} /><span>{t('media.featured')}</span></label>
+          <button class="a-btn a-btn-primary"><AIcon name="plus" size={15} />{t('media.add')}</button>
+        </div>
+      </div>
+      <div class="hidden lg:block">
+        <div class="relative grid aspect-video place-items-center overflow-hidden rounded-xl border border-line bg-paper-2 text-ink-mute">
+          <img src={previewId ? `https://i.ytimg.com/vi/${previewId}/mqdefault.jpg` : undefined} alt="" class:list={['absolute inset-0 h-full w-full object-cover', !previewId && 'hidden']} data-thumb referrerpolicy="no-referrer" />
+          <AIcon name="play" size={26} />
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <section class="a-card !p-0 [contain:inline-size]">
+    <div class="flex items-center justify-between border-b border-line px-4 py-2.5 text-[13px]">
+      <span class="font-semibold">{t('media.count', { n: videos.length })}</span>
+    </div>
+    {videos.length === 0 && <p class="a-empty">{t('media.empty')}</p>}
+    <ul class="a-list px-4">
+      {videos.map((v) => (
+        <li id={v.id} class="flex items-center gap-3 py-2.5">
+          <a href={`/admin/mediathek/${v.id}`} class="group flex min-w-0 flex-1 items-center gap-3 no-underline">
+            <img src={`https://i.ytimg.com/vi/${v.data.youtubeId}/mqdefault.jpg`} alt="" width="320" height="180" loading="lazy" referrerpolicy="no-referrer" class="aspect-video w-24 shrink-0 rounded-lg bg-paper-2 object-cover sm:w-32" />
+            <span class="min-w-0 flex-1">
+              <span class="flex flex-wrap items-center gap-1.5 text-[11.5px]">
+                {v.data.featured && <span class="a-chip a-chip-scheduled !px-2"><AIcon name="star" size={11} />{t('media.isFeatured')}</span>}
+                <span class="a-chip a-chip-draft !px-2">{t(`media.series.${v.data.series}`)}</span>
+                <span class="a-lang-tag">{v.data.language === 'de-ar' ? 'DE · AR' : v.data.language.toUpperCase()}</span>
+                <span class="a-muted">{fmt(v.data.date)}</span>
+              </span>
+              <span class="a-row-title mt-1 block text-[13.5px] text-ink group-hover:text-wine"><bdi lang="de">{v.data.title_de}</bdi></span>
+              {v.data.title_ar
+                ? <span class="block truncate text-[12.5px] a-muted"><bdi lang="ar">{v.data.title_ar}</bdi></span>
+                : <span class="block text-[12px] font-semibold text-[#8a5a1a]">{t('media.missingAr')}</span>}
+            </span>
+          </a>
+          <form method="post" action="/admin/mediathek" class="shrink-0">
+            <input type="hidden" name="action" value="feature" />
+            <input type="hidden" name="id" value={v.id} />
+            <button class:list={['a-btn a-btn-icon a-btn-ghost', v.data.featured ? '!text-[#c08a2c]' : 'text-ink-mute']} title={t('media.featured')} aria-label={t('media.featured')} aria-pressed={v.data.featured ? 'true' : 'false'}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill={v.data.featured ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z" /></svg>
+            </button>
+          </form>
+          <a href={`/admin/mediathek/${v.id}`} class="a-btn a-btn-icon a-btn-ghost hidden shrink-0 sm:inline-flex" title={t('common.edit')} aria-label={t('common.edit')}><AIcon name="edit" size={15} /></a>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <script is:inline type="application/json" id="media-i18n" set:html={JSON.stringify({ fetching: t('media.fetching'), fetched: t('media.fetched'), fail: t('media.fetchFail'), invalid: t('media.urlInvalid'), hint: t('media.urlHint') }).replace(/</g, '\\u003c')} />
+
+  <script>
+    const form = document.querySelector<HTMLFormElement>('[data-add-form]')!;
+    const i18n = JSON.parse(document.getElementById('media-i18n')!.textContent!);
+    const url = form.querySelector<HTMLInputElement>('[data-url]')!;
+    const status = form.querySelector<HTMLElement>('[data-url-status]')!;
+    const title = form.querySelector<HTMLInputElement>('[data-title]')!;
+    const speaker = form.querySelector<HTMLInputElement>('[data-speaker]')!;
+    const thumb = form.querySelector<HTMLImageElement>('[data-thumb]')!;
+    let last = '';
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const setStatus = (text: string, tone: 'muted' | 'ok' | 'error' = 'muted') => {
+      status.textContent = text;
+      status.className = tone === 'error' ? 'a-error-text' : tone === 'ok' ? 'a-hint !text-[#2f6d39] font-semibold' : 'a-hint';
+    };
+    const lookup = async () => {
+      const value = url.value.trim();
+      if (!value || value === last) return;
+      last = value;
+      setStatus(i18n.fetching);
+      try {
+        const res = await fetch(`/admin/api/youtube?url=${encodeURIComponent(value)}`, { headers: { Accept: 'application/json' } });
+        const data = await res.json();
+        if (url.value.trim() !== value) return;
+        if (!res.ok || !data.id) { url.setAttribute('aria-invalid', 'true'); thumb.classList.add('hidden'); return setStatus(i18n.invalid, 'error'); }
+        url.removeAttribute('aria-invalid');
+        thumb.src = `https://i.ytimg.com/vi/${data.id}/mqdefault.jpg`;
+        thumb.classList.remove('hidden');
+        if (data.title) {
+          if (!title.value || title.dataset.auto === 'true') { title.value = data.title; title.dataset.auto = 'true'; }
+          if (!speaker.value || speaker.dataset.auto === 'true') { speaker.value = data.author; speaker.dataset.auto = 'true'; }
+          setStatus(i18n.fetched, 'ok');
+        } else setStatus(i18n.fail, 'error');
+      } catch {
+        setStatus(i18n.fail, 'error');
+      }
+    };
+    url.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(lookup, 350); });
+    url.addEventListener('paste', () => { clearTimeout(timer); timer = setTimeout(lookup, 50); });
+    title.addEventListener('input', () => (title.dataset.auto = 'false'));
+    speaker.addEventListener('input', () => (speaker.dataset.auto = 'false'));
+    if (location.hash === '#neu' && !url.value) url.focus();
+  </script>
+</AdminLayout>

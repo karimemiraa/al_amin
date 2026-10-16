@@ -18,9 +18,9 @@ const { t, lang, sessions, currentId, userId, action = 'revokeSession' } = Astro
             <span class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13.5px] font-semibold">
               {deviceName(s.userAgent, lang)}
               {s.id === currentId && <span class="a-chip a-chip-live">{t('users.thisDevice')}</span>}
-              {!s.mfaOk && <span class="a-chip a-chip-warn">2FA …</span>}
+              {!s.mfaOk && <span class="a-chip a-chip-warn">{t('users.pending2fa')}</span>}
             </span>
-            <small class="block truncate a-muted">
+            <small class="block a-muted">
               <span dir="ltr">{s.ip ?? '—'}</span> · {t('users.lastSeen', { time: relTime(lang, s.lastSeen) })} · {t('users.since', { time: relTime(lang, s.createdAt) })}
             </small>
           </span>

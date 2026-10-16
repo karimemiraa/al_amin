@@ -1,0 +1,279 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import BiField from '../../../components/admin/BiField.astro';
+import SaveBar from '../../../components/admin/SaveBar.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, isTime } from '../../../admin/util';
+import { getPrayerSettings, saveSetting, savePrayerTable, getUploadedPrayerTables, type PrayerSettings } from '../../../lib/content';
+import { getDay, berlinToday, getPublishedYears } from '../../../lib/prayer';
+import { audit } from '../../../lib/server/auth';
+import { parsePrayerCsv, MAX_CSV_BYTES, type CsvError } from '../../../components/admin/content/prayer-csv';
+
+const denied = guardArea(Astro, 'content');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+
+const IQAMA = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
+/** "14.00", "9:30", "1400" → "14:00" / "09:30"; anything else is returned trimmed for the error message. */
+const normTime = (raw: string) => {
+  const v = raw.trim().slice(0, 8);
+  const m = v.match(/^(\d{1,2})[:.]?(\d{2})$/);
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : v;
+};
+const MAX_JUMUAH = 4;
+const current = getPrayerSettings();
+const [ty, tm, td] = berlinToday();
+
+let offsets: Record<string, string> = Object.fromEntries(IQAMA.map((p) => [p, String(current.iqamaOffsets?.[p] ?? 0)]));
+let jumuah: PrayerSettings['jumuah'] = (current.jumuah ?? []).map((j) => ({ ...j }));
+let noticeDe = current.noticeDe ?? '';
+let noticeAr = current.noticeAr ?? '';
+const errors: Record<string, string> = {};
+let csvErrors: CsvError[] = [];
+let csvTotal = 0;
+let csvText = '';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const formName = str(fd, 'form', 20);
+
+  if (formName === 'settings') {
+    const action = str(fd, 'action', 30);
+    offsets = Object.fromEntries(IQAMA.map((p) => [p, str(fd, `iqama_${p}`, 4)]));
+    const times = fd.getAll('ju_time').map((v) => normTime(String(v)));
+    const notesDe = fd.getAll('ju_note_de').map((v) => String(v).trim().slice(0, 200));
+    const notesAr = fd.getAll('ju_note_ar').map((v) => String(v).trim().slice(0, 200));
+    jumuah = times.map((time, i) => ({ time, noteDe: notesDe[i] ?? '', noteAr: notesAr[i] ?? '' })).slice(0, MAX_JUMUAH + 1);
+    noticeDe = str(fd, 'notice_de', 400);
+    noticeAr = str(fd, 'notice_ar', 400);
+
+    // Without JavaScript the add/remove buttons submit the form: apply them and show the form again.
+    if (action === 'ju:add' || action.startsWith('ju:remove:')) {
+      if (action === 'ju:add' && jumuah.length < MAX_JUMUAH) jumuah.push({ time: '', noteDe: '', noteAr: '' });
+      else jumuah.splice(Number(action.split(':')[2]), 1);
+    } else {
+      for (const p of IQAMA) {
+        const v = offsets[p];
+        if (!/^\d{1,2}$/.test(v) || Number(v) > 90) errors[`iqama_${p}`] = t('prayer.offsetInvalid');
+      }
+      jumuah = jumuah.filter((j) => j.time || j.noteDe || j.noteAr).slice(0, MAX_JUMUAH);
+      jumuah.forEach((j, i) => { if (!isTime(j.time)) errors[`ju_${i}`] = t('prog.timeInvalid'); });
+      if (!Object.keys(errors).length) {
+        const next: PrayerSettings = {
+          ...current,
+          iqamaOffsets: Object.fromEntries(IQAMA.map((p) => [p, Number(offsets[p])])) as PrayerSettings['iqamaOffsets'],
+          jumuah: [...jumuah].sort((a, b) => a.time.localeCompare(b.time)),
+          noticeDe,
+          noticeAr,
+        };
+        saveSetting('prayer', next, user.id);
+        audit(user, 'prayer.update', undefined, {
+          iqama: IQAMA.filter((p) => current.iqamaOffsets?.[p] !== next.iqamaOffsets[p]).map((p) => `${p}: ${current.iqamaOffsets?.[p]} → ${next.iqamaOffsets[p]}`),
+          jumuah: next.jumuah.map((j) => j.time),
+          notice: Boolean(noticeDe),
+        });
+        setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/gebetszeiten' });
+        return Astro.redirect('/admin/gebetszeiten', 303);
+      }
+      Astro.locals.flash = { type: 'error', key: 'flash.error' }; // shown on this re-render
+    }
+  }
+
+  if (formName === 'table') {
+    const file = fd.get('csv');
+    if (file instanceof File && file.size > 0) {
+      if (file.size > MAX_CSV_BYTES) csvErrors = [{ key: 'prayer.err.tooBig' }];
+      else csvText = await file.text();
+    } else {
+      csvText = str(fd, 'csv_text', MAX_CSV_BYTES + 1);
+      if (csvText.length > MAX_CSV_BYTES) { csvErrors = [{ key: 'prayer.err.tooBig' }]; csvText = ''; }
+    }
+    if (!csvErrors.length) {
+      const result = parsePrayerCsv(csvText, { minYear: 2020, maxYear: ty + 5 });
+      if (result.ok) {
+        const days = Object.keys(result.data).length;
+        savePrayerTable(result.year, result.data);
+        audit(user, 'prayer.table', String(result.year), { days, replaced: getPublishedYears().includes(result.year) });
+        setFlash(Astro, { type: 'ok', key: 'prayer.flashTable', vars: { year: String(result.year), n: String(days) }, link: '/gebetszeiten' });
+        return Astro.redirect('/admin/gebetszeiten#kalender', 303);
+      }
+      csvErrors = result.errors;
+      csvTotal = result.total;
+    }
+    csvTotal = Math.max(csvTotal, csvErrors.length);
+    Astro.locals.flash = { type: 'error', key: 'flash.error' }; // shown on this re-render
+  }
+}
+
+const today = getDay(ty, tm, td);
+const years = getPublishedYears();
+const uploaded = new Set(getUploadedPrayerTables().keys());
+const provisionalYear = years.at(-1)! + 1;
+const templateYear = years.includes(ty) ? ty : years.at(-1)!;
+const errText = (e: CsvError) =>
+  t(e.key, Object.fromEntries(Object.entries(e.vars ?? {}).map(([k, v]) => [k, typeof v === 'string' && v.startsWith('@') ? t(`prayer.name.${v.slice(1)}`) : v])));
+const jumuahRows = jumuah;
+const todayLabel = new Intl.DateTimeFormat(user.lang === 'ar' ? 'ar-u-nu-latn' : 'de-DE', { weekday: 'short', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(today.date + 'T12:00:00Z'));
+---
+<AdminLayout title={t('prayer.title')} active="prayer">
+  <PageHead title={t('prayer.title')} intro={t('prayer.intro')}>
+    <a href="/gebetszeiten" target="_blank" rel="noopener" class="a-btn"><AIcon name="external" size={15} />{t('flash.view')}</a>
+  </PageHead>
+
+  <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <form method="post" data-track class="grid content-start gap-4" id="prayer-form">
+      <input type="hidden" name="form" value="settings" />
+      <!-- Default button for Enter in a field (otherwise the first row's remove button would be used). -->
+      <button type="submit" name="action" value="save" class="sr-only" tabindex="-1" aria-hidden="true">{t('common.save')}</button>
+
+      <section class="a-card">
+        <div class="a-card-title"><span>{t('prayer.iqama')}</span><span class="normal-case tracking-normal font-normal">{t('prayer.today')} · {todayLabel}</span></div>
+        <p class="mb-3 text-[12.5px] a-muted">{t('prayer.iqamaText')}</p>
+        <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+          {IQAMA.map((p) => (
+            <label class="grid gap-1.5 rounded-xl border border-line bg-paper/50 p-2.5" data-iqama={p} data-adhan={today.times[p]}>
+              <span class="text-[12.5px] font-semibold text-ink-soft">{t(`prayer.name.${p}`)}</span>
+              <span class="flex items-center gap-1.5">
+                <input class="a-input !min-h-9 w-full !px-2 text-center font-semibold tabular-nums" type="number" name={`iqama_${p}`} value={offsets[p]} min="0" max="90" step="1" inputmode="numeric" required dir="ltr" aria-invalid={errors[`iqama_${p}`] ? 'true' : undefined} />
+                <span class="text-[12px] a-muted">{t('prayer.min')}</span>
+              </span>
+              <span class="text-[11.5px] leading-tight a-muted">{t('prayer.adhan')} <b dir="ltr" class="font-semibold text-ink-soft">{today.times[p]}</b><br />{t('prayer.iqamaShort')} <b dir="ltr" class="font-semibold text-wine" data-iqama-out>{today.iqama[p]}</b></span>
+              {errors[`iqama_${p}`] && <span class="a-error-text">{errors[`iqama_${p}`]}</span>}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section id="freitagsgebet" class="a-card scroll-mt-6">
+        <div class="a-card-title"><span>{t('prayer.jumuah')}</span></div>
+        <p class="mb-3 text-[12.5px] a-muted">{t('prayer.jumuahText')}</p>
+        <ul class="grid gap-2.5" data-ju-list>
+          {jumuahRows.map((j, i) => (
+            <li class="grid gap-2 rounded-xl border border-line bg-paper/50 p-2.5 sm:grid-cols-[84px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start" data-ju-row>
+              <label class="a-field"><span class="a-label text-[11.5px]">{t('prayer.jumuahTime')}</span><input class="a-input tabular-nums" name="ju_time" value={j.time} required maxlength="5" inputmode="numeric" placeholder="14:00" dir="ltr" aria-invalid={errors[`ju_${i}`] ? 'true' : undefined} />{errors[`ju_${i}`] && <span class="a-error-text">{errors[`ju_${i}`]}</span>}</label>
+              <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">DE</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_de" value={j.noteDe} maxlength="200" dir="ltr" lang="de" placeholder={t('prayer.jumuahNotePh')} /></label>
+              <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">AR</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_ar" value={j.noteAr} maxlength="200" dir="rtl" lang="ar" /></label>
+              <button type="submit" name="action" value={`ju:remove:${i}`} formnovalidate class="a-btn a-btn-sm a-btn-ghost a-btn-danger justify-self-end sm:mt-[22px]" data-ju-remove title={t('prayer.remove')}><AIcon name="trash" size={14} /><span class="sm:sr-only">{t('prayer.remove')}</span></button>
+            </li>
+          ))}
+        </ul>
+        <p class:list={['text-[13px] a-muted', jumuahRows.length && 'hidden']} data-ju-empty>{t('prayer.jumuahEmpty')}</p>
+        <button type="submit" name="action" value="ju:add" formnovalidate class="a-btn a-btn-sm mt-3" data-ju-add disabled={jumuahRows.length >= MAX_JUMUAH}><AIcon name="plus" size={14} />{t('prayer.addJumuah')}</button>
+        <template data-ju-template>
+          <li class="grid gap-2 rounded-xl border border-line bg-paper/50 p-2.5 sm:grid-cols-[84px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start" data-ju-row>
+            <label class="a-field"><span class="a-label text-[11.5px]">{t('prayer.jumuahTime')}</span><input class="a-input tabular-nums" name="ju_time" value="" required maxlength="5" inputmode="numeric" placeholder="14:00" dir="ltr" /></label>
+            <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">DE</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_de" value="" maxlength="200" dir="ltr" lang="de" placeholder={t('prayer.jumuahNotePh')} /></label>
+            <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">AR</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_ar" value="" maxlength="200" dir="rtl" lang="ar" /></label>
+            <button type="submit" name="action" value="ju:remove:0" formnovalidate class="a-btn a-btn-sm a-btn-ghost a-btn-danger justify-self-end sm:mt-[22px]" data-ju-remove title={t('prayer.remove')}><AIcon name="trash" size={14} /><span class="sm:sr-only">{t('prayer.remove')}</span></button>
+          </li>
+        </template>
+      </section>
+
+      <section class="a-card">
+        <BiField t={t} name="notice" label={t('prayer.notice')} hint={t('prayer.noticeText')} de={noticeDe} ar={noticeAr} multiline rows={2} maxlength={400} placeholderDe={t('prayer.noticePh')} />
+      </section>
+
+      <SaveBar t={t} />
+    </form>
+
+    <section id="kalender" class="a-card grid content-start gap-4 self-start scroll-mt-6">
+      <div class="flex items-start gap-3">
+        <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-pale text-[#7a5a2c]"><AIcon name="calendar" /></span>
+        <div><h2 class="a-section-title">{t('prayer.table')}</h2><p class="text-[12.5px] a-muted">{t('prayer.tableText')}</p></div>
+      </div>
+
+      <div>
+        <span class="a-label mb-1.5">{t('prayer.years')}</span>
+        <ul class="flex flex-wrap gap-1.5">
+          {years.map((y) => (
+            <li class="a-chip a-chip-live"><AIcon name="check" size={11} /><span dir="ltr">{y}</span> · {uploaded.has(y) ? t('prayer.uploaded') : t('prayer.bundled')}</li>
+          ))}
+          <li class="a-chip a-chip-warn border border-dashed border-[#e0b46a]"><AIcon name="clock" size={11} /><span dir="ltr">{provisionalYear}</span> · {t('prayer.provisional')}</li>
+        </ul>
+        <p class="a-hint mt-1.5">{t('prayer.provisionalHint', { year: provisionalYear, src: years.at(-1)! })}</p>
+      </div>
+
+      <div class="rounded-xl bg-paper px-3 py-2.5">
+        <a href={`/admin/gebetszeiten/vorlage.csv?jahr=${templateYear}`} download class="a-btn a-btn-sm"><AIcon name="download" size={14} />{t('prayer.template')}</a>
+        <p class="a-hint mt-1.5">{t('prayer.templateHint', { year: templateYear })}</p>
+      </div>
+
+      <form method="post" enctype="multipart/form-data" class="grid gap-3" id="table-form">
+        <input type="hidden" name="form" value="table" />
+        {csvErrors.length > 0 && (
+          <div class="rounded-xl border border-[#e7b7b3] bg-[#fdf0ef] p-3 text-[12.5px] text-[#7a1f22]" role="alert">
+            <p class="flex items-center gap-1.5 font-semibold"><AIcon name="alert" size={14} />{t('prayer.errTitle')}</p>
+            <ul class="mt-1.5 grid list-disc gap-0.5 ps-5">
+              {csvErrors.map((e) => <li>{errText(e)}</li>)}
+              {csvTotal > csvErrors.length && <li class="list-none">{t('prayer.err.more', { n: csvTotal - csvErrors.length })}</li>}
+            </ul>
+          </div>
+        )}
+        <label class="group grid cursor-pointer place-items-center gap-1 rounded-xl border-[1.5px] border-dashed border-line bg-paper/60 px-3 py-4 text-center text-[12.5px] a-muted hover:border-wine">
+          <AIcon name="upload" size={20} />
+          <span class="font-semibold text-ink-soft" data-file-name>{t('prayer.csv')}</span>
+          <span class="text-[11.5px]">.csv · max. 200 KB</span>
+          <input type="file" name="csv" accept=".csv,text/csv,text/plain" class="sr-only" data-file />
+        </label>
+        <details class="text-[12.5px]" open={csvText && !csvErrors.some((e) => e.key === 'prayer.err.tooBig') ? true : undefined}>
+          <summary class="cursor-pointer font-semibold text-wine">{t('prayer.csvPaste')}</summary>
+          <textarea class="a-textarea mt-2 !min-h-[110px] font-mono !text-[12px]" name="csv_text" rows="5" dir="ltr" spellcheck="false" placeholder="date;fajr;sunrise;dhuhr;asr;maghrib;isha&#10;2027-01-01;06:25;08:24;12:29;14:06;16:25;18:11">{csvText}</textarea>
+        </details>
+        <p class="a-hint" dir="auto">{t('prayer.format')}</p>
+        <button class="a-btn a-btn-primary justify-self-start"><AIcon name="check" size={15} />{t('prayer.upload')}</button>
+        <p class="flex gap-1.5 border-t border-paper-2 pt-3 text-[12px] a-muted"><AIcon name="info" size={14} class="mt-0.5" /><span>{t('prayer.pdfHint')}</span></p>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    const form = document.querySelector<HTMLFormElement>('#prayer-form')!;
+    const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const fmt = (m: number) => { const x = ((m % 1440) + 1440) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
+    const update = () => {
+      form.querySelectorAll<HTMLElement>('[data-iqama]').forEach((box) => {
+        const input = box.querySelector('input')!;
+        const off = Number(input.value);
+        const out = box.querySelector<HTMLElement>('[data-iqama-out]')!;
+        out.textContent = input.value !== '' && Number.isInteger(off) && off >= 0 && off <= 90 ? fmt(toMin(box.dataset.adhan!) + off) : '––:––';
+      });
+    };
+    form.addEventListener('input', update);
+
+    // Jumu'ah rows: add / remove without a round trip.
+    const list = form.querySelector<HTMLElement>('[data-ju-list]')!;
+    const tpl = form.querySelector<HTMLTemplateElement>('[data-ju-template]')!;
+    const addBtn = form.querySelector<HTMLButtonElement>('[data-ju-add]')!;
+    const empty = form.querySelector<HTMLElement>('[data-ju-empty]')!;
+    const sync = () => {
+      const rows = list.querySelectorAll('[data-ju-row]').length;
+      addBtn.disabled = rows >= 4;
+      empty.classList.toggle('hidden', rows > 0);
+      form.dataset.dirty = 'true';
+    };
+    addBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      list.append(tpl.content.cloneNode(true));
+      list.querySelector<HTMLInputElement>('[data-ju-row]:last-child input')?.focus();
+      sync();
+    });
+    list.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('[data-ju-remove]');
+      if (!btn) return;
+      e.preventDefault();
+      btn.closest('[data-ju-row]')!.remove();
+      sync();
+    });
+
+    // CSV file name
+    const file = document.querySelector<HTMLInputElement>('[data-file]');
+    file?.addEventListener('change', () => {
+      const name = document.querySelector<HTMLElement>('[data-file-name]');
+      if (name && file.files?.[0]) name.textContent = file.files[0].name;
+    });
+  </script>
+</AdminLayout>

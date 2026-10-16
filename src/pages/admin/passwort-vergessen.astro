@@ -1,0 +1,75 @@
+---
+export const prerender = false;
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import { adminT } from '../../admin/i18n';
+import { adminLang, clientIp, str, isEmail } from '../../admin/util';
+import { findUserByEmail, ipBlocked, audit, createToken } from '../../lib/server/auth';
+import { mailConfigured, sendMail } from '../../lib/server/mail';
+import { fmtDate } from '../../components/admin/people/helpers';
+
+const lang = adminLang(Astro);
+const t = adminT(lang);
+const mailOn = mailConfigured();
+let sent = false;
+let rate = false;
+let email = '';
+
+// Small in-memory limiter: max. 5 requests per IP and 3 per address within 15 minutes.
+const WINDOW = 15 * 60_000;
+const g = globalThis as unknown as { __ighResetReq?: Map<string, number[]> };
+g.__ighResetReq ??= new Map();
+const hit = (key: string, limit: number) => {
+  const now = Date.now();
+  const recent = (g.__ighResetReq!.get(key) ?? []).filter((x) => now - x < WINDOW);
+  const over = recent.length >= limit;
+  if (!over) recent.push(now);
+  g.__ighResetReq!.set(key, recent);
+  if (g.__ighResetReq!.size > 5000) g.__ighResetReq!.delete(g.__ighResetReq!.keys().next().value!);
+  return over;
+};
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  email = str(fd, 'email', 120).toLowerCase();
+  const ip = clientIp(Astro);
+  if (ipBlocked(ip) || hit(`ip:${ip}`, 5)) {
+    rate = true;
+  } else {
+    sent = true;
+    if (isEmail(email) && !hit(`mail:${email}`, 3)) {
+      const user = findUserByEmail(email);
+      if (user && user.active && mailOn) {
+        const ttl = 60 * 60_000;
+        const raw = createToken(user.id, 'reset', ttl);
+        const link = new URL(`/admin/passwort-neu/${raw}`, Astro.url).href;
+        const tu = adminT(user.lang);
+        audit(user, 'password.resetRequested', user.email, { ip }, true);
+        // Not awaited: the response time must not reveal whether the account exists.
+        sendMail({ to: user.email, subject: tu('reset.mailSubject'), text: tu('reset.mailText', { name: user.name, link, date: fmtDate(user.lang, Date.now() + ttl) }) })
+          .catch((err) => console.error('[mail] reset e-mail failed', err));
+      }
+    }
+  }
+}
+---
+<AuthLayout title={t('reset.title')} lang={lang}>
+  <span class="grid size-12 place-items-center rounded-2xl bg-rose-soft text-wine"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM13 12l8 8M17 16l2-2M19 18l2-2" /></svg></span>
+  <h1 class="mt-4 font-display text-[1.7rem] font-semibold leading-tight">{t('reset.title')}</h1>
+  {sent ? (
+    <div>
+      <p class="mt-5 rounded-xl bg-paper-2 px-4 py-3 text-[13.5px]" role="status">{t('reset.sent')}</p>
+      {!mailOn && <p class="mt-3 rounded-xl border border-[#ecd9b4] bg-[#fbf0dc] px-4 py-3 text-[13.5px] text-[#6b4a14]">{t('reset.noMail')}</p>}
+    </div>
+  ) : (
+    <div>
+      <p class="mt-2 a-muted">{t('reset.text')}</p>
+      {rate && <p class="mt-5 rounded-xl border border-[#e8b4b0] bg-[#fdf0ef] px-4 py-3 text-[13.5px] font-semibold text-[#8a2a2a]" role="alert">{t('reset.rate')}</p>}
+      {!mailOn && <p class="mt-5 rounded-xl border border-[#ecd9b4] bg-[#fbf0dc] px-4 py-3 text-[13.5px] text-[#6b4a14]">{t('reset.noMail')}</p>}
+      <form method="post" class="mt-6 grid gap-4">
+        <label class="a-field"><span class="a-label">{t('auth.email')}</span><input class="a-input !h-11" type="email" name="email" value={email} required autofocus autocomplete="username" dir="ltr" maxlength="120" /></label>
+        <button class="a-btn a-btn-primary !h-11 w-full text-[15px]">{t('reset.submit')}</button>
+      </form>
+    </div>
+  )}
+  <a href="/admin/login" class="mt-5 block text-center text-[13px] font-semibold a-muted hover:text-wine"><span class="flip-rtl inline-block">←</span> {t('reset.back')}</a>
+</AuthLayout>

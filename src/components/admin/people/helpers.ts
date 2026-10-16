@@ -28,7 +28,7 @@ export const toDate = (v: string | number) => (typeof v === 'number' ? new Date(
 
 export function fmtDate(lang: AdminLang, v: string | number | Date, o: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) {
   const d = v instanceof Date ? v : toDate(v);
-  return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-u-nu-latn' : 'de-DE', { timeZone: 'Europe/Berlin', ...o }).format(d);
+  return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-u-nu-latn' : 'de-DE', { timeZone: 'Europe/Berlin', hourCycle: 'h23', ...o }).format(d);
 }
 
 /** "vor 5 Min." style relative time, falling back to a date after a week. */
@@ -86,26 +86,35 @@ export async function issueLink(user: User, kind: 'invite' | 'reset', origin: UR
 
 const SECRET_KEY = /pass|secret|token|hash|recovery|totp|otp|apikey|api_key|private|signing|webhook/i;
 const SECRET_VALUE = /^(sk|rk|whsec|pk)_(live|test)_|^-----BEGIN/;
+const MASKED = /[…•]/;
 
-/** Turns an audit details JSON into readable lines; secrets are never shown. */
+/**
+ * Turns an audit details JSON into readable "key: value" lines (nested objects flattened one level,
+ * {from, to} shown as "from → to"). Secrets are never shown; already masked values (maskSecret) are.
+ */
 export function detailLines(json: string | null, hidden: string): { key: string; value: string }[] {
   if (!json) return [];
   let data: unknown;
-  try { data = JSON.parse(json); } catch { return [{ key: '', value: json.slice(0, 300) }]; }
-  const show = (k: string, v: unknown): string => {
-    if (SECRET_KEY.test(k)) return hidden;
+  try { data = JSON.parse(json); } catch { return [{ key: '', value: '…' }]; }
+  const scalar = (k: string, v: unknown): string => {
     if (v === null || v === undefined || v === '') return '—';
     if (typeof v === 'boolean') return v ? '✓' : '✗';
-    if (typeof v === 'object') {
-      const o = v as Record<string, unknown>;
-      if ('from' in o || 'to' in o) return `${show(k, o.from)} → ${show(k, o.to)}`;
-      return Array.isArray(v) ? v.map((x) => show(k, x)).join(', ') : JSON.stringify(v).slice(0, 200);
-    }
-    const s = String(v);
-    return SECRET_VALUE.test(s) ? hidden : s.slice(0, 200);
+    if (typeof v === 'object') return Array.isArray(v) ? v.map((x) => scalar(k, x)).join(', ') : hidden;
+    const s = String(v).slice(0, 200);
+    if (MASKED.test(s) && s.length <= 48) return s; // already masked (maskSecret)
+    if (SECRET_KEY.test(k) || SECRET_VALUE.test(s)) return hidden;
+    return s;
   };
-  if (typeof data !== 'object' || data === null || Array.isArray(data)) return [{ key: '', value: show('', data) }];
-  const keys = Object.keys(data);
-  if (keys.every((k) => k === 'from' || k === 'to')) return [{ key: '', value: show('', data) }];
-  return Object.entries(data as Record<string, unknown>).map(([k, v]) => ({ key: k, value: show(k, v) }));
+  const isFromTo = (v: unknown): v is { from?: unknown; to?: unknown } =>
+    typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length > 0 && Object.keys(v).every((x) => x === 'from' || x === 'to');
+  const value = (k: string, v: unknown) => isFromTo(v) ? `${scalar(k, v.from)} → ${scalar(k, v.to)}` : scalar(k, v);
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return [{ key: '', value: scalar('', data) }];
+  if (isFromTo(data)) return [{ key: '', value: value('', data) }];
+  const out: { key: string; value: string }[] = [];
+  for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+    if (typeof v === 'object' && v !== null && !Array.isArray(v) && !isFromTo(v)) {
+      for (const [sk, sv] of Object.entries(v as Record<string, unknown>)) out.push({ key: `${k}.${sk}`, value: value(sk, sv) });
+    } else out.push({ key: k, value: value(k, v) });
+  }
+  return out.slice(0, 40);
 }

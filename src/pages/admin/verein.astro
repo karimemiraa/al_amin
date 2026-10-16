@@ -1,0 +1,250 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AIcon from '../../components/admin/AIcon.astro';
+import PageHead from '../../components/admin/PageHead.astro';
+import BiField from '../../components/admin/BiField.astro';
+import SaveBar from '../../components/admin/SaveBar.astro';
+import Field from '../../components/admin/settings/Field.astro';
+import { adminT } from '../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, isEmail, isDate } from '../../admin/util';
+import { getSite, saveSetting, type Site } from '../../lib/content';
+import { audit } from '../../lib/server/auth';
+
+const denied = guardArea(Astro, 'org');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+
+const stored = getSite();
+let site: Site = { ...stored, social: { ...stored.social }, representatives: [...(stored.representatives ?? [])] };
+const errors: Record<string, string> = {};
+const thisYear = new Date().getFullYear();
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+
+const isHttps = (v: string) => {
+  if (!v) return true;
+  try { const u = new URL(v); return u.protocol === 'https:' && u.hostname.includes('.') && !/\s/.test(v); } catch { return false; }
+};
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const ytRaw = str(fd, 'youtubeChannelId', 200);
+  const ytId = ytRaw.match(/(UC[\w-]{22})(?:[/?#]|$)/)?.[1] ?? ytRaw;
+  const foundedRaw = str(fd, 'founded', 4);
+  site = {
+    ...stored,
+    orgName: str(fd, 'orgName', 160),
+    mosqueName: str(fd, 'mosqueName', 160),
+    mosqueNameAr: str(fd, 'mosqueNameAr', 160),
+    street: str(fd, 'street', 120),
+    zip: str(fd, 'zip', 10),
+    city: str(fd, 'city', 80),
+    mapsUrl: str(fd, 'mapsUrl', 600),
+    founded: Number(foundedRaw),
+    directionsDe: str(fd, 'directions_de', 600),
+    directionsAr: str(fd, 'directions_ar', 600),
+    phone: str(fd, 'phone', 30),
+    phoneContactName: str(fd, 'phoneContactName', 120),
+    email: str(fd, 'email', 200),
+    representatives: fd.getAll('representatives').map((v) => String(v).trim().slice(0, 120)).filter(Boolean).slice(0, 10),
+    registerCourt: str(fd, 'registerCourt', 120),
+    registerNumber: str(fd, 'registerNumber', 60),
+    taxOffice: str(fd, 'taxOffice', 120),
+    taxNumber: str(fd, 'taxNumber', 60),
+    exemptionNoticeDate: str(fd, 'exemptionNoticeDate', 10),
+    bank: stored.bank, // edited on /admin/zahlungen only
+    social: {
+      ...stored.social,
+      telegram: str(fd, 'telegram', 300),
+      youtubeUrl: str(fd, 'youtubeUrl', 300),
+      youtubeChannelId: ytId,
+      whatsappChannel: str(fd, 'whatsappChannel', 300),
+      instagram: str(fd, 'instagram', 300),
+    },
+  };
+
+  for (const k of ['orgName', 'mosqueName', 'street', 'city'] as const) if (!site[k]) errors[k] = t('common.required');
+  if (!/^\d{5}$/.test(site.zip)) errors.zip = t('org.zipError');
+  if (!Number.isInteger(site.founded) || site.founded < 1900 || site.founded > thisYear) errors.founded = t('org.yearError');
+  if (!isHttps(site.mapsUrl)) errors.mapsUrl = t('org.httpsError');
+  if (!site.email) errors.email = t('common.required');
+  else if (!isEmail(site.email)) errors.email = t('org.emailError');
+  if (site.phone && !/^\+?[\d\s()/-]{5,25}$/.test(site.phone)) errors.phone = t('org.phoneError');
+  if (site.exemptionNoticeDate && (!isDate(site.exemptionNoticeDate) || site.exemptionNoticeDate > today)) errors.exemptionNoticeDate = t('org.dateError');
+  for (const k of ['telegram', 'youtubeUrl', 'whatsappChannel', 'instagram'] as const) if (!isHttps(site.social[k])) errors[k] = t('org.httpsError');
+  if (site.social.youtubeChannelId && !/^UC[\w-]{22}$/.test(site.social.youtubeChannelId)) errors.youtubeChannelId = t('org.youtubeIdError');
+
+  if (!Object.keys(errors).length) {
+    const changed: string[] = [];
+    for (const k of Object.keys(site) as (keyof Site)[]) {
+      if (k === 'social') {
+        for (const s of Object.keys(site.social) as (keyof Site['social'])[]) if (site.social[s] !== (stored.social?.[s] ?? '')) changed.push(`social.${s}`);
+      } else if (JSON.stringify(site[k]) !== JSON.stringify(stored[k])) changed.push(k);
+    }
+    if (!changed.length) {
+      setFlash(Astro, { type: 'info', key: 'org.noChange' });
+    } else {
+      saveSetting('site', site, user.id);
+      audit(user, 'org.update', changed.join(', '), { fields: changed });
+      setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/impressum' });
+    }
+    return Astro.redirect('/admin/verein', 303);
+  }
+  // Re-render with the entered values; show the error toast now (a flash cookie would only appear on the next page).
+  Astro.locals.flash = { type: 'error', key: 'flash.error' };
+}
+
+// Freistellungsbescheid: valid for donation receipts up to 5 years after the notice date.
+const exemption = (() => {
+  if (!isDate(site.exemptionNoticeDate ?? '')) return null;
+  const d = new Date(site.exemptionNoticeDate + 'T12:00:00Z');
+  const until = new Date(d); until.setUTCFullYear(d.getUTCFullYear() + 5);
+  const days = Math.floor((until.getTime() - Date.now()) / 86_400_000);
+  const date = new Intl.DateTimeFormat(ar ? 'ar-u-nu-latn' : 'de-DE', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(until);
+  return { date, state: days < 0 ? 'expired' : days < 180 ? 'soon' : 'valid' } as const;
+})();
+const reps = site.representatives.length ? site.representatives : [''];
+const sections = [
+  { id: 'name', label: t('org.sec.name'), icon: 'pin' },
+  { id: 'kontakt', label: t('org.sec.contact'), icon: 'mail' },
+  { id: 'rechtliches', label: t('org.sec.legal'), icon: 'shield' },
+  { id: 'social', label: t('org.sec.social'), icon: 'globe' },
+] as const;
+---
+<AdminLayout title={t('org.title')} active="org">
+  <PageHead title={t('org.title')} intro={t('org.intro')}>
+    <a class="a-btn" href="/impressum" target="_blank" rel="noopener"><AIcon name="external" size={15} />{t('nav.viewSite')}</a>
+  </PageHead>
+
+  <nav class="-mt-2 mb-4 flex w-0 min-w-full gap-1.5 overflow-x-auto pb-1" aria-label={t('org.title')}>
+    {sections.map((s) => (
+      <a href={`#${s.id}`} class="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1 text-[13px] font-semibold text-ink-soft no-underline hover:border-wine hover:text-wine"><AIcon name={s.icon} size={14} />{s.label}</a>
+    ))}
+  </nav>
+
+  <form method="post" data-track novalidate>
+    <div class="grid grid-cols-12 gap-3.5">
+      <!-- Name & Adresse -->
+      <section id="name" class="a-card col-span-12 scroll-mt-6 xl:col-span-7">
+        <h2 class="a-card-title"><span>{t('org.sec.name')}</span></h2>
+        <div class="grid gap-3.5">
+          <div class="grid items-start gap-3.5 sm:grid-cols-2">
+            <Field t={t} name="orgName" label={t('org.orgName')} value={site.orgName} error={errors.orgName} maxlength={160} />
+            <Field t={t} name="mosqueName" label={t('org.mosqueName')} value={site.mosqueName} error={errors.mosqueName} maxlength={160} />
+          </div>
+          <Field t={t} name="mosqueNameAr" label={t('org.mosqueNameAr')} value={site.mosqueNameAr} dir="rtl" maxlength={160} optional />
+          <div class="grid items-start gap-3.5 sm:grid-cols-[2fr_7rem_1.4fr]">
+            <Field t={t} name="street" label={t('org.street')} value={site.street} error={errors.street} maxlength={120} autocomplete="street-address" />
+            <Field t={t} name="zip" label={t('org.zip')} value={site.zip} error={errors.zip} maxlength={5} inputmode="numeric" dir="ltr" />
+            <Field t={t} name="city" label={t('org.city')} value={site.city} error={errors.city} maxlength={80} />
+          </div>
+          <div class="grid items-start gap-3.5 sm:grid-cols-[1fr_9rem]">
+            <Field t={t} name="mapsUrl" label={t('org.mapsUrl')} value={site.mapsUrl} type="url" dir="ltr" maxlength={600} hint={t('org.mapsHint')} error={errors.mapsUrl} optional placeholder="https://maps.app.goo.gl/…" />
+            <Field t={t} name="founded" label={t('org.founded')} value={Number.isFinite(site.founded) ? site.founded : ''} type="number" min={1900} max={thisYear} dir="ltr" error={errors.founded} />
+          </div>
+          <BiField t={t} name="directions" label={t('org.directions')} de={site.directionsDe} ar={site.directionsAr} multiline rows={3} maxlength={600} hint={t('org.directionsHint')} />
+        </div>
+      </section>
+
+      <div class="col-span-12 grid content-start gap-3.5 xl:col-span-5">
+        <!-- Kontakt -->
+        <section id="kontakt" class="a-card scroll-mt-6">
+          <h2 class="a-card-title"><span>{t('org.sec.contact')}</span></h2>
+          <div class="grid gap-3.5">
+            <div class="grid items-start gap-3.5 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+              <Field t={t} name="phone" label={t('org.phone')} value={site.phone} type="tel" dir="ltr" maxlength={30} hint={t('org.phoneHint')} error={errors.phone} optional autocomplete="tel" />
+              <Field t={t} name="phoneContactName" label={t('org.phoneContactName')} value={site.phoneContactName} maxlength={120} optional />
+            </div>
+            <Field t={t} name="email" label={t('org.email')} value={site.email} type="email" dir="ltr" maxlength={200} hint={t('org.emailHint')} error={errors.email} autocomplete="email" />
+          </div>
+        </section>
+        <p class="a-card flex items-start gap-3 !py-3 text-[13px]">
+          <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-gold-pale text-[#7a5a2c]"><AIcon name="bank" size={16} /></span>
+          <span class="min-w-0"><span class="a-muted">{t('org.bankNote')}</span> <a href="/admin/zahlungen#bank" class="font-semibold text-wine">{t('org.bankLink')} →</a></span>
+        </p>
+        <p class="flex items-start gap-2 px-1 text-[12.5px] a-muted"><AIcon name="info" size={15} class="mt-0.5" />{t('org.shownIn')}</p>
+      </div>
+
+      <!-- Rechtliches -->
+      <section id="rechtliches" class="a-card col-span-12 scroll-mt-6 xl:col-span-7">
+        <h2 class="a-card-title"><span>{t('org.sec.legal')}</span></h2>
+        <p class="mb-4 flex items-start gap-2 rounded-xl bg-paper px-3 py-2 text-[13px] text-ink-soft"><AIcon name="info" size={16} class="mt-0.5 text-gold" />{t('org.legalHint')}</p>
+        <div class="grid gap-4">
+          <fieldset class="a-field">
+            <legend class="a-label mb-1.5">{t('org.reps')}</legend>
+            <ul class="grid gap-2" data-reps>
+              {reps.map((r) => (
+                <li class="flex items-center gap-2" data-rep>
+                  <input class="a-input" name="representatives" value={r} maxlength="120" placeholder={t('org.repPlaceholder')} dir="auto" aria-label={t('org.reps')} />
+                  <button type="button" class="a-btn a-btn-icon a-btn-ghost shrink-0 text-ink-mute hover:!text-[#a3262a]" data-rep-remove aria-label={t('org.repRemove')} title={t('org.repRemove')}><AIcon name="x" size={16} /></button>
+                </li>
+              ))}
+            </ul>
+            <template data-rep-template>
+              <li class="flex items-center gap-2" data-rep>
+                <input class="a-input" name="representatives" value="" maxlength="120" placeholder={t('org.repPlaceholder')} dir="auto" aria-label={t('org.reps')} />
+                <button type="button" class="a-btn a-btn-icon a-btn-ghost shrink-0 text-ink-mute hover:!text-[#a3262a]" data-rep-remove aria-label={t('org.repRemove')} title={t('org.repRemove')}><AIcon name="x" size={16} /></button>
+              </li>
+            </template>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="a-hint">{t('org.repsHint')}</span>
+              <button type="button" class="a-btn a-btn-sm" data-rep-add><AIcon name="plus" size={14} />{t('org.repAdd')}</button>
+            </div>
+          </fieldset>
+          <div class="grid items-start gap-3.5 sm:grid-cols-2">
+            <Field t={t} name="registerCourt" label={t('org.registerCourt')} value={site.registerCourt} maxlength={120} optional />
+            <Field t={t} name="registerNumber" label={t('org.registerNumber')} value={site.registerNumber} maxlength={60} dir="ltr" placeholder={t('org.registerNumberHint')} optional />
+            <Field t={t} name="taxOffice" label={t('org.taxOffice')} value={site.taxOffice} maxlength={120} placeholder="Finanzamt Hannover-Nord" optional />
+            <Field t={t} name="taxNumber" label={t('org.taxNumber')} value={site.taxNumber} maxlength={60} dir="ltr" placeholder="25/206/12345" optional />
+          </div>
+          <div class="grid gap-2">
+            <Field t={t} name="exemptionNoticeDate" label={t('org.exemption')} value={site.exemptionNoticeDate} type="date" dir="ltr" max={today} error={errors.exemptionNoticeDate} class="sm:max-w-[16rem]" optional />
+            <p class="a-hint">{t('org.exemptionHint')}</p>
+            {exemption?.state === 'valid' && <p class="flex items-center gap-2 text-[12.5px] font-semibold text-[#2f6d39]"><AIcon name="shieldCheck" size={15} />{t('org.exemptionValid', { date: exemption.date })}</p>}
+            {exemption?.state === 'soon' && <p class="flex items-center gap-2 text-[12.5px] font-semibold text-[#8a5a1a]"><AIcon name="clock" size={15} />{t('org.exemptionSoon', { date: exemption.date })}</p>}
+            {exemption?.state === 'expired' && <p class="flex items-start gap-2 rounded-lg bg-[#fdf0ef] px-3 py-2 text-[12.5px] font-semibold text-[#a3262a]"><AIcon name="alert" size={15} class="mt-0.5" />{t('org.exemptionExpired')}</p>}
+            {!exemption && <p class="flex items-center gap-2 text-[12.5px] text-[#8a5a1a]"><AIcon name="info" size={15} />{t('org.exemptionMissing')}</p>}
+          </div>
+        </div>
+      </section>
+
+      <!-- Social -->
+      <section id="social" class="a-card col-span-12 scroll-mt-6 self-start xl:col-span-5">
+        <h2 class="a-card-title"><span>{t('org.sec.social')}</span></h2>
+        <div class="grid gap-3.5">
+          <Field t={t} name="telegram" label={t('org.telegram')} value={site.social.telegram} type="url" dir="ltr" maxlength={300} error={errors.telegram} placeholder="https://t.me/…" optional />
+          <Field t={t} name="youtubeUrl" label={t('org.youtubeUrl')} value={site.social.youtubeUrl} type="url" dir="ltr" maxlength={300} error={errors.youtubeUrl} placeholder="https://www.youtube.com/@…" optional />
+          <Field t={t} name="youtubeChannelId" label={t('org.youtubeChannelId')} value={site.social.youtubeChannelId} dir="ltr" maxlength={200} mono hint={t('org.youtubeIdHint')} error={errors.youtubeChannelId} placeholder="UCxxxxxxxxxxxxxxxxxxxxxx" optional />
+          <Field t={t} name="whatsappChannel" label={t('org.whatsapp')} value={site.social.whatsappChannel} type="url" dir="ltr" maxlength={300} error={errors.whatsappChannel} placeholder="https://whatsapp.com/channel/…" optional />
+          <Field t={t} name="instagram" label={t('org.instagram')} value={site.social.instagram} type="url" dir="ltr" maxlength={300} error={errors.instagram} placeholder="https://instagram.com/…" optional />
+          <p class="a-hint">{t('org.socialHint')}</p>
+        </div>
+      </section>
+    </div>
+
+    <SaveBar t={t} />
+  </form>
+
+  <script>
+    const list = document.querySelector<HTMLUListElement>('[data-reps]');
+    const tpl = document.querySelector<HTMLTemplateElement>('[data-rep-template]');
+    const form = list?.closest('form');
+    const dirty = () => form?.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('[data-rep-add]')?.addEventListener('click', () => {
+      if (!list || !tpl || list.children.length >= 10) return;
+      list.append(tpl.content.cloneNode(true));
+      list.querySelector<HTMLInputElement>('[data-rep]:last-child input')?.focus();
+      dirty();
+    });
+    list?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('[data-rep-remove]');
+      if (!btn) return;
+      const row = btn.closest('[data-rep]')!;
+      if (list.children.length > 1) row.remove();
+      else row.querySelector('input')!.value = '';
+      dirty();
+    });
+  </script>
+</AdminLayout>
