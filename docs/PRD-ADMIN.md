@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **DRAFT – awaiting sign-off** |
+| Status | **Approved 2026-10-16** (both admin languages, owner 2FA mandatory, 4 designs, automatic online total, AI translation) – built |
 | Date | 2026-10-16 |
 | Related | [PRD.md](PRD.md) (website), [CONTENT-TODO.md](CONTENT-TODO.md) |
 

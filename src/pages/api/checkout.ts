@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import Stripe from 'stripe';
+import { getSecret } from '../../lib/server/secrets';
 
 export const prerender = false;
 
@@ -36,9 +37,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     const dedication = String(form.get('dedication') ?? '').slice(0, 120).trim();
     const receipt = form.get('receipt') === '1';
 
-    const key = process.env.STRIPE_SECRET_KEY || import.meta.env.STRIPE_SECRET_KEY;
+    // Key from the admin ("Zahlungen & E-Mail"), falling back to STRIPE_SECRET_KEY in the environment.
+    const key = getSecret('stripe_secret_key') || import.meta.env.STRIPE_SECRET_KEY;
     if (!key) {
-      console.error('[checkout] STRIPE_SECRET_KEY is not configured');
+      console.error('[checkout] Stripe secret key is not configured');
       return back('fehler=konfiguration');
     }
     const stripe = new Stripe(key);

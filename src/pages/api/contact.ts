@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import nodemailer from 'nodemailer';
+import { mailConfig, sendMail } from '../../lib/server/mail';
 
 export const prerender = false;
 
@@ -16,8 +16,6 @@ type Subject = keyof typeof SUBJECTS;
 /** Submissions faster than this after page load are treated as bots. */
 const MIN_FILL_MS = 3000;
 const EMAIL_RE = /^[^\s@<>()",;:]+@[^\s@<>()",;:]+\.[^\s@<>()",;:]{2,}$/;
-
-const env = (key: string): string => (process.env[key] || (import.meta.env as Record<string, string | undefined>)[key] || '').trim();
 
 /** Single-line text: strip control characters and line breaks (no header injection). */
 const oneLine = (v: FormDataEntryValue | null, max: number) =>
@@ -53,31 +51,21 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
   if (!name || !EMAIL_RE.test(email) || message.length < 2 || !privacy) return back('fehler=eingabe');
 
-  const host = env('SMTP_HOST');
-  const to = env('CONTACT_TO');
-  const from = env('CONTACT_FROM');
+  // SMTP settings from the admin ("Zahlungen & E-Mail"), falling back to SMTP_* / CONTACT_* env vars.
+  const { host, to, from } = mailConfig();
   if (!host || !to || !from) {
-    console.error('[contact] SMTP is not configured (SMTP_HOST, CONTACT_TO and CONTACT_FROM are required)');
+    console.error('[contact] SMTP is not configured (host, sender and recipient are required)');
     return back('fehler=1');
   }
 
-  const port = Number(env('SMTP_PORT')) || 587;
-  const user = env('SMTP_USER');
-  const pass = env('SMTP_PASS');
   const subjectLabel = SUBJECTS[subjectKey];
   const sentAt = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Berlin' }).format(new Date());
 
   try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: user ? { user, pass } : undefined,
-    });
-    await transporter.sendMail({
-      from: { name: 'Website Mohammad Al-Amien Moschee', address: from },
+    await sendMail({
       to,
-      replyTo: { name, address: email },
+      // Quoted display name (quotes/backslashes removed) so commas in names cannot add recipients.
+      replyTo: `"${name.replace(/["\\]/g, '')}" <${email}>`,
       subject: `[Kontaktformular] ${subjectLabel}: ${name}`,
       text: [
         `Neue Nachricht über das Kontaktformular der Website (${lang === 'ar' ? 'arabische' : 'deutsche'} Seite).`,

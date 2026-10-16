@@ -10,7 +10,9 @@ const PUBLIC_ADMIN = [/^\/admin\/login(\/|$)/, /^\/admin\/logout$/, /^\/admin\/s
 const ENROLL_PATH = '/admin/2fa-einrichten';
 
 // --- Page cache ---------------------------------------------------------------------
-type Cached = { version: number; day: string; status: number; headers: [string, string][]; body: ArrayBuffer };
+type Cached = { version: number; day: string; at: number; status: number; headers: [string, string][]; body: ArrayBuffer };
+// HTML is re-rendered at least every 5 minutes so scheduled announcements and notices appear on time.
+const HTML_TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, Cached>();
 const MAX_ENTRIES = 600;
 const berlinDay = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
@@ -73,7 +75,7 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
   const key = isImage ? pathname + ctx.url.search : pathname;
   const day = isImage ? '' : berlinDay();
   const hit = cache.get(key);
-  if (hit && (isImage || (hit.version === contentVersion() && hit.day === day))) {
+  if (hit && (isImage || (hit.version === contentVersion() && hit.day === day && Date.now() - hit.at < HTML_TTL_MS))) {
     return new Response(hit.body.slice(0), { status: hit.status, headers: [...hit.headers, ['X-Cache', 'HIT']] });
   }
 
@@ -83,7 +85,7 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
     const body = await res.arrayBuffer();
     const headers: [string, string][] = [...res.headers.entries()];
     if (isImage) headers.push(['Cache-Control', 'public, max-age=31536000, immutable']);
-    remember(key, { version: contentVersion(), day, status: res.status, headers, body });
+    remember(key, { version: contentVersion(), day, at: Date.now(), status: res.status, headers, body });
     return new Response(body.slice(0), { status: res.status, headers: [...headers, ['X-Cache', 'MISS']] });
   }
   return res;

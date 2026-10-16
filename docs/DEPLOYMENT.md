@@ -2,7 +2,7 @@
 
 Diese Anleitung beschreibt, wie die Website **www.igh-hannover.de** auf einem eigenen Server (VPS) läuft, wie man sie zum ersten Mal einrichtet und wie Updates, Backups und Fehlersuche funktionieren. Sie richtet sich an Ehrenamtliche mit etwas Technik-Erfahrung (Befehle in ein Terminal kopieren können reicht).
 
-> Für das Bearbeiten von Inhalten (Spendenstand, Meldungen, Videos …) siehe [CMS-ANLEITUNG.md](CMS-ANLEITUNG.md). Dafür braucht man keinen Server-Zugang.
+> Für das Bearbeiten von Inhalten (Spendenstand, Ankündigungen, Programm, Videos, Design …) siehe [ADMIN-ANLEITUNG.md](ADMIN-ANLEITUNG.md). Das geschieht im Browser unter `/admin` – dafür braucht man keinen Server-Zugang.
 
 ---
 
@@ -13,13 +13,15 @@ Besucher ──HTTPS──▶ Caddy (Port 80/443, automatische Zertifikate)
                         │
                         ▼
                     web (Node.js, Port 4321, nur intern erreichbar)
-                    ├─ fertige Seiten (statisches HTML)
-                    └─ /api/checkout (Stripe-Spenden), /api/contact (Kontaktformular)
+                    ├─ Website (Seiten werden aus der Datenbank erzeugt und zwischengespeichert)
+                    ├─ /admin (Verwaltung mit Login + 2FA)
+                    ├─ /api/checkout (Stripe), /api/stripe-webhook, /api/contact
+                    └─ Volume igh_data: SQLite-Datenbank, hochgeladene Bilder, nächtliche Backups
 ```
 
-- Der gesamte Quellcode und alle Inhalte liegen im GitHub-Repository.
+- Der **Quellcode** liegt im GitHub-Repository. Die **Inhalte** (Ankündigungen, Programm, Spendenstand, Benutzer …) liegen in der Datenbank auf dem Server (Docker-Volume `igh_data`) und werden in der Verwaltung unter `/admin` bearbeitet – Änderungen sind sofort live.
 - Auf dem Server laufen zwei Docker-Container: **web** (die Website) und **caddy** (Webserver, kümmert sich um HTTPS-Zertifikate von Let's Encrypt und Weiterleitungen).
-- Bei jeder Änderung auf dem Branch `main` (z. B. durch das CMS) baut GitHub Actions die Seite zur Probe und spielt sie dann per SSH automatisch auf den Server. Dauer: ca. 2–3 Minuten.
+- Bei jeder **Code-Änderung** auf dem Branch `main` baut GitHub Actions die Seite zur Probe und spielt sie dann per SSH automatisch auf den Server (ca. 2–3 Minuten). Die Datenbank bleibt dabei unangetastet.
 
 Wichtige Dateien im Repository:
 
@@ -29,7 +31,8 @@ Wichtige Dateien im Repository:
 | `deploy/docker-compose.yml` | Startet `web` und `caddy` zusammen |
 | `deploy/Caddyfile` | Domains, HTTPS, Sicherheits-Header, Weiterleitungen alter URLs |
 | `.github/workflows/deploy.yml` | Automatisches Bauen und Ausrollen |
-| `.env` (nur auf dem Server!) | Geheime Zugangsdaten (Stripe, E-Mail) |
+| `.env` (nur auf dem Server!) | Hauptschlüssel `APP_SECRET` und optionale Grundeinstellungen |
+| Volume `igh_data` | Datenbank, Bilder, Backups – **das Wichtigste auf dem Server** |
 
 ---
 
@@ -164,7 +167,7 @@ EOF
 git clone git@github.com:karimemiraa/al_amin.git .
 ```
 
-> Zieht das Repository später in eine GitHub-Organisation des Vereins um: `git remote set-url origin <neue-URL>` auf dem Server ausführen und `repo:` in `public/admin/config.yml` anpassen.
+> Zieht das Repository später in eine GitHub-Organisation des Vereins um: `git remote set-url origin <neue-URL>` auf dem Server ausführen.
 
 ---
 
@@ -181,8 +184,11 @@ Die `.env` liegt **nur auf dem Server** und wird nie ins Repository hochgeladen.
 
 | Variable | Bedeutung |
 |---|---|
+| `APP_SECRET` | **Pflicht.** Hauptschlüssel, mit dem gespeicherte Zugangsdaten (Stripe-Schlüssel, SMTP-Passwort) verschlüsselt werden. Einmalig erzeugen mit `openssl rand -base64 32`, im Passwortmanager des Vorstands sichern und **nie wieder ändern** (sonst sind gespeicherte Zugangsdaten unlesbar und müssen neu eingegeben werden). |
+| `DATA_DIR` | Nicht ändern – im Container ist das `/app/data` (Volume `igh_data`). |
 | `PUBLIC_SITE_URL` | Adresse der Website, `https://www.igh-hannover.de`. Wird für die Rücksprung-Links von Stripe gebraucht. |
-| `STRIPE_SECRET_KEY` | Geheimer Stripe-Schlüssel (siehe unten). Beginnt mit `sk_test_…` (Test) oder `sk_live_…` (echt). |
+| `STRIPE_SECRET_KEY` | Optional. Besser in der Verwaltung unter *Zahlungen & E-Mail* eintragen (verschlüsselt gespeichert, Änderungen protokolliert). Ein Wert hier dient nur als Ersatz. |
+| `SMTP_*`, `CONTACT_*` | Optional – ebenfalls besser in der Verwaltung unter *Zahlungen & E-Mail* eintragen. |
 | `SMTP_HOST` | Mailserver des E-Mail-Anbieters, z. B. `smtp.ionos.de` |
 | `SMTP_PORT` | Meist `587` (STARTTLS). `465` nur, wenn der Anbieter es verlangt (siehe Abschnitt 12). |
 | `SMTP_USER` / `SMTP_PASS` | Login des Postfachs, über das die Website Mails verschickt |
@@ -203,8 +209,9 @@ Wichtig:
 ### 6.1 Stripe einrichten
 
 1. Im [Stripe Dashboard](https://dashboard.stripe.com) das Vereinskonto vollständig aktivieren (Vereinsregisterauszug, Vorstand, Bankkonto). Beim Stripe-Support nachfragen, ob es einen Rabatt für gemeinnützige Organisationen gibt.
-2. **Testen zuerst:** oben rechts „Testmodus“ einschalten → *Entwickler → API-Schlüssel* → „Geheimer Schlüssel“ (`sk_test_…`) in `STRIPE_SECRET_KEY` eintragen. Testspenden mit der Karte `4242 4242 4242 4242`, beliebigem zukünftigen Ablaufdatum und beliebiger Prüfziffer.
-3. **Live gehen:** Testmodus aus → den Live-Schlüssel (`sk_live_…`) eintragen und neu starten. Den Live-Schlüssel niemals per E-Mail/Chat verschicken und nur in die `.env` auf dem Server schreiben.
+2. **Testen zuerst:** oben rechts „Testmodus“ einschalten → *Entwickler → API-Schlüssel* → „Geheimer Schlüssel“ (`sk_test_…`) kopieren und in der Verwaltung unter *Zahlungen & E-Mail* eintragen, Modus „Test“, dann „Verbindung testen“. Testspenden mit der Karte `4242 4242 4242 4242`, beliebigem zukünftigen Ablaufdatum und beliebiger Prüfziffer.
+3. **Webhook (für den automatischen Spendenstand):** *Entwickler → Webhooks → Endpunkt hinzufügen* → URL `https://www.igh-hannover.de/api/stripe-webhook`, Ereignisse `checkout.session.completed` und `invoice.paid`. Das angezeigte Signing Secret (`whsec_…`) in der Verwaltung eintragen. Danach werden Online-Spenden automatisch zum Spendenstand addiert.
+3a. **Live gehen:** Testmodus aus → den Live-Schlüssel (`sk_live_…`) und das Live-Webhook-Secret in der Verwaltung eintragen, Modus „Live“. Den Live-Schlüssel niemals per E-Mail/Chat verschicken.
 4. *Einstellungen → Zahlungen → Zahlungsmethoden* aktivieren:
    - **Karten**
    - **PayPal** (muss bei Stripe einmalig freigeschaltet bzw. mit dem PayPal-Konto verbunden werden)
@@ -230,7 +237,9 @@ docker compose -f deploy/docker-compose.yml ps        # beide Container "running
 docker compose -f deploy/docker-compose.yml logs -f caddy   # Zertifikate: "certificate obtained successfully"
 ```
 
-Dann im Browser <https://www.igh-hannover.de> öffnen. Testen: Seiten aufrufen, eine Testspende (im Stripe-Testmodus), eine Nachricht über das Kontaktformular, Weiterleitung von `https://spende.igh-hannover.de`.
+Dann im Browser <https://www.igh-hannover.de> öffnen.
+
+**Erster Start der Verwaltung:** <https://www.igh-hannover.de/admin> öffnen. Beim allerersten Aufruf erscheint die Einrichtung: Name, E-Mail und Passwort des ersten **Inhabers** eingeben, danach die Zwei-Faktor-Anmeldung mit einer Authenticator-App einrichten und die Wiederherstellungscodes sicher ablegen. Weitere Personen lädt der Inhaber danach unter *Benutzer* ein. (Die Einrichtungsseite ist nur erreichbar, solange noch kein Konto existiert – direkt nach dem ersten Deployment erledigen!) Testen: Seiten aufrufen, eine Testspende (im Stripe-Testmodus), eine Nachricht über das Kontaktformular, Weiterleitung von `https://spende.igh-hannover.de`.
 
 Tipp: Damit man den Befehl nicht ständig tippen muss, einmalig ausführen:
 
@@ -293,19 +302,24 @@ Test: *Actions → Build & Deploy → Run workflow*. Beide Jobs sollten grün we
 ### 8.3 So fließt eine Änderung
 
 ```
-CMS „Speichern“ ─▶ Commit auf main ─▶ GitHub Actions: Build check ─▶ Deploy auf Server ─▶ live
-                                      (ca. 1 Min.)                  (ca. 1–2 Min.)
+Code-Änderung ─▶ Commit auf main ─▶ GitHub Actions: Build check ─▶ Deploy auf Server ─▶ live
+                                    (ca. 1 Min.)                  (ca. 1–2 Min.)
 ```
 
-Insgesamt **2–3 Minuten**. Den Fortschritt sieht man unter *Actions* im Repository. Ein roter Haken bedeutet: Es wurde nichts ausgerollt – Fehlermeldung im Job anklicken.
+Insgesamt **2–3 Minuten**. Inhalte aus der Verwaltung (`/admin`) brauchen das nicht – sie sind sofort nach „Speichern“ live. Den Fortschritt sieht man unter *Actions* im Repository. Ein roter Haken bedeutet: Es wurde nichts ausgerollt – Fehlermeldung im Job anklicken.
 
 ---
 
 ## 9. Backups
 
-Fast alles liegt in Git und GitHub, ein Server-Ausfall verliert also keine Inhalte. Zu sichern sind nur:
+Der Code liegt in GitHub. **Die Inhalte, Benutzer und Bilder liegen aber nur auf dem Server** (Volume `igh_data`) – deshalb:
 
-1. **Die Datei `/opt/igh-website/.env`** – an einem sicheren Ort (z. B. Passwortmanager des Vorstands) ablegen und bei jeder Änderung aktualisieren.
+1. **Automatisch:** Die Website legt jede Nacht ein Datenbank-Backup im Volume an (`/app/data/backups`, die letzten 14 Tage). Inhaber können unter *Benutzer → Sicherung* jederzeit ein aktuelles Backup **herunterladen** – am besten einmal im Monat und vor größeren Änderungen, und außerhalb des Servers aufbewahren.
+2. **Komplettes Volume sichern** (Datenbank + Bilder), z. B. per Cronjob nachts auf einen anderen Speicher:
+   ```bash
+   docker run --rm -v igh-website_igh_data:/data -v /root/backups:/backup alpine tar czf /backup/igh_data-$(date +%F).tgz -C /data .
+   ```
+3. **Die Datei `/opt/igh-website/.env`** – an einem sicheren Ort (z. B. Passwortmanager des Vorstands) ablegen und bei jeder Änderung aktualisieren.
 2. **Caddy-Zertifikate** (Docker-Volume `igh-website_caddy_data`) – nicht zwingend nötig, Caddy holt sie bei Verlust neu. Bei häufigen Neuinstallationen aber sinnvoll, weil Let's Encrypt die Anzahl neuer Zertifikate begrenzt:
    ```bash
    docker run --rm -v igh-website_caddy_data:/data -v "$PWD":/backup alpine tar czf /backup/caddy_data.tgz -C /data .
@@ -313,7 +327,9 @@ Fast alles liegt in Git und GitHub, ein Server-Ausfall verliert also keine Inhal
 
 Zusätzlich lohnen sich die (günstigen) automatischen Server-Backups/Snapshots beim Hoster.
 
-**Server komplett neu aufsetzen:** Abschnitte 3–7 wiederholen, `.env` zurückkopieren, DNS auf die neue IP umstellen, `VPS_HOST` in GitHub anpassen.
+**Wiederherstellen:** Container stoppen (`dc stop web`), das gesicherte Archiv zurück ins Volume entpacken (`docker run --rm -v igh-website_igh_data:/data -v /root/backups:/backup alpine sh -c "rm -rf /data/* && tar xzf /backup/igh_data-DATUM.tgz -C /data"`) oder eine heruntergeladene `igh-backup-….sqlite` als `/data/igh.sqlite` hineinkopieren, dann `dc start web`. Dafür muss dieselbe `APP_SECRET` gesetzt sein.
+
+**Server komplett neu aufsetzen:** Abschnitte 3–7 wiederholen, `.env` zurückkopieren, Volume-Backup zurückspielen, DNS auf die neue IP umstellen, `VPS_HOST` in GitHub anpassen.
 
 ---
 

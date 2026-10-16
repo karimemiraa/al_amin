@@ -8,9 +8,8 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const DATA_DIR = path.resolve(process.env.DATA_DIR || './data');
-export const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
-export const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+import { DATA_DIR, UPLOAD_DIR, BACKUP_DIR } from './paths';
+export { DATA_DIR, UPLOAD_DIR, BACKUP_DIR };
 
 // Seed content bundled into the build.
 const seedSettings = import.meta.glob<Record<string, unknown>>('../../content/settings/*.json', { eager: true, import: 'default' });

@@ -40,6 +40,9 @@ WORKDIR /app
 COPY package.json ./
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+ENV DATA_DIR=/app/data
+RUN mkdir -p /app/data && chown node:node /app/data
+VOLUME ["/app/data"]
 USER node
 EXPOSE 4321
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

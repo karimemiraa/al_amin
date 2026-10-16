@@ -22,6 +22,10 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: "4321"
+      DATA_DIR: /app/data
+    volumes:
+      # Database (content, users, audit log), uploaded images and nightly backups – keep this volume!
+      - igh_data:/app/data
     restart: unless-stopped
     # Only reachable from Caddy inside the Docker network, not from the internet.
     expose:
@@ -56,5 +60,6 @@ secrets:
     file: ../.env
 
 volumes:
+  igh_data:
   caddy_data:
   caddy_config:

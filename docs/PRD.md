@@ -177,7 +177,7 @@ The current web presence works against this goal:
 ## 11. Open questions (blocking sign-off)
 
 Answered on 2026-10-13:
-- **Q1 Tech**: deploy on own VPS → Astro + Sveltia CMS + Docker/Caddy (see `DEPLOYMENT.md`).
+- **Q1 Tech**: deploy on own VPS → Astro + Docker/Caddy (see `DEPLOYMENT.md`). The git-based CMS was later replaced by the custom admin panel (see `PRD-ADMIN.md`).
 - **Q2 Deadline**: 01.02.2027 confirmed.
 - **Q4 Languages**: German + Arabic at launch (entire site, not only campaign pages).
 - **All other inputs**: build with what exists, edit later → tracked in [`CONTENT-TODO.md`](CONTENT-TODO.md).

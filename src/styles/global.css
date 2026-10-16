@@ -160,7 +160,7 @@
  * Built with PUBLIC_THEME=green. Darker shades of the same hue keep text and
  * white-on-green buttons above WCAG AA contrast.
  */
-html[data-theme='green'] {
+[data-theme='green'] {
   --color-wine: #2f7d3e;
   --color-wine-deep: #23622f;
   --color-wine-ink: #15391c;
@@ -169,17 +169,17 @@ html[data-theme='green'] {
   --shadow-soft: 0 1px 2px rgb(21 57 28 / 0.04), 0 8px 24px -8px rgb(21 57 28 / 0.12);
   --shadow-lift: 0 2px 4px rgb(21 57 28 / 0.06), 0 24px 48px -16px rgb(21 57 28 / 0.22);
 }
-html[data-theme='green'] .btn-primary { box-shadow: 0 6px 18px -6px rgb(47 125 62 / 0.5); }
-html[data-theme='green'] .btn-primary:hover { box-shadow: 0 10px 24px -8px rgb(47 125 62 / 0.55); }
-html[data-theme='green'] .bg-wine-pattern {
+[data-theme='green'] .btn-primary { box-shadow: 0 6px 18px -6px rgb(47 125 62 / 0.5); }
+[data-theme='green'] .btn-primary:hover { box-shadow: 0 10px 24px -8px rgb(47 125 62 / 0.55); }
+[data-theme='green'] .bg-wine-pattern {
   background-image:
     radial-gradient(120% 80% at 100% 0%, rgb(105 184 107 / 0.35), transparent 60%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23d9c39d' stroke-opacity='.13' stroke-width='1'%3E%3Cpath d='M40 4l10.6 25.4L76 40 50.6 50.6 40 76 29.4 50.6 4 40l25.4-10.6z'/%3E%3Ccircle cx='40' cy='40' r='13'/%3E%3C/g%3E%3C/svg%3E");
 }
-html[data-theme='green'] .logo-mark { color: #69b86b; }
+[data-theme='green'] .logo-mark { color: #69b86b; }
 
 /* Colour variant "navy": Nachtblau & Gold. */
-html[data-theme='navy'] {
+[data-theme='navy'] {
   --color-wine: #24365e;
   --color-wine-deep: #1a2847;
   --color-wine-ink: #0f1b33;
@@ -190,15 +190,15 @@ html[data-theme='navy'] {
   --shadow-soft: 0 1px 2px rgb(15 27 51 / 0.05), 0 8px 24px -8px rgb(15 27 51 / 0.14);
   --shadow-lift: 0 2px 4px rgb(15 27 51 / 0.07), 0 24px 48px -16px rgb(15 27 51 / 0.26);
 }
-html[data-theme='navy'] .btn-primary { box-shadow: 0 6px 18px -6px rgb(36 54 94 / 0.55); }
-html[data-theme='navy'] .bg-wine-pattern {
+[data-theme='navy'] .btn-primary { box-shadow: 0 6px 18px -6px rgb(36 54 94 / 0.55); }
+[data-theme='navy'] .bg-wine-pattern {
   background-image:
     radial-gradient(120% 80% at 100% 0%, rgb(201 164 92 / 0.22), transparent 60%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='none' stroke='%23dcc48f' stroke-opacity='.14' stroke-width='1'%3E%3Cpath d='M40 4l10.6 25.4L76 40 50.6 50.6 40 76 29.4 50.6 4 40l25.4-10.6z'/%3E%3Ccircle cx='40' cy='40' r='13'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* Colour variant "ramadan": night indigo with lantern gold and crescents (seasonal). */
-html[data-theme='ramadan'] {
+[data-theme='ramadan'] {
   --color-wine: #3b2f63;
   --color-wine-deep: #2b2350;
   --color-wine-ink: #121a30;
@@ -210,10 +210,22 @@ html[data-theme='ramadan'] {
   --shadow-soft: 0 1px 2px rgb(18 26 48 / 0.05), 0 8px 24px -8px rgb(18 26 48 / 0.14);
   --shadow-lift: 0 2px 4px rgb(18 26 48 / 0.07), 0 24px 48px -16px rgb(18 26 48 / 0.28);
 }
-html[data-theme='ramadan'] .btn-primary { box-shadow: 0 6px 18px -6px rgb(59 47 99 / 0.55); }
-html[data-theme='ramadan'] .bg-wine-pattern {
+[data-theme='ramadan'] .btn-primary { box-shadow: 0 6px 18px -6px rgb(59 47 99 / 0.55); }
+[data-theme='ramadan'] .bg-wine-pattern {
   background-image:
     radial-gradient(90% 70% at 85% 10%, rgb(232 200 115 / 0.22), transparent 60%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23e8c873' fill-opacity='.16'%3E%3Cpath d='M38 20a14 14 0 1 0 12 21 11 11 0 1 1-12-21z'/%3E%3Cpath d='M92 74l2.2 5 5.3.6-4 3.6 1.1 5.2L92 85.7l-4.6 2.7 1.1-5.2-4-3.6 5.3-.6z'/%3E%3Ccircle cx='20' cy='92' r='1.6'/%3E%3Ccircle cx='70' cy='30' r='1.2'/%3E%3Ccircle cx='104' cy='18' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
 }
-html[data-theme='navy'] .logo-mark, html[data-theme='ramadan'] .logo-mark { color: var(--color-wine); }
+[data-theme='navy'] .logo-mark, [data-theme='ramadan'] .logo-mark { color: var(--color-wine); }
+
+/* Explicit default variant, so a preview element can show "wine" inside another active theme. */
+[data-theme='wine'] {
+  --color-wine: #8e2c3f;
+  --color-wine-deep: #6b1f2f;
+  --color-wine-ink: #4a1520;
+  --color-rose: #b4505f;
+  --color-rose-soft: #f3e3e3;
+  --color-gold: #a8844f;
+  --color-gold-soft: #d9c39d;
+  --color-gold-pale: #f1e6d2;
+}
