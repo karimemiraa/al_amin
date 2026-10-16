@@ -1,8 +1,9 @@
 ---
+import { getSite } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import LegalArticle from '../components/LegalArticle.astro';
-import site from '../content/settings/site.json';
 import { formatDate, localizePath, type Lang } from '../i18n/ui';
+const site = getSite();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;

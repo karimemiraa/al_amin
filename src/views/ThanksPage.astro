@@ -1,11 +1,12 @@
 ---
+import { getSite } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ShareButtons from '../components/ShareButtons.astro';
 import CampaignProgress from '../components/CampaignProgress.astro';
 import Ornament from '../components/Ornament.astro';
 import Icon from '../components/Icon.astro';
-import site from '../content/settings/site.json';
 import { localizePath, type Lang } from '../i18n/ui';
+const site = getSite();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;

@@ -1,9 +1,10 @@
 ---
+import { getSite } from '../lib/content';
 import Logo from './Logo.astro';
 import Icon from './Icon.astro';
 import CopyButton from './CopyButton.astro';
-import site from '../content/settings/site.json';
 import { nav, localizePath, useTranslations, type Lang } from '../i18n/ui';
+const site = getSite();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;

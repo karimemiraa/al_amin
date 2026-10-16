@@ -1,11 +1,12 @@
 ---
+import { getCampaign } from '../lib/content';
 /**
  * Donation form. Works without JavaScript: it posts to /api/checkout, which redirects to Stripe Checkout.
  * JavaScript only enhances it (live summary, m² calculator, monthly presets).
  */
 import Icon from './Icon.astro';
-import campaign from '../content/settings/campaign.json';
 import { formatEuro, withBase, type Lang } from '../i18n/ui';
+const campaign = getCampaign();
 
 interface Props { lang: Lang; fund?: 'kauf' | 'allgemein' | 'zakat' }
 const { lang, fund = 'kauf' } = Astro.props;

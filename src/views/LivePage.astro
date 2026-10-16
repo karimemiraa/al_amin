@@ -1,13 +1,15 @@
 ---
-import { getCollection } from 'astro:content';
+import { getProgram, getSite } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import VideoEmbed from '../components/VideoEmbed.astro';
 import Icon from '../components/Icon.astro';
-import site from '../content/settings/site.json';
-import { getDay, jumuah, publishedYears } from '../lib/prayer';
+import { getDay, getJumuah, getPublishedYears } from '../lib/prayer';
 import { localizePath, pick, useTranslations, type Lang } from '../i18n/ui';
 import friday from '../assets/photos/gemeinde-freitag.jpg';
+const site = getSite();
+const jumuah = getJumuah();
+const publishedYears = getPublishedYears();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -75,7 +77,7 @@ const monthly = Array.from({ length: 12 }, (_, i) => {
   return keys.map((k) => toMin(d.times[k]));
 });
 
-const program = await getCollection('program', (e) => e.data.active);
+const program = getProgram();
 const lessons = program
   .map((e) => ({
     id: e.id,

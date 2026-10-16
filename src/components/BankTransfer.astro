@@ -1,9 +1,10 @@
 ---
+import { getSite } from '../lib/content';
 import Icon from './Icon.astro';
 import CopyButton from './CopyButton.astro';
-import site from '../content/settings/site.json';
 import { giroCodeSvg } from '../lib/girocode';
 import { useTranslations, type Lang } from '../i18n/ui';
+const site = getSite();
 
 interface Props { lang: Lang; reference?: string; class?: string }
 const { lang, reference = site.bank.reference, class: cls = '' } = Astro.props;

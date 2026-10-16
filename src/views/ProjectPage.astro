@@ -1,4 +1,5 @@
 ---
+import { getCampaign, getSite } from '../lib/content';
 import { Picture } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CampaignProgress from '../components/CampaignProgress.astro';
@@ -9,13 +10,13 @@ import Wave from '../components/Wave.astro';
 import Icon from '../components/Icon.astro';
 import Faq from '../components/Faq.astro';
 import ShareButtons from '../components/ShareButtons.astro';
-import campaign from '../content/settings/campaign.json';
-import site from '../content/settings/site.json';
 import { localizePath, formatEuro, formatNumber, formatDate, useTranslations, type Lang } from '../i18n/ui';
 import building from '../assets/photos/neues-gebaeude.jpg';
 import hall from '../assets/photos/gebetsraum-2.jpg';
 import crowd from '../assets/photos/gemeinde-freitag.jpg';
 import hallway from '../assets/photos/flur.jpg';
+const site = getSite();
+const campaign = getCampaign();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -189,7 +190,7 @@ const ids = c.subnav.map(([href]) => href.slice(1));
 <BaseLayout lang={lang} title={c.title} description={c.description}>
   <!-- HERO -->
   <section class="relative isolate overflow-hidden bg-wine-ink text-white">
-    <Picture src={building} alt={ar ? 'المبنى الجديد المراد شراؤه' : 'Das Gebäude, das wir erwerben möchten'} widths={[640, 960, 1400, 2000, 2400]} sizes="100vw" formats={['avif', 'webp']} class="absolute inset-0 -z-10 h-full w-full object-cover" loading="eager" fetchpriority="high" />
+    <Picture src={building} alt={ar ? 'المبنى الجديد المراد شراؤه' : 'Das Gebäude, das wir erwerben möchten'} widths={[640, 960, 1400, 2000, 2400]} sizes="100vw" formats={['webp']} class="absolute inset-0 -z-10 h-full w-full object-cover" loading="eager" fetchpriority="high" />
     <div class="absolute inset-0 -z-10 bg-gradient-to-t from-wine-ink via-wine-ink/70 to-wine-ink/20"></div>
     <div class="container-x pb-24 pt-28 md:pb-32 md:pt-48">
       <p class="eyebrow !text-gold-soft">{c.eyebrow}</p>
@@ -225,7 +226,7 @@ const ids = c.subnav.map(([href]) => href.slice(1));
         <p class="mt-8 font-display text-lg italic text-wine">{c.letterSign}</p>
       </article>
       <div class="grid content-start gap-4">
-        <Picture src={crowd} alt={ar ? 'المصلون في صلاة الجمعة بالمسجد الحالي' : 'Freitagsgebet in der jetzigen Moschee'} widths={[500, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-[var(--radius-card)] object-cover shadow-soft" />
+        <Picture src={crowd} alt={ar ? 'المصلون في صلاة الجمعة بالمسجد الحالي' : 'Freitagsgebet in der jetzigen Moschee'} widths={[500, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['webp']} class="aspect-[4/3] w-full rounded-[var(--radius-card)] object-cover shadow-soft" />
         <div class="card p-6">
           <h3 class="text-lg font-semibold">{c.compareTitle}</h3>
           <p class="mt-4 text-sm font-semibold uppercase tracking-wider text-ink-mute">{c.today}</p>
@@ -252,7 +253,7 @@ const ids = c.subnav.map(([href]) => href.slice(1));
       </dl>
       <div class="mt-10 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <figure>
-          <Picture src={building} alt={ar ? 'واجهة المبنى الجديد' : 'Außenansicht des neuen Gebäudes'} widths={[640, 1000, 1400]} sizes="(min-width: 1024px) 55vw, 100vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-[var(--radius-card)] object-cover shadow-lift" />
+          <Picture src={building} alt={ar ? 'واجهة المبنى الجديد' : 'Außenansicht des neuen Gebäudes'} widths={[640, 1000, 1400]} sizes="(min-width: 1024px) 55vw, 100vw" formats={['webp']} class="aspect-[4/3] w-full rounded-[var(--radius-card)] object-cover shadow-lift" />
           <figcaption class="mt-3 flex items-center gap-2 text-sm text-ink-mute"><Icon name="info" size={16} />{c.photoNote}</figcaption>
         </figure>
         <div class="card p-7">
@@ -331,7 +332,7 @@ const ids = c.subnav.map(([href]) => href.slice(1));
         <p class="mt-3 text-ink-soft">{c.useText}</p>
         <a href={L('/ueber-uns') + '#transparenz'} class="mt-5 inline-flex items-center gap-1.5 font-semibold text-wine hover:underline">{c.transparencyLink} <Icon name="arrow" size={16} /></a>
       </div>
-      <Picture src={hallway} alt="" widths={[500, 800]} sizes="(min-width: 1024px) 35vw, 100vw" formats={['avif', 'webp']} class="mt-6 hidden aspect-[16/9] w-full rounded-[var(--radius-card)] object-cover shadow-soft lg:block" />
+      <Picture src={hallway} alt="" widths={[500, 800]} sizes="(min-width: 1024px) 35vw, 100vw" formats={['webp']} class="mt-6 hidden aspect-[16/9] w-full rounded-[var(--radius-card)] object-cover shadow-soft lg:block" />
     </div>
     <ul class="grid content-start gap-4 sm:grid-cols-2">
       {c.trust.map((item) => (
@@ -342,7 +343,7 @@ const ids = c.subnav.map(([href]) => href.slice(1));
         </li>
       ))}
       <li class="sm:col-span-2">
-        <Picture src={hall} alt={ar ? 'قاعة الصلاة الحالية' : 'Der jetzige Gebetsraum'} widths={[600, 1000]} sizes="(min-width: 1024px) 45vw, 100vw" formats={['avif', 'webp']} class="aspect-[16/7] w-full rounded-[var(--radius-card)] object-cover shadow-soft" />
+        <Picture src={hall} alt={ar ? 'قاعة الصلاة الحالية' : 'Der jetzige Gebetsraum'} widths={[600, 1000]} sizes="(min-width: 1024px) 45vw, 100vw" formats={['webp']} class="aspect-[16/7] w-full rounded-[var(--radius-card)] object-cover shadow-soft" />
       </li>
     </ul>
   </section>

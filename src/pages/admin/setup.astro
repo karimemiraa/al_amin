@@ -1,0 +1,42 @@
+---
+export const prerender = false;
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import { adminT } from '../../admin/i18n';
+import { adminLang, setSessionCookie, str, isEmail, clientIp } from '../../admin/util';
+import { userCount, createUser, createSession, passwordProblem, audit, getUser } from '../../lib/server/auth';
+
+if (userCount() > 0) return Astro.redirect('/admin/login', 302);
+const lang = adminLang(Astro);
+const t = adminT(lang);
+const errors: Record<string, string> = {};
+const values = { name: '', email: '' };
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  values.name = str(fd, 'name', 80);
+  values.email = str(fd, 'email', 120).toLowerCase();
+  const password = String(fd.get('password') ?? '');
+  if (!values.name) errors.name = t('common.required');
+  if (!isEmail(values.email)) errors.email = t('common.required');
+  const pw = passwordProblem(password, values.email);
+  if (pw) errors.password = t(pw);
+  else if (password !== String(fd.get('repeat') ?? '')) errors.repeat = t('pw.mismatch');
+  if (!Object.keys(errors).length && userCount() === 0) {
+    const id = createUser({ email: values.email, name: values.name, role: 'owner', lang, password });
+    audit(getUser(id)!, 'user.setup', values.email, { ip: clientIp(Astro) }, true);
+    setSessionCookie(Astro, createSession(id, false, clientIp(Astro), Astro.request.headers.get('user-agent')));
+    return Astro.redirect('/admin/2fa-einrichten', 303);
+  }
+}
+---
+<AuthLayout title={t('setup.title')} lang={lang}>
+  <h1 class="font-display text-[1.7rem] font-semibold leading-tight">{t('setup.title')}</h1>
+  <p class="mt-2 a-muted">{t('setup.text')}</p>
+  <form method="post" class="mt-7 grid gap-4">
+    <label class="a-field"><span class="a-label">{t('setup.name')}</span><input class="a-input" name="name" value={values.name} required autocomplete="name" aria-invalid={errors.name ? 'true' : undefined} />{errors.name && <span class="a-error-text">{errors.name}</span>}</label>
+    <label class="a-field"><span class="a-label">{t('auth.email')}</span><input class="a-input" type="email" name="email" value={values.email} required autocomplete="username" dir="ltr" aria-invalid={errors.email ? 'true' : undefined} />{errors.email && <span class="a-error-text">{errors.email}</span>}</label>
+    <label class="a-field"><span class="a-label">{t('pw.new')}</span><input class="a-input" type="password" name="password" required minlength="10" autocomplete="new-password" aria-invalid={errors.password ? 'true' : undefined} /><span class="a-hint">{t('pw.hint')}</span>{errors.password && <span class="a-error-text">{errors.password}</span>}</label>
+    <label class="a-field"><span class="a-label">{t('pw.repeat')}</span><input class="a-input" type="password" name="repeat" required autocomplete="new-password" aria-invalid={errors.repeat ? 'true' : undefined} />{errors.repeat && <span class="a-error-text">{errors.repeat}</span>}</label>
+    <button class="a-btn a-btn-primary mt-2 !h-11 w-full">{t('setup.submit')}</button>
+  </form>
+</AuthLayout>

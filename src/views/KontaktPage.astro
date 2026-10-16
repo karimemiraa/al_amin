@@ -1,10 +1,11 @@
 ---
+import { getSite } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import Icon from '../components/Icon.astro';
-import site from '../content/settings/site.json';
 import { localizePath, withBase, type Lang } from '../i18n/ui';
 import heroImg from '../assets/photos/brunnen.jpg';
+const site = getSite();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;

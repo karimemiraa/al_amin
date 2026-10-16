@@ -1,0 +1,190 @@
+---
+import '../styles/admin.css';
+import AIcon from '../components/admin/AIcon.astro';
+import mark from '../assets/brand/mark.svg?raw';
+import { adminT } from '../admin/i18n';
+import { can } from '../lib/server/auth';
+import { getActiveTheme, getEntries, announcementStatus } from '../lib/content';
+
+export type NavKey = 'dashboard' | 'announcements' | 'program' | 'media' | 'prayer' | 'campaign' | 'org' | 'payments' | 'design' | 'users' | 'account' | 'audit';
+
+interface Props { title: string; active?: NavKey; wide?: boolean }
+const { title, active, wide = false } = Astro.props;
+const user = Astro.locals.user!;
+const lang = user.lang;
+const t = adminT(lang);
+const theme = getActiveTheme();
+const flash = Astro.locals.flash;
+const markSvg = mark.replace('<svg', '<svg aria-hidden="true" class="h-7 w-auto"');
+
+const annCount = getEntries('announcements').filter((e) => ['live', 'scheduled'].includes(announcementStatus(e.data))).length;
+const lessonCount = getEntries('program').filter((e) => e.data.active).length;
+
+type Item = { key: NavKey; href: string; icon: Parameters<typeof AIcon>[0]['name']; area: Parameters<typeof can>[1]; count?: number; sensitive?: boolean };
+const content: Item[] = [
+  { key: 'announcements', href: '/admin/ankuendigungen', icon: 'megaphone', area: 'content', count: annCount },
+  { key: 'program', href: '/admin/programm', icon: 'book', area: 'content', count: lessonCount },
+  { key: 'media', href: '/admin/mediathek', icon: 'play', area: 'content' },
+  { key: 'prayer', href: '/admin/gebetszeiten', icon: 'moon', area: 'content' },
+  { key: 'campaign', href: '/admin/kampagne', icon: 'heart', area: 'campaign' },
+];
+const settings: Item[] = [
+  { key: 'org', href: '/admin/verein', icon: 'pin', area: 'org' },
+  { key: 'payments', href: '/admin/zahlungen', icon: 'card', area: 'payments', sensitive: true },
+  { key: 'design', href: '/admin/design', icon: 'palette', area: 'design' },
+  { key: 'users', href: '/admin/benutzer', icon: 'users', area: 'users', sensitive: true },
+  { key: 'audit', href: '/admin/protokoll', icon: 'history', area: 'audit' },
+];
+const visible = (items: Item[]) => items.filter((i) => can(user, i.area));
+
+const commands = [
+  { label: t('cmd.newAnnouncement'), href: '/admin/ankuendigungen/neu', hint: t('nav.announcements'), terms: 'neu ankündigung news eid إعلان' },
+  { label: t('cmd.updateTotal'), href: '/admin#spendenstand', hint: t('nav.campaign'), terms: 'spenden spendenstand geld betrag تبرع رصيد' },
+  { label: t('cmd.newLesson'), href: '/admin/programm/neu', hint: t('nav.program'), terms: 'unterricht dars kurs درس' },
+  { label: t('cmd.newVideo'), href: '/admin/mediathek#neu', hint: t('nav.media'), terms: 'video youtube khutbah فيديو' },
+  { label: t('cmd.notice'), href: '/admin/ankuendigungen#hinweisleiste', hint: t('nav.announcements'), terms: 'hinweis banner leiste eid تنبيه' },
+  { label: t('nav.dashboard'), href: '/admin', hint: '', terms: 'start home übersicht' },
+  ...[...visible(content), ...visible(settings)].map((i) => ({ label: t(`nav.${i.key}`), href: i.href, hint: '', terms: i.key })),
+  { label: t('nav.account'), href: '/admin/konto', hint: '', terms: 'konto passwort 2fa profil حساب' },
+  { label: t('nav.viewSite'), href: '/', hint: '', terms: 'website seite homepage موقع' },
+];
+const initials = user.name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+---
+<!doctype html>
+<html lang={lang} dir={lang === 'ar' ? 'rtl' : 'ltr'} data-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} · {t('app.name')}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="a-body">
+    <header class="a-topbar">
+      <button type="button" class="a-btn a-btn-icon a-btn-ghost !text-white" data-side-open aria-label={t('nav.menu')}><AIcon name="menu" size={20} /></button>
+      <span class="flex items-center gap-2 font-display font-semibold"><span class="text-gold-soft" set:html={markSvg} />{t('app.brand')}</span>
+      <button type="button" class="a-btn a-btn-icon a-btn-ghost !text-white" data-cmd-open aria-label={t('nav.search')}><AIcon name="search" size={19} /></button>
+    </header>
+
+    <div class="a-shell">
+      <aside class="a-side" data-side aria-label={t('nav.menu')}>
+        <a href="/admin" class="mb-4 flex items-center gap-2.5 px-2 text-white no-underline">
+          <span class="text-gold-soft" set:html={markSvg} />
+          <span class="leading-tight"><b class="block font-display text-[15px] font-semibold">{t('app.brand')}</b><small class="text-[10px] uppercase tracking-[0.16em] text-gold-soft rtl:tracking-normal rtl:text-[11px]">{t('app.name')}</small></span>
+        </a>
+        <button type="button" class="a-search-btn" data-cmd-open><AIcon name="search" size={15} />{t('nav.search')}<span class="a-kbd" data-kbd>Ctrl K</span></button>
+        <nav class="a-nav grid gap-px">
+          <a href="/admin" aria-current={active === 'dashboard' ? 'page' : undefined}><AIcon name="dashboard" />{t('nav.dashboard')}</a>
+          <div class="a-nav-group">{t('nav.groupContent')}</div>
+          {visible(content).map((i) => (
+            <a href={i.href} aria-current={active === i.key ? 'page' : undefined}><AIcon name={i.icon} />{t(`nav.${i.key}`)}{i.count ? <span class="a-count">{i.count}</span> : null}</a>
+          ))}
+          <div class="a-nav-group">{t('nav.groupSettings')}</div>
+          {visible(settings).map((i) => (
+            <a href={i.href} aria-current={active === i.key ? 'page' : undefined}><AIcon name={i.icon} />{t(`nav.${i.key}`)}{i.sensitive && <AIcon name="lock" size={13} class="a-lock" />}</a>
+          ))}
+          <a href="/admin/konto" aria-current={active === 'account' ? 'page' : undefined}><AIcon name="user" />{t('nav.account')}</a>
+        </nav>
+
+        <div class="mt-auto grid gap-2 border-t border-white/10 pt-3">
+          <a href="/" target="_blank" rel="noopener" class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] text-white/70 no-underline hover:bg-white/5 hover:text-white"><AIcon name="external" size={15} />{t('nav.viewSite')}</a>
+          <div class="flex items-center gap-2.5 px-2">
+            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-gold-soft text-[12px] font-bold text-wine-ink">{initials}</span>
+            <span class="min-w-0 flex-1 leading-tight">
+              <b class="block truncate text-[13px] font-semibold text-white">{user.name}</b>
+              <small class="flex items-center gap-1.5 text-[11px] text-white/55"><span class:list={['size-1.5 rounded-full', user.totpEnabled ? 'bg-[#69b86b]' : 'bg-[#e0a33a]']}></span>{t(`role.${user.role}`)}{user.totpEnabled ? ' · 2FA' : ''}</small>
+            </span>
+            <form method="post" action="/admin/sprache">
+              <input type="hidden" name="next" value={Astro.url.pathname} />
+              <button class="a-btn a-btn-sm a-btn-ghost !h-7 !px-2 !text-[12px] !text-gold-soft" title="Sprache / اللغة">{t('nav.switchLang')}</button>
+            </form>
+            <form method="post" action="/admin/logout">
+              <button class="a-btn a-btn-icon a-btn-ghost !size-7 !text-white/70 hover:!text-white" title={t('nav.logout')} aria-label={t('nav.logout')}><AIcon name="logout" size={16} /></button>
+            </form>
+          </div>
+        </div>
+      </aside>
+      <div class="fixed inset-0 z-50 hidden bg-black/40 lg:hidden" data-side-backdrop></div>
+
+      <main class:list={['a-main', wide && '!max-w-none']} id="main">
+        <slot />
+      </main>
+    </div>
+
+    <dialog class="a-cmd" data-cmd aria-label={t('nav.search')}>
+      <input type="search" placeholder={t('cmd.placeholder')} data-cmd-input autocomplete="off" />
+      <ul data-cmd-list role="listbox">
+        {commands.map((c) => (
+          <li data-terms={`${c.label} ${c.terms}`.toLowerCase()}><a href={c.href} role="option" aria-selected="false" target={c.href === '/' ? '_blank' : undefined}><AIcon name="chevron" size={14} class="opacity-40" />{c.label}{c.hint && <small>{c.hint}</small>}</a></li>
+        ))}
+      </ul>
+      <p class="hidden px-4 py-6 text-center a-muted" data-cmd-empty>{t('cmd.empty')}</p>
+      <footer>{t('cmd.hint')}</footer>
+    </dialog>
+
+    {flash && (
+      <div class="a-toast" data-type={flash.type} role="status" data-toast>
+        <span class:list={['grid size-5 place-items-center rounded-full', flash.type === 'error' ? 'bg-white/20' : 'bg-[#69b86b]']}><AIcon name={flash.type === 'error' ? 'alert' : 'check'} size={12} /></span>
+        <span>{t(flash.key, flash.vars)}</span>
+        {flash.link && <a href={flash.link} target="_blank" rel="noopener">{t('flash.view')}</a>}
+      </div>
+    )}
+
+    <script>
+      // Mobile sidebar
+      const side = document.querySelector<HTMLElement>('[data-side]');
+      const backdrop = document.querySelector<HTMLElement>('[data-side-backdrop]');
+      const setSide = (open: boolean) => { if (!side || !backdrop) return; side.dataset.open = String(open); backdrop.classList.toggle('hidden', !open); };
+      document.querySelectorAll('[data-side-open]').forEach((b) => b.addEventListener('click', () => setSide(true)));
+      backdrop?.addEventListener('click', () => setSide(false));
+
+      // Command palette (Ctrl/Cmd + K)
+      const dlg = document.querySelector<HTMLDialogElement>('[data-cmd]')!;
+      const input = dlg.querySelector<HTMLInputElement>('[data-cmd-input]')!;
+      const items = [...dlg.querySelectorAll<HTMLLIElement>('[data-cmd-list] li')];
+      const empty = dlg.querySelector<HTMLElement>('[data-cmd-empty]')!;
+      if (/Mac|iPhone|iPad/.test(navigator.platform)) document.querySelectorAll('[data-kbd]').forEach((k) => (k.textContent = '⌘ K'));
+      let sel = 0;
+      const shown = () => items.filter((li) => !li.hidden);
+      const mark = () => shown().forEach((li, i) => li.querySelector('a')!.setAttribute('aria-selected', String(i === sel)));
+      const filter = () => {
+        const q = input.value.trim().toLowerCase();
+        items.forEach((li) => (li.hidden = !!q && !q.split(/\s+/).every((w) => li.dataset.terms!.includes(w))));
+        sel = 0; mark(); empty.classList.toggle('hidden', shown().length > 0);
+      };
+      const open = () => { dlg.showModal(); input.value = ''; filter(); input.focus(); };
+      document.querySelectorAll('[data-cmd-open]').forEach((b) => b.addEventListener('click', open));
+      document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); dlg.open ? dlg.close() : open(); }
+      });
+      input.addEventListener('input', filter);
+      input.addEventListener('keydown', (e) => {
+        const list = shown();
+        if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, list.length - 1); mark(); }
+        if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); mark(); }
+        if (e.key === 'Enter' && list[sel]) { e.preventDefault(); list[sel].querySelector('a')!.click(); dlg.close(); }
+      });
+      dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+
+      // Toast auto-hide
+      const toast = document.querySelector<HTMLElement>('[data-toast]');
+      if (toast) setTimeout(() => toast.remove(), 6000);
+
+      // Unsaved-changes guard for forms marked data-track
+      document.querySelectorAll<HTMLFormElement>('form[data-track]').forEach((form) => {
+        form.addEventListener('input', () => (form.dataset.dirty = 'true'));
+        form.addEventListener('change', () => (form.dataset.dirty = 'true'));
+        form.addEventListener('submit', () => (form.dataset.dirty = 'false'));
+      });
+      window.addEventListener('beforeunload', (e) => {
+        if (document.querySelector('form[data-dirty="true"]')) e.preventDefault();
+      });
+
+      // Confirmation for destructive buttons
+      document.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-confirm]');
+        if (btn && !confirm(btn.dataset.confirm!)) { e.preventDefault(); e.stopPropagation(); }
+      }, true);
+    </script>
+  </body>
+</html>

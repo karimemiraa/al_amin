@@ -1,14 +1,14 @@
 ---
-import { getCollection } from 'astro:content';
+import { getEntries, getSite } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import SectionHeading from '../components/SectionHeading.astro';
 import VideoEmbed from '../components/VideoEmbed.astro';
 import FilterChips from '../components/FilterChips.astro';
 import Icon from '../components/Icon.astro';
-import site from '../content/settings/site.json';
 import { localizePath, formatDate, pick, useTranslations, type Lang } from '../i18n/ui';
 import friday from '../assets/photos/gemeinde-freitag.jpg';
+const site = getSite();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -66,7 +66,7 @@ const c = ar
       series: { khutbah: 'Freitagspredigt', sirah: 'Sirah', aqidah: 'Aqida', tazkiyah: 'Tazkiyah', quran: 'Quran', campaign: 'Kampagne', other: 'Sonstiges' } as Record<string, string>,
     };
 
-const videos = (await getCollection('videos')).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+const videos = getEntries('videos').sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 const featured = videos.find((v) => v.data.featured) ?? videos[0];
 const seriesOrder = ['khutbah', 'sirah', 'aqidah', 'tazkiyah', 'quran', 'campaign', 'other'];
 const present = seriesOrder.filter((s) => videos.some((v) => v.data.series === s));

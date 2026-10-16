@@ -1,0 +1,126 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, bool, isDate } from '../../../admin/util';
+import { getEntries, announcementStatus, getNotice, saveSetting, type Notice } from '../../../lib/content';
+import { audit } from '../../../lib/server/auth';
+
+const denied = guardArea(Astro, 'content');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+
+let noticeErrors: Record<string, string> = {};
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const notice: Notice = {
+    active: bool(fd, 'active'),
+    text_de: str(fd, 'text_de', 180),
+    text_ar: str(fd, 'text_ar', 180),
+    link: str(fd, 'link', 300),
+    until: str(fd, 'until', 10),
+    tone: str(fd, 'tone', 10) === 'brand' ? 'brand' : 'gold',
+  };
+  if (notice.active && !notice.text_de) noticeErrors.text = t('common.required');
+  if (notice.until && !isDate(notice.until)) noticeErrors.until = t('common.required');
+  if (notice.link && !/^(\/|https:\/\/)/.test(notice.link)) noticeErrors.link = t('notice.linkHint');
+  if (!Object.keys(noticeErrors).length) {
+    saveSetting('notice', notice, user.id);
+    audit(user, 'notice.update', notice.active ? notice.text_de : '—');
+    setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/' });
+    return Astro.redirect('/admin/ankuendigungen#hinweisleiste', 303);
+  }
+}
+
+const filter = Astro.url.searchParams.get('status') ?? 'all';
+const order = { live: 0, scheduled: 1, draft: 2, expired: 3 } as const;
+const all = getEntries('announcements')
+  .map((e) => ({ ...e, status: announcementStatus(e.data) }))
+  .sort((a, b) => order[a.status] - order[b.status] || Number(b.data.pinned) - Number(a.data.pinned) || b.data.date.getTime() - a.data.date.getTime());
+const counts = { all: all.length, live: 0, scheduled: 0, draft: 0, expired: 0 } as Record<string, number>;
+all.forEach((a) => counts[a.status]++);
+const list = filter === 'all' ? all : all.filter((a) => a.status === filter);
+const notice = getNotice();
+const fmt = (d: Date | string, o: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }) =>
+  new Intl.DateTimeFormat(ar ? 'ar-u-nu-latn' : 'de-DE', { timeZone: 'Europe/Berlin', ...o }).format(typeof d === 'string' ? new Date(d) : d);
+---
+<AdminLayout title={t('ann.title')} active="announcements">
+  <PageHead title={t('ann.title')} intro={t('ann.intro')}>
+    <a href="/admin/ankuendigungen/neu" class="a-btn a-btn-primary"><AIcon name="plus" size={15} />{t('ann.new')}</a>
+  </PageHead>
+
+  <div class="grid gap-4 xl:grid-cols-[1fr_360px]">
+    <section class="a-card !p-0">
+      <nav class="flex flex-wrap gap-1 border-b border-line px-3 py-2.5" aria-label={t('common.status')}>
+        {(['all', 'live', 'scheduled', 'draft', 'expired'] as const).map((s) => (
+          <a href={s === 'all' ? '?' : `?status=${s}`} aria-current={filter === s ? 'page' : undefined} class="rounded-full px-3 py-1 text-[13px] font-semibold text-ink-soft no-underline hover:bg-paper aria-[current=page]:bg-wine aria-[current=page]:text-white">
+            {s === 'all' ? t('common.all') : t(`ann.status.${s}`)} <span class="opacity-60">{counts[s]}</span>
+          </a>
+        ))}
+      </nav>
+      {list.length === 0 && <p class="a-empty">{t('common.none')}</p>}
+      <ul class="a-list px-4">
+        {list.map((a) => (
+          <li>
+            <a href={`/admin/ankuendigungen/${a.id}`} class="a-row group no-underline">
+              {a.data.image
+                ? <img src={a.data.image} alt="" class="size-12 shrink-0 rounded-lg object-cover" loading="lazy" />
+                : <span class="grid size-12 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-mute"><AIcon name="megaphone" /></span>}
+              <span class="min-w-0 flex-1">
+                <span class="flex items-center gap-2">
+                  <span class={`a-chip a-chip-${a.status}`}>{t(`ann.status.${a.status}`)}</span>
+                  {a.data.pinned && <span class="a-chip a-chip-brand"><AIcon name="pinTop" size={11} />{t('ann.pinned')}</span>}
+                  <span class="a-chip a-chip-draft">{t(`ann.cat.${a.data.category}`)}</span>
+                </span>
+                <span class="a-row-title mt-1 block text-ink group-hover:text-wine" dir="auto">{ar && a.data.title_ar ? a.data.title_ar : a.data.title_de}</span>
+                <small class="a-muted">
+                  {a.status === 'scheduled' && a.data.publishFrom ? t('ann.from', { date: fmt(a.data.publishFrom, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }) : fmt(a.data.date)}
+                  {a.data.publishUntil && a.status !== 'expired' && <> · {t('ann.until', { date: fmt(a.data.publishUntil, { day: 'numeric', month: 'short' }) })}</>}
+                  {!a.data.title_ar && <> · <span class="font-semibold text-[#8a5a1a]">{t('ann.missingAr')}</span></>}
+                </small>
+              </span>
+              <AIcon name="chevron" size={16} class="text-ink-mute" />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section id="hinweisleiste" class="a-card self-start scroll-mt-6">
+      <div class="flex items-start gap-3">
+        <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-pale text-[#7a5a2c]"><AIcon name="bell" /></span>
+        <div><h2 class="a-section-title">{t('notice.title')}</h2><p class="text-[12.5px] a-muted">{t('notice.intro')}</p></div>
+      </div>
+      <form method="post" class="mt-4 grid gap-3.5" data-track>
+        <label class="a-check items-center"><input type="checkbox" name="active" class="a-switch" checked={notice.active} /><span class="font-semibold">{t('notice.active')}</span></label>
+        <label class="a-field"><span class="a-label"><span class="a-lang-tag">DE</span>{t('notice.text')}</span><input class="a-input" name="text_de" value={notice.text_de} maxlength="180" dir="ltr" aria-invalid={noticeErrors.text ? 'true' : undefined} placeholder="Eid-Gebet am Sonntag um 8:00 Uhr im Außenbereich" />{noticeErrors.text && <span class="a-error-text">{noticeErrors.text}</span>}</label>
+        <label class="a-field"><span class="a-label"><span class="a-lang-tag">AR</span>{t('notice.text')} <span class="a-opt">({t('common.optional')})</span></span><input class="a-input" name="text_ar" value={notice.text_ar} maxlength="180" dir="rtl" placeholder="صلاة العيد يوم الأحد الساعة 8:00" /></label>
+        <label class="a-field"><span class="a-label">{t('notice.link')}</span><input class="a-input" name="link" value={notice.link} dir="ltr" placeholder="/gebetszeiten" aria-invalid={noticeErrors.link ? 'true' : undefined} /><span class="a-hint">{t('notice.linkHint')}</span></label>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="a-field"><span class="a-label">{t('notice.until')}</span><input class="a-input" type="date" name="until" value={notice.until} /></label>
+          <label class="a-field"><span class="a-label">{t('notice.tone')}</span><select class="a-select" name="tone"><option value="gold" selected={notice.tone !== 'brand'}>{t('notice.tone.gold')}</option><option value="brand" selected={notice.tone === 'brand'}>{t('notice.tone.brand')}</option></select></label>
+        </div>
+        <div class="rounded-xl border border-dashed border-line p-2" aria-hidden="true">
+          <div data-notice-preview class:list={['rounded-lg px-3 py-2 text-center text-[13px] font-semibold', notice.tone === 'brand' ? 'bg-wine text-white' : 'bg-gold-pale text-wine-ink']}>{notice.text_de || '…'}</div>
+        </div>
+        <button class="a-btn a-btn-primary justify-self-end"><AIcon name="check" size={15} />{t('common.save')}</button>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    const form = document.querySelector<HTMLFormElement>('#hinweisleiste form');
+    const preview = document.querySelector<HTMLElement>('[data-notice-preview]');
+    form?.addEventListener('input', () => {
+      if (!preview) return;
+      const fd = new FormData(form);
+      preview.textContent = String(fd.get('text_de') || '…');
+      const brand = fd.get('tone') === 'brand';
+      preview.className = `rounded-lg px-3 py-2 text-center text-[13px] font-semibold ${brand ? 'bg-wine text-white' : 'bg-gold-pale text-wine-ink'}`;
+    });
+  </script>
+</AdminLayout>

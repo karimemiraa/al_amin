@@ -1,6 +1,7 @@
 ---
-import campaign from '../content/settings/campaign.json';
+import { getCampaign } from '../lib/content';
 import { formatEuro, formatNumber, formatDate, useTranslations, type Lang } from '../i18n/ui';
+const campaign = getCampaign();
 
 interface Props { lang: Lang; tone?: 'light' | 'dark'; class?: string }
 const { lang, tone = 'light', class: cls = '' } = Astro.props;

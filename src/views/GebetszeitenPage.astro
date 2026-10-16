@@ -1,4 +1,5 @@
 ---
+import { getPrayerSettings } from '../lib/content';
 import fs from 'node:fs';
 import path from 'node:path';
 import BaseLayout from '../layouts/BaseLayout.astro';
@@ -6,10 +7,13 @@ import PageHero from '../components/PageHero.astro';
 import PrayerToday from '../components/PrayerToday.astro';
 import SectionHeading from '../components/SectionHeading.astro';
 import Icon from '../components/Icon.astro';
-import prayerSettings from '../content/settings/prayer.json';
-import { berlinToday, getMonth, publishedYears, jumuah, iqamaOffsets, PRAYERS, isoDate } from '../lib/prayer';
+import { berlinToday, getMonth, getPublishedYears, getJumuah, getIqamaOffsets, PRAYERS, isoDate } from '../lib/prayer';
 import { localizePath, withBase, intlLocale, useTranslations, type Lang } from '../i18n/ui';
 import hall from '../assets/photos/gebetsraum-2.jpg';
+const prayerSettings = getPrayerSettings();
+const publishedYears = getPublishedYears();
+const jumuah = getJumuah();
+const iqamaOffsets = getIqamaOffsets();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;

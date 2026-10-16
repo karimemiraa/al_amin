@@ -1,0 +1,45 @@
+---
+export const prerender = false;
+import AuthLayout from '../../../layouts/AuthLayout.astro';
+import { adminT } from '../../../admin/i18n';
+import { adminLang, setSessionCookie, str, clientIp, safeNext } from '../../../admin/util';
+import { attemptLogin, createSession, twoFactorRequired, markLogin, audit } from '../../../lib/server/auth';
+
+const lang = adminLang(Astro);
+const t = adminT(lang);
+const next = safeNext(Astro.url.searchParams.get('next'));
+if (Astro.locals.user && Astro.locals.session?.mfaOk) return Astro.redirect(next, 302);
+
+let error = '';
+const info = Astro.url.searchParams.get('abgemeldet') ? t('auth.loggedOut') : '';
+let email = '';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  email = str(fd, 'email', 120);
+  const ip = clientIp(Astro);
+  const result = attemptLogin(email, String(fd.get('password') ?? ''), ip);
+  if (result.ok) {
+    const { user } = result;
+    const needsCode = user.totpEnabled;
+    const mustEnroll = !user.totpEnabled && twoFactorRequired(user);
+    setSessionCookie(Astro, createSession(user.id, !needsCode && !mustEnroll, ip, Astro.request.headers.get('user-agent')));
+    if (needsCode) return Astro.redirect(`/admin/login/2fa?next=${encodeURIComponent(next)}`, 303);
+    markLogin(user.id);
+    audit(user, 'login', user.email, { ip });
+    return Astro.redirect(mustEnroll ? '/admin/2fa-einrichten' : next, 303);
+  }
+  error = t(`auth.${result.reason}`);
+}
+---
+<AuthLayout title={t('auth.title')} lang={lang}>
+  <h1 class="font-display text-[1.9rem] font-semibold">{t('auth.title')}</h1>
+  <p class="mt-1 a-muted">{t('auth.subtitle')}</p>
+  {info && <p class="mt-5 rounded-xl bg-paper-2 px-4 py-3 text-[13.5px]" role="status">{info}</p>}
+  {error && <p class="mt-5 rounded-xl border border-[#e8b4b0] bg-[#fdf0ef] px-4 py-3 text-[13.5px] font-semibold text-[#8a2a2a]" role="alert">{error}</p>}
+  <form method="post" class="mt-6 grid gap-4">
+    <label class="a-field"><span class="a-label">{t('auth.email')}</span><input class="a-input !h-11" type="email" name="email" value={email} required autofocus autocomplete="username" dir="ltr" /></label>
+    <label class="a-field"><span class="a-label flex justify-between">{t('auth.password')}<a href="/admin/passwort-vergessen" class="text-[12px] font-semibold text-wine">{t('auth.forgot')}</a></span><input class="a-input !h-11" type="password" name="password" required autocomplete="current-password" /></label>
+    <button class="a-btn a-btn-primary mt-1 !h-11 w-full text-[15px]">{t('auth.submit')}</button>
+  </form>
+</AuthLayout>

@@ -9,10 +9,12 @@
     "preview": "astro preview",
     "start": "node ./dist/server/entry.mjs",
     "check": "astro check",
-    "build:pages": "SITE_URL=https://karimemiraa.github.io SITE_BASE=/al_amin PUBLIC_DEMO=1 PUBLIC_DEMO_ROOT=/al_amin astro build",
-    "build:pages:green": "SITE_URL=https://karimemiraa.github.io SITE_BASE=/al_amin/gruen PUBLIC_DEMO=1 PUBLIC_DEMO_ROOT=/al_amin PUBLIC_THEME=green astro build"
+    "build:pages": "rm -rf .demo-data && STATIC_BUILD=1 DATA_DIR=.demo-data SITE_URL=https://karimemiraa.github.io SITE_BASE=/al_amin PUBLIC_DEMO=1 PUBLIC_DEMO_ROOT=/al_amin astro build",
+    "build:pages:green": "rm -rf .demo-data && STATIC_BUILD=1 DATA_DIR=.demo-data SITE_URL=https://karimemiraa.github.io SITE_BASE=/al_amin/gruen PUBLIC_DEMO=1 PUBLIC_DEMO_ROOT=/al_amin PUBLIC_THEME=green astro build",
+    "test": "node --test --experimental-strip-types tests/"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@astrojs/node": "^11.1.7",
     "@astrojs/sitemap": "^3.7.4",
     "@fontsource-variable/fraunces": "^5.3.0",
@@ -25,8 +27,10 @@
     "marked": "^18.1.1",
     "nodemailer": "^10.1.0",
     "qrcode": "^1.5.4",
+    "sharp": "^0.35.5",
     "stripe": "^23.0.0",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

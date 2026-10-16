@@ -1,0 +1,253 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AIcon from '../../components/admin/AIcon.astro';
+import { adminT } from '../../admin/i18n';
+import { currentUser, setFlash, num, str } from '../../admin/util';
+import { readiness } from '../../admin/readiness';
+import { getCampaign, getSetting, saveSetting, getEntries, announcementStatus, THEMES, getActiveTheme, type ThemeId } from '../../lib/content';
+import { getDay, berlinToday, PRAYERS } from '../../lib/prayer';
+import { listAudit, audit, can } from '../../lib/server/auth';
+import { auditLabel } from '../../admin/audit-labels';
+
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const ar = user.lang === 'ar';
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const action = str(fd, 'action', 20);
+  if (action === 'total' && can(user, 'campaign')) {
+    const c = getSetting('campaign');
+    const raised = Math.max(0, Math.round(num(fd, 'raised', c.raised)));
+    const donors = Math.max(0, Math.round(num(fd, 'donors', c.donors)));
+    const asOf = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+    saveSetting('campaign', { ...c, raised, donors, asOf }, user.id);
+    audit(user, 'campaign.total', `${raised} €`, { from: c.raised, to: raised, donors });
+    setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/neue-moschee' });
+  }
+  if (action === 'theme' && can(user, 'design')) {
+    const id = str(fd, 'theme', 20) as ThemeId;
+    if (THEMES.some((th) => th.id === id)) {
+      const cur = getSetting('theme');
+      saveSetting('theme', { ...cur, active: id }, user.id);
+      audit(user, 'design.theme', id, { from: cur.active, to: id }, true);
+      setFlash(Astro, { type: 'ok', key: 'flash.saved', link: '/' });
+    }
+  }
+  return Astro.redirect('/admin', 303);
+}
+
+const campaign = getCampaign();
+const fmt = (n: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+const pct = (n: number) => Math.min(100, (n / campaign.goal) * 100);
+const deadline = new Date(campaign.deadline + 'T23:59:59+01:00');
+const daysLeft = Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / 86_400_000));
+const dateFmt = (d: Date | string, o: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }) =>
+  new Intl.DateTimeFormat(ar ? 'ar-u-nu-latn' : 'de-DE', { timeZone: 'Europe/Berlin', ...o }).format(typeof d === 'string' ? new Date(d) : d);
+
+const checks = readiness();
+const doneCount = checks.filter((c) => c.done).length;
+const openRequired = checks.filter((c) => c.required && !c.done).length;
+const ring = 2 * Math.PI * 15.5;
+const shownChecks = [...checks].sort((a, b) => Number(a.done) - Number(b.done) || Number(b.required) - Number(a.required)).slice(0, 5);
+
+const statusOrder = { live: 0, scheduled: 1, draft: 2, expired: 3 } as const;
+const announcements = getEntries('announcements')
+  .map((e) => ({ ...e, status: announcementStatus(e.data) }))
+  .sort((a, b) => statusOrder[a.status] - statusOrder[b.status] || Number(b.data.pinned) - Number(a.data.pinned) || b.data.date.getTime() - a.data.date.getTime())
+  .slice(0, 4);
+
+const [y, m, d] = berlinToday();
+const today = getDay(y, m, d);
+const nowMin = (() => { const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()).split(':').map(Number); return p[0] * 60 + p[1]; })();
+const toMin = (hm: string) => { const [h, mi] = hm.split(':').map(Number); return h * 60 + mi; };
+const nextPrayer = (['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).find((p) => toMin(today.times[p]) > nowMin);
+const jumuah = getSetting('prayer').jumuah?.[0]?.time;
+
+const todayWd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+const prayerRank = { fajr: 0, dhuhr: 1, asr: 2, maghrib: 3, isha: 4, time: 2 } as const;
+const lessons = getEntries('program')
+  .filter((e) => e.data.active)
+  .map((e) => {
+    let ahead = (e.data.weekday - todayWd + 7) % 7;
+    if (ahead === 0 && e.data.after !== 'time' && toMin(today.times[e.data.after]) + 60 < nowMin) ahead = 7;
+    return { ...e, ahead };
+  })
+  .sort((a, b) => a.ahead - b.ahead || prayerRank[a.data.after] - prayerRank[b.data.after])
+  .slice(0, 4);
+const wdShort = (wd: number) => new Intl.DateTimeFormat(ar ? 'ar' : 'de-DE', { weekday: ar ? 'long' : 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2024, 0, 7 + wd)));
+const prayerShort: Record<string, [string, string]> = { fajr: ['Fadschr', 'الفجر'], dhuhr: ['Dhuhr', 'الظهر'], asr: ['Asr', 'العصر'], maghrib: ['Maghrib', 'المغرب'], isha: ['Ischa', 'العشاء'], time: ['', ''] };
+const prayerName = (p: string) => prayerShort[p][ar ? 1 : 0];
+
+const recent = listAudit(5);
+const themeSettings = getSetting('theme');
+const activeTheme = getActiveTheme();
+const hijri = new Intl.DateTimeFormat(ar ? 'ar-SA-u-ca-islamic-umalqura-nu-latn' : 'de-DE-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' }).format(new Date());
+const firstName = user.name.split(' ')[0];
+const sqm = Math.floor(campaign.raised / campaign.pricePerSqm);
+---
+<AdminLayout title={t('nav.dashboard')} active="dashboard">
+  <div class="a-head">
+    <div>
+      <h1>{t('dash.greeting', { name: firstName })}</h1>
+      <p>{dateFmt(new Date(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · {hijri}{jumuah && <> · {ar ? 'الجمعة' : 'Freitagsgebet'} <span dir="ltr">{jumuah}</span></>}</p>
+    </div>
+    <div class="a-head-actions">
+      <a class="a-btn" href="/" target="_blank" rel="noopener"><AIcon name="external" size={15} />{t('nav.viewSite')}</a>
+      <a class="a-btn a-btn-primary" href="/admin/ankuendigungen/neu"><AIcon name="plus" size={15} />{t('common.new')}</a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-12 gap-3.5">
+    <!-- Campaign -->
+    <section id="spendenstand" class="bg-wine-pattern relative col-span-12 overflow-hidden rounded-2xl p-[18px] text-white shadow-[var(--shadow-lift)] xl:col-span-7">
+      <div class="a-card-title !text-gold-soft"><span>{t('dash.campaign')}</span><a href="/admin/kampagne" class="!text-gold-soft">{t('dash.openCampaign')} →</a></div>
+      <p class="font-display text-[2.4rem] font-semibold leading-none tracking-tight" dir="ltr" style="text-align:start"><span class="inline-block">{fmt(campaign.raised)}</span> <small class="font-sans text-sm font-normal tracking-normal text-white/65">{t('dash.of', { goal: fmt(campaign.goal) })} · {pct(campaign.raised).toLocaleString('de-DE', { maximumFractionDigits: 1 })} %</small></p>
+      <div class="my-3.5 flex h-2.5 overflow-hidden rounded-full bg-white/15">
+        <i class="block h-full bg-gradient-to-r from-gold to-gold-soft" style={`width:${Math.max(pct(campaign.manualRaised), 0.6)}%`}></i>
+        <i class="block h-full bg-[#69b86b]" style={`width:${pct(campaign.onlineRaised)}%`}></i>
+      </div>
+      <div class="flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-white/75">
+        <span class="inline-flex items-center gap-1.5"><i class="size-2 rounded-sm bg-gold-soft"></i>{t('dash.bank')} <b dir="ltr" class="text-white">{fmt(campaign.manualRaised)}</b></span>
+        <span class="inline-flex items-center gap-1.5"><i class="size-2 rounded-sm bg-[#69b86b]"></i>{t('dash.online')} <b dir="ltr" class="text-white">{fmt(campaign.onlineRaised)}</b></span>
+      </div>
+      <div class="mt-3.5 grid grid-cols-3 gap-2.5">
+        <div class="rounded-xl bg-white/[0.07] px-3 py-2"><b class="block font-display text-lg" dir="ltr">{sqm.toLocaleString('de-DE')} m²</b><small class="text-[11px] text-white/60">{t('dash.sqm', { total: campaign.totalSqm.toLocaleString('de-DE') })}</small></div>
+        <div class="rounded-xl bg-white/[0.07] px-3 py-2"><b class="block font-display text-lg">{campaign.donors.toLocaleString('de-DE')}</b><small class="text-[11px] text-white/60">{t('dash.donors')}</small></div>
+        <div class="rounded-xl bg-white/[0.07] px-3 py-2"><b class="block font-display text-lg">{daysLeft}</b><small class="text-[11px] text-white/60">{t('dash.daysLeft', { date: dateFmt(campaign.deadline, { day: '2-digit', month: '2-digit', year: 'numeric' }) })}</small></div>
+      </div>
+      {can(user, 'campaign') && (
+        <form method="post" class="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.08] p-2">
+          <input type="hidden" name="action" value="total" />
+          <label class="ps-1.5 text-[12px] text-white/70" for="raised">{t('dash.manualLabel')}</label>
+          <input id="raised" name="raised" inputmode="numeric" value={campaign.manualRaised.toLocaleString('de-DE')} class="h-8 min-w-0 flex-1 rounded-lg border border-white/20 bg-black/15 px-2.5 font-semibold text-white outline-none focus:border-gold-soft" dir="ltr" />
+          <input type="hidden" name="donors" value={getSetting('campaign').donors} />
+          <button class="a-btn a-btn-sm !h-8 !border-0 !bg-gold-soft !text-wine-ink">{t('dash.saveTotal')}</button>
+        </form>
+      )}
+    </section>
+
+    <!-- Readiness -->
+    <section class="a-card col-span-12 xl:col-span-5">
+      <div class="a-card-title"><span>{t('dash.readiness')}</span></div>
+      <div class="mb-2.5 flex items-center gap-3.5">
+        <svg viewBox="0 0 36 36" class="size-[54px] shrink-0"><circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--color-paper-2)" stroke-width="4" /><circle cx="18" cy="18" r="15.5" fill="none" stroke="var(--color-wine)" stroke-width="4" stroke-linecap="round" stroke-dasharray={`${(doneCount / checks.length) * ring} ${ring}`} transform="rotate(-90 18 18)" /></svg>
+        <div><b class="block font-display text-lg leading-tight">{t('dash.readinessCount', { done: doneCount, total: checks.length })}</b><small class="a-muted">{openRequired ? t('dash.readinessOpen', { n: openRequired }) : t('dash.readinessAllRequired')}</small></div>
+      </div>
+      <ul class="grid gap-0.5">
+        {shownChecks.map((c) => (
+          <li class="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-[13.5px] hover:bg-paper">
+            {c.done
+              ? <span class="grid size-[18px] place-items-center rounded-full bg-rose-soft text-wine"><AIcon name="check" size={11} /></span>
+              : <span class:list={['size-[18px] rounded-full border-[1.5px] border-dashed', c.required ? 'border-[#b7791f]' : 'border-gold-soft']}></span>}
+            <span class:list={[c.done && 'a-muted line-through decoration-line']}>{t(c.key)}</span>
+            {!c.done && c.required && <span class="a-chip a-chip-warn !px-1.5 !py-0 !text-[10px] uppercase">{t('dash.required')}</span>}
+            {!c.done && <a href={c.href} class="ms-auto text-[12.5px] font-semibold text-wine">{t('dash.fix')}</a>}
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <!-- Quick actions -->
+    <section class="a-card col-span-12 grid gap-2.5 !p-3 sm:grid-cols-2 xl:grid-cols-4">
+      {[
+        { href: '/admin/ankuendigungen/neu', icon: 'megaphone', title: 'dash.quickAnnouncement', text: 'dash.quickAnnouncementText' },
+        { href: '/admin/programm/neu', icon: 'bookPlus', title: 'dash.quickLesson', text: 'dash.quickLessonText' },
+        { href: '/admin/mediathek#neu', icon: 'play', title: 'dash.quickVideo', text: 'dash.quickVideoText' },
+        { href: '/admin/ankuendigungen#hinweisleiste', icon: 'bell', title: 'dash.quickNotice', text: 'dash.quickNoticeText', gold: true },
+      ].map((q) => (
+        <a href={q.href} class="flex items-center gap-3 rounded-xl border border-paper-2 bg-gradient-to-b from-white to-card px-3 py-2.5 no-underline transition hover:-translate-y-px hover:border-line hover:shadow-[var(--shadow-soft)]">
+          <span class:list={['grid size-9 shrink-0 place-items-center rounded-[10px]', q.gold ? 'bg-gold-pale text-[#7a5a2c]' : 'bg-rose-soft text-wine']}><AIcon name={q.icon as 'megaphone'} /></span>
+          <span class="min-w-0"><b class="block text-[13.5px] font-semibold text-ink">{t(q.title)}</b><small class="block truncate text-[12px] a-muted">{t(q.text)}</small></span>
+        </a>
+      ))}
+    </section>
+
+    <!-- Announcements -->
+    <section class="a-card col-span-12 md:col-span-6 xl:col-span-5">
+      <div class="a-card-title"><span>{t('dash.announcements')}</span><a href="/admin/ankuendigungen">{t('common.all')}</a></div>
+      <div class="a-list">
+        {announcements.length === 0 && <p class="a-empty">{t('common.none')}</p>}
+        {announcements.map((a) => (
+          <a href={`/admin/ankuendigungen/${a.id}`} class="a-row !items-start no-underline">
+            <span class={`a-chip a-chip-${a.status} mt-0.5`}>{t(`ann.status.${a.status}`)}</span>
+            <span class="min-w-0 flex-1">
+              <span class="a-row-title block text-ink" dir="auto">{ar && a.data.title_ar ? a.data.title_ar : a.data.title_de}</span>
+              <small class="a-muted">
+                {a.data.pinned && <>{t('ann.pinned')} · </>}
+                {a.status === 'scheduled' && a.data.publishFrom ? t('ann.from', { date: dateFmt(a.data.publishFrom, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }) : t('ann.since', { date: dateFmt(a.data.date) })}
+                {!a.data.title_ar && <> · <span class="text-[#8a5a1a]">{t('ann.missingAr')}</span></>}
+              </small>
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- Lessons -->
+    <section class="a-card col-span-12 md:col-span-6 xl:col-span-4">
+      <div class="a-card-title"><span>{t('dash.nextLessons')}</span><a href="/admin/programm">{t('dash.weekPlan')}</a></div>
+      <div class="a-list">
+        {lessons.map((l) => (
+          <a href={`/admin/programm/${l.id}`} class="a-row no-underline">
+            <span class="w-[46px] shrink-0 rounded-[10px] bg-gold-pale py-1 text-center text-[10.5px] font-bold leading-tight text-[#6b4f2a]">{wdShort(l.data.weekday).replace('.', '')}<span class="block font-medium">{l.data.after === 'time' ? l.data.time : prayerName(l.data.after)}</span></span>
+            <span class="min-w-0 flex-1"><span class="a-row-title block text-ink" dir="auto">{ar ? l.data.title_ar : l.data.title_de}</span><small class="flex items-center gap-1.5 a-muted"><span class="a-lang-tag">{l.data.language.toUpperCase()}</span>{l.ahead === 0 ? t('common.today') : l.ahead === 1 ? t('common.tomorrow') : wdShort(l.data.weekday)}</small></span>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- Prayer today -->
+    <section class="a-card col-span-12 sm:col-span-6 xl:col-span-3">
+      <div class="a-card-title"><span>{t('dash.todayPrayer')}</span><a href="/admin/gebetszeiten">Iqama</a></div>
+      <table class="w-full text-[13.5px]">
+        <tbody>
+          {PRAYERS.filter((p) => p !== 'sunrise').map((p) => (
+            <tr class:list={['border-t border-paper-2 first:border-0', p === nextPrayer && 'font-semibold text-wine']}>
+              <td class="py-1.5">{prayerName(p)}</td>
+              <td class="py-1.5 text-end tabular" dir="ltr">{today.times[p]} <span class="a-muted font-normal">· {today.iqama[p]}</span></td>
+            </tr>
+          ))}
+          {jumuah && <tr class="border-t border-paper-2"><td class="py-1.5">{ar ? 'الجمعة' : "Dschumu'a"}</td><td class="py-1.5 text-end font-semibold tabular" dir="ltr">{jumuah}</td></tr>}
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Recent changes -->
+    <section class="a-card col-span-12 xl:col-span-7">
+      <div class="a-card-title"><span>{t('dash.recent')}</span>{can(user, 'audit') && <a href="/admin/protokoll">{t('nav.audit')}</a>}</div>
+      <div class="a-list">
+        {recent.length === 0 && <p class="a-empty">{t('common.none')}</p>}
+        {recent.map((r) => (
+          <div class="a-row text-[13.5px]">
+            <span class="grid size-[26px] shrink-0 place-items-center rounded-full bg-gold-pale text-[11px] font-bold text-[#6b4f2a]">{(r.user_name ?? '?').split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}</span>
+            <span class:list={['min-w-0 flex-1', r.sensitive && 'text-[#8a5a1a]']}>{auditLabel(r, user.lang)}</span>
+            <span class="shrink-0 text-[12px] a-muted">{dateFmt(r.at + 'Z', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Design -->
+    <section class="a-card col-span-12 xl:col-span-5">
+      <div class="a-card-title"><span>{t('dash.design')}</span>{can(user, 'design') && <a href="/admin/design">{t('common.edit')}</a>}</div>
+      <form method="post" class="grid grid-cols-4 gap-2">
+        <input type="hidden" name="action" value="theme" />
+        {THEMES.map((th) => (
+          <button name="theme" value={th.id} disabled={!can(user, 'design')} class:list={['overflow-hidden rounded-xl border-[1.5px] bg-card text-center text-[11.5px] font-semibold transition enabled:hover:-translate-y-px', th.id === themeSettings.active ? 'border-wine shadow-[0_0_0_3px_var(--color-rose-soft)]' : 'border-line']}>
+            <span class="relative block h-14" style={`background:linear-gradient(135deg, ${th.swatch[0]}, ${th.swatch[1]})`}>
+              {th.id === 'ramadan' && <span class="absolute end-3 top-2 size-3 rounded-full" style={`box-shadow: inset -3px 1px 0 0 ${th.swatch[2]}`}></span>}
+              <i class="absolute inset-x-2 bottom-2 h-2.5 rounded bg-white/85"><i class="absolute end-1 top-[2px] h-1.5 w-4 rounded-sm" style={`background:${th.swatch[2]}`}></i></i>
+            </span>
+            <span class="block px-1 py-1.5">{th.id === themeSettings.active && '✓ '}{ar ? th.ar : th.de.replace(/ \(.+\)/, '')}</span>
+          </button>
+        ))}
+      </form>
+      <p class="mt-2.5 flex items-center gap-2 rounded-xl bg-paper px-3 py-2 text-[12.5px] a-muted">
+        <span class:list={['size-2 rounded-full', themeSettings.autoRamadan ? 'bg-[#69b86b]' : 'bg-line']}></span>
+        {t('dash.ramadanAuto')}{activeTheme !== themeSettings.active && <b class="ms-auto text-wine">● {ar ? 'نشط الآن' : 'jetzt aktiv'}</b>}
+      </p>
+    </section>
+  </div>
+</AdminLayout>

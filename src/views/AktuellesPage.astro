@@ -1,15 +1,15 @@
 ---
+import { getPublicAnnouncements, getSite } from '../lib/content';
 import { Picture } from 'astro:assets';
-import { getCollection } from 'astro:content';
 import { marked } from 'marked';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import CampaignProgress from '../components/CampaignProgress.astro';
 import Icon from '../components/Icon.astro';
-import site from '../content/settings/site.json';
 import { localizePath, formatDate, pick, useTranslations, type Lang } from '../i18n/ui';
 import courtyard from '../assets/photos/innenhof.jpg';
 import building from '../assets/photos/neues-gebaeude.jpg';
+const site = getSite();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -64,7 +64,7 @@ const categoryClass: Record<string, string> = {
   news: '',
 };
 
-const entries = (await getCollection('announcements', (e) => e.data.published)).sort(
+const entries = getPublicAnnouncements().sort(
   (a, b) => Number(b.data.pinned) - Number(a.data.pinned) || b.data.date.getTime() - a.data.date.getTime(),
 );
 
@@ -133,7 +133,7 @@ const schema = posts.slice(0, 10).map((p) => ({
 
     <aside class="news-aside space-y-6 lg:sticky lg:top-28 lg:self-start">
       <div class="card overflow-hidden">
-        <Picture src={building} alt={c.buildingAlt} widths={[400, 700]} sizes="(min-width: 1024px) 23rem, 100vw" formats={['avif', 'webp']} class="h-40 w-full object-cover" />
+        <Picture src={building} alt={c.buildingAlt} widths={[400, 700]} sizes="(min-width: 1024px) 23rem, 100vw" formats={['webp']} class="h-40 w-full object-cover" />
         <div class="p-6">
           <p class="eyebrow">{c.campaignEyebrow}</p>
           <h2 class="mt-2 text-xl font-semibold leading-snug">{c.campaignTitle}</h2>

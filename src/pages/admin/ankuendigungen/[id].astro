@@ -1,0 +1,208 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AIcon from '../../../components/admin/AIcon.astro';
+import PageHead from '../../../components/admin/PageHead.astro';
+import BiField from '../../../components/admin/BiField.astro';
+import SaveBar from '../../../components/admin/SaveBar.astro';
+import { adminT } from '../../../admin/i18n';
+import { currentUser, guardArea, setFlash, str, bool, isDate, berlinToIso, isoToBerlin } from '../../../admin/util';
+import { getEntry, saveEntry, deleteEntry, newId, announcementStatus, type Announcement } from '../../../lib/content';
+import { audit } from '../../../lib/server/auth';
+import { saveImage, deleteImage, UploadError } from '../../../lib/server/uploads';
+import { getSecret } from '../../../lib/server/secrets';
+
+const denied = guardArea(Astro, 'content');
+if (denied) return denied;
+const { user } = currentUser(Astro);
+const t = adminT(user.lang);
+const id = Astro.params.id!;
+const isNew = id === 'neu';
+const existing = isNew ? undefined : getEntry('announcements', id);
+if (!isNew && !existing) return Astro.redirect('/admin/ankuendigungen', 302);
+
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+let a: Announcement = existing?.data ?? {
+  date: new Date(today), category: 'news', title_de: '', title_ar: '', text_de: '', text_ar: '',
+  pinned: false, published: true, publishFrom: '', publishUntil: '', eventDate: '', image: '',
+};
+const errors: Record<string, string> = {};
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  if (fd.get('action') === 'delete' && existing) {
+    deleteEntry('announcements', id);
+    deleteImage(existing.data.image);
+    audit(user, 'announcement.delete', existing.data.title_de);
+    setFlash(Astro, { type: 'ok', key: 'flash.deleted' });
+    return Astro.redirect('/admin/ankuendigungen', 303);
+  }
+  const category = str(fd, 'category', 20);
+  a = {
+    date: new Date(isDate(str(fd, 'date', 10)) ? str(fd, 'date', 10) : today),
+    category: (['news', 'campaign', 'event', 'ramadan'].includes(category) ? category : 'news') as Announcement['category'],
+    title_de: str(fd, 'title_de', 160),
+    title_ar: str(fd, 'title_ar', 160),
+    text_de: str(fd, 'text_de', 5000),
+    text_ar: str(fd, 'text_ar', 5000),
+    eventDate: str(fd, 'eventDate', 120),
+    pinned: bool(fd, 'pinned'),
+    published: fd.get('action') !== 'draft' && bool(fd, 'published'),
+    publishFrom: berlinToIso(str(fd, 'publishFrom', 16)),
+    publishUntil: berlinToIso(str(fd, 'publishUntil', 16)),
+    image: existing?.data.image ?? '',
+  };
+  if (!a.title_de) errors.title = t('common.required');
+  if (!a.text_de) errors.text = t('common.required');
+  if (a.publishFrom && a.publishUntil && a.publishUntil <= a.publishFrom) errors.until = t('ann.publishHint');
+
+  const file = fd.get('image');
+  if (!Object.keys(errors).length) {
+    try {
+      if (bool(fd, 'removeImage')) { deleteImage(a.image); a.image = ''; }
+      if (file instanceof File && file.size > 0) { const url = await saveImage(file); deleteImage(a.image); a.image = url; }
+    } catch (err) {
+      errors.image = err instanceof UploadError ? t('ann.imageHint') : t('flash.error');
+    }
+  }
+  if (!Object.keys(errors).length) {
+    const saveId = isNew ? newId('ankuendigung') : id;
+    saveEntry('announcements', saveId, { ...a, date: a.date.toISOString().slice(0, 10) }, user.id);
+    audit(user, isNew ? 'announcement.create' : 'announcement.update', a.title_de);
+    const live = announcementStatus(a) === 'live';
+    setFlash(Astro, { type: 'ok', key: isNew ? 'flash.created' : 'flash.saved', link: live ? `/aktuelles#${saveId}` : undefined });
+    return Astro.redirect(`/admin/ankuendigungen/${saveId}`, 303);
+  }
+  setFlash(Astro, { type: 'error', key: 'flash.error' });
+}
+
+const status = announcementStatus(a);
+const canTranslate = Boolean(getSecret('anthropic_api_key'));
+const dateValue = a.date instanceof Date && !Number.isNaN(a.date.getTime()) ? a.date.toISOString().slice(0, 10) : today;
+---
+<AdminLayout title={isNew ? t('ann.new') : t('ann.edit')} active="announcements">
+  <PageHead title={isNew ? t('ann.new') : a.title_de || t('ann.edit')} back={{ href: '/admin/ankuendigungen', label: t('ann.title') }}>
+    {!isNew && <span class={`a-chip a-chip-${status}`}><span class="a-dot"></span>{t(`ann.status.${status}`)}</span>}
+  </PageHead>
+
+  <form method="post" enctype="multipart/form-data" data-track class="grid gap-4 xl:grid-cols-[1fr_340px]" id="ann-form">
+    <div class="grid content-start gap-4">
+      <section class="a-card grid gap-5">
+        <BiField t={t} name="title" label={t('ann.fieldTitle')} de={a.title_de} ar={a.title_ar} required error={errors.title} />
+        <BiField t={t} name="text" label={t('ann.fieldText')} de={a.text_de} ar={a.text_ar} multiline rows={8} required hint={t('ann.fieldTextHint')} error={errors.text} />
+        {canTranslate && (
+          <div class="flex flex-wrap items-center gap-3 rounded-xl bg-paper px-3 py-2.5">
+            <button type="button" class="a-btn a-btn-sm" data-translate><AIcon name="sparkles" size={14} />{t('ann.translate')}</button>
+            <span class="text-[12px] a-muted" data-translate-status>{t('ann.translateNote')}</span>
+          </div>
+        )}
+      </section>
+
+      <section class="a-card">
+        <div class="a-card-title"><span>{t('common.preview')}</span></div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <article class="rounded-xl border border-line bg-white p-4" lang="de" dir="ltr">
+            <p class="text-[12px] a-muted" data-pv-date></p>
+            <h3 class="mt-1 font-display text-lg font-semibold" data-pv="title_de"></h3>
+            <div class="prose-igh mt-1.5 text-[14px]" data-pv-md="text_de"></div>
+          </article>
+          <article class="rounded-xl border border-line bg-white p-4" lang="ar" dir="rtl">
+            <h3 class="font-display text-lg font-semibold" data-pv="title_ar" data-fallback="title_de"></h3>
+            <div class="prose-igh mt-1.5 text-[14px]" data-pv-md="text_ar" data-fallback="text_de"></div>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <aside class="grid content-start gap-4">
+      <section class="a-card grid gap-3.5">
+        <div class="a-card-title !mb-0"><span>{t('ann.publish')}</span></div>
+        <label class="a-check items-center"><input type="checkbox" name="published" class="a-switch" checked={a.published} /><span class="font-semibold">{t('ann.published')}</span></label>
+        <label class="a-check items-center"><input type="checkbox" name="pinned" class="a-switch" checked={a.pinned} /><span>{t('ann.pin')}</span></label>
+        <label class="a-field"><span class="a-label">{t('ann.publishFrom')}</span><input class="a-input" type="datetime-local" name="publishFrom" value={isoToBerlin(a.publishFrom)} /></label>
+        <label class="a-field"><span class="a-label">{t('ann.publishUntil')}</span><input class="a-input" type="datetime-local" name="publishUntil" value={isoToBerlin(a.publishUntil)} aria-invalid={errors.until ? 'true' : undefined} /><span class="a-hint">{t('ann.publishHint')}</span></label>
+      </section>
+
+      <section class="a-card grid gap-3.5">
+        <label class="a-field"><span class="a-label">{t('ann.category')}</span>
+          <select class="a-select" name="category">{(['news', 'campaign', 'event', 'ramadan'] as const).map((c) => <option value={c} selected={a.category === c}>{t(`ann.cat.${c}`)}</option>)}</select>
+        </label>
+        <label class="a-field"><span class="a-label">{t('ann.date')}</span><input class="a-input" type="date" name="date" value={dateValue} data-date /></label>
+        <label class="a-field"><span class="a-label">{t('ann.eventDate')}</span><input class="a-input" name="eventDate" value={a.eventDate} maxlength="120" placeholder={t('ann.eventDateHint')} /></label>
+      </section>
+
+      <section class="a-card grid gap-3">
+        <span class="a-label">{t('ann.image')}</span>
+        <label class="group relative grid aspect-[16/9] cursor-pointer place-items-center overflow-hidden rounded-xl border-[1.5px] border-dashed border-line bg-paper text-center text-[12.5px] a-muted hover:border-wine">
+          <img src={a.image || undefined} alt="" class:list={['absolute inset-0 h-full w-full object-cover', !a.image && 'hidden']} data-img-preview />
+          <span class:list={['grid justify-items-center gap-1', a.image && 'hidden']} data-img-empty><AIcon name="image" size={22} />{t('ann.imageHint')}</span>
+          <input type="file" name="image" accept="image/jpeg,image/png,image/webp" class="sr-only" data-img-input />
+        </label>
+        {errors.image && <span class="a-error-text">{errors.image}</span>}
+        {a.image && <label class="a-check text-[13px]"><input type="checkbox" name="removeImage" />{t('ann.removeImage')}</label>}
+      </section>
+    </aside>
+
+    <div class="xl:col-span-2">
+      <SaveBar t={t} canDelete={!isNew} secondary={{ name: 'action', value: 'draft', label: t('common.saveDraft') }} />
+    </div>
+  </form>
+
+  <script>
+    import { marked } from 'marked';
+    const form = document.querySelector<HTMLFormElement>('#ann-form')!;
+    const get = (n: string) => (form.elements.namedItem(n) as HTMLInputElement | null)?.value ?? '';
+    const render = () => {
+      form.querySelectorAll<HTMLElement>('[data-pv]').forEach((el) => {
+        const own = get(el.dataset.pv!);
+        el.textContent = own || get(el.dataset.fallback ?? '') || '…';
+        if (el.dataset.fallback) el.dir = own ? 'rtl' : 'ltr';
+      });
+      form.querySelectorAll<HTMLElement>('[data-pv-md]').forEach((el) => {
+        const own = get(el.dataset.pvMd!);
+        const src = own || get(el.dataset.fallback ?? '');
+        if (el.dataset.fallback) el.dir = own ? 'rtl' : 'ltr';
+        el.innerHTML = src ? (marked.parse(src.replace(/</g, '&lt;')) as string) : '<p class="a-muted">…</p>';
+      });
+      const d = get('date');
+      const pv = form.querySelector('[data-pv-date]');
+      if (pv && d) pv.textContent = new Date(d).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+    };
+    form.addEventListener('input', render);
+    render();
+
+    // Image preview
+    const input = form.querySelector<HTMLInputElement>('[data-img-input]');
+    input?.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const img = form.querySelector<HTMLImageElement>('[data-img-preview]')!;
+      img.src = URL.createObjectURL(file);
+      img.classList.remove('hidden');
+      form.querySelector('[data-img-empty]')?.classList.add('hidden');
+    });
+
+    // AI translation suggestion (DE -> AR)
+    const btn = form.querySelector<HTMLButtonElement>('[data-translate]');
+    btn?.addEventListener('click', async () => {
+      const status = form.querySelector<HTMLElement>('[data-translate-status]')!;
+      const original = status.textContent;
+      btn.disabled = true;
+      status.textContent = '…';
+      try {
+        const res = await fetch('/admin/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: get('title_de'), text: get('text_de') }) });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        (form.elements.namedItem('title_ar') as HTMLInputElement).value = data.title ?? '';
+        (form.elements.namedItem('text_ar') as HTMLTextAreaElement).value = data.text ?? '';
+        form.dataset.dirty = 'true';
+        render();
+        status.textContent = original;
+      } catch {
+        status.textContent = '⚠';
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</AdminLayout>

@@ -1,7 +1,8 @@
 ---
 import Icon from './Icon.astro';
-import { berlinToday, getRange, jumuah, type PrayerKey } from '../lib/prayer';
+import { berlinToday, getRange, getJumuah, type PrayerKey } from '../lib/prayer';
 import { localizePath, useTranslations, type Lang } from '../i18n/ui';
+const jumuah = getJumuah();
 
 interface Props { lang: Lang; variant?: 'card' | 'compact' }
 const { lang, variant = 'card' } = Astro.props;

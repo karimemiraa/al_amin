@@ -1,0 +1,31 @@
+---
+/**
+ * German + Arabic field pair. Names are `${name}_de` and `${name}_ar`.
+ * German is required when `required` is set; Arabic is always optional (falls back to German).
+ */
+import type { T } from '../../admin/i18n';
+interface Props {
+  t: T; name: string; label: string; de?: string; ar?: string; multiline?: boolean; rows?: number;
+  required?: boolean; maxlength?: number; hint?: string; error?: string; placeholderDe?: string; placeholderAr?: string;
+}
+const { t, name, label, de = '', ar = '', multiline = false, rows = 6, required = false, maxlength = multiline ? 5000 : 160, hint, error, placeholderDe, placeholderAr } = Astro.props;
+---
+<fieldset class="grid gap-1.5">
+  <legend class="a-label mb-1.5">{label}{!required && <span class="a-opt">({t('common.optional')})</span>}</legend>
+  <div class="a-bilingual">
+    <label class="a-field">
+      <span class="flex items-center gap-2 text-[11.5px] font-semibold a-muted"><span class="a-lang-tag">DE</span>{t('common.german')}</span>
+      {multiline
+        ? <textarea class="a-textarea" name={`${name}_de`} rows={rows} required={required} maxlength={maxlength} dir="ltr" lang="de" placeholder={placeholderDe} aria-invalid={error ? 'true' : undefined} data-preview={`${name}_de`}>{de}</textarea>
+        : <input class="a-input" name={`${name}_de`} value={de} required={required} maxlength={maxlength} dir="ltr" lang="de" placeholder={placeholderDe} aria-invalid={error ? 'true' : undefined} data-preview={`${name}_de`} />}
+    </label>
+    <label class="a-field">
+      <span class="flex items-center gap-2 text-[11.5px] font-semibold a-muted"><span class="a-lang-tag">AR</span>{t('common.arabic')} <span class="font-normal">· {t('common.arabicHint')}</span></span>
+      {multiline
+        ? <textarea class="a-textarea" name={`${name}_ar`} rows={rows} maxlength={maxlength} dir="rtl" lang="ar" placeholder={placeholderAr} data-preview={`${name}_ar`}>{ar}</textarea>
+        : <input class="a-input" name={`${name}_ar`} value={ar} maxlength={maxlength} dir="rtl" lang="ar" placeholder={placeholderAr} data-preview={`${name}_ar`} />}
+    </label>
+  </div>
+  {hint && <span class="a-hint">{hint}</span>}
+  {error && <span class="a-error-text">{error}</span>}
+</fieldset>

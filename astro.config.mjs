@@ -11,8 +11,9 @@ const base = process.env.SITE_BASE || '/';
 export default defineConfig({
   site,
   base,
-  // Pages are prerendered (static HTML); only /api/* routes run on the server.
-  output: 'static',
+  // Production: pages are rendered on the server (content comes from the admin's database,
+  // cached in src/middleware.ts). STATIC_BUILD=1 prerenders everything for GitHub Pages previews.
+  output: process.env.STATIC_BUILD ? 'static' : 'server',
   adapter: node({ mode: 'standalone' }),
   trailingSlash: 'never',
   devToolbar: { enabled: false },

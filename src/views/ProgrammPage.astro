@@ -1,14 +1,15 @@
 ---
-import { getCollection } from 'astro:content';
+import { getProgram, getSite } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import SectionHeading from '../components/SectionHeading.astro';
 import Icon from '../components/Icon.astro';
 import FilterChips from '../components/FilterChips.astro';
-import site from '../content/settings/site.json';
-import { jumuah } from '../lib/prayer';
+import { getJumuah } from '../lib/prayer';
 import { localizePath, pick, useTranslations, type Lang } from '../i18n/ui';
 import lecture from '../assets/photos/gemeinde-vortrag.jpg';
+const site = getSite();
+const jumuah = getJumuah();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -102,7 +103,7 @@ const c = ar
 const afterLabel = (after: string, time?: string) =>
   after === 'time' ? c.at(time ?? '') : `${t('common.after')} ${t(`prayer.${after}` as 'prayer.asr')}`;
 
-const entries = await getCollection('program', (e) => e.data.active);
+const entries = getProgram();
 const lessons = new Map<number, Lesson[]>();
 for (const e of entries) {
   const d = e.data;

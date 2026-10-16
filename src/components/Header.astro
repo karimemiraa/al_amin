@@ -1,9 +1,10 @@
 ---
+import { getPrayerSettings, getSite } from '../lib/content';
 import Logo from './Logo.astro';
 import Icon from './Icon.astro';
-import site from '../content/settings/site.json';
-import prayer from '../content/settings/prayer.json';
 import { nav, localizePath, basePath, useTranslations, type Lang } from '../i18n/ui';
+const site = getSite();
+const prayer = getPrayerSettings();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;

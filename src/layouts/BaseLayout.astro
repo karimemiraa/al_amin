@@ -1,12 +1,13 @@
 ---
+import { getSite, getActiveTheme, getActiveNotice } from '../lib/content';
 import '../styles/global.css';
 import { getImage } from 'astro:assets';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ConsentBanner from '../components/ConsentBanner.astro';
-import site from '../content/settings/site.json';
 import ogDefault from '../assets/photos/neues-gebaeude.jpg';
 import { dir, localizePath, basePath, withBase, useTranslations, type Lang } from '../i18n/ui';
+const site = getSite();
 
 interface Props {
   lang: Lang;
@@ -32,7 +33,10 @@ const plausibleDomain = import.meta.env.PUBLIC_PLAUSIBLE_DOMAIN;
 const plausibleSrc = import.meta.env.PUBLIC_PLAUSIBLE_SRC || 'https://plausible.io/js/script.js';
 const googleAdsId = import.meta.env.PUBLIC_GOOGLE_ADS_ID;
 const demo = import.meta.env.PUBLIC_DEMO === '1';
-const theme = import.meta.env.PUBLIC_THEME === 'green' ? 'green' : 'wine';
+const theme = getActiveTheme();
+const notice = getActiveNotice();
+const themeColor = { wine: '#6b1f2f', green: '#23622f', navy: '#1a2847', ramadan: '#2b2350' }[theme];
+const favicon = theme === 'wine' ? '/favicon.svg' : `/favicon-${theme}.svg`;
 // Test builds only: links to the same page in both colour variants on GitHub Pages.
 const demoRoot = import.meta.env.PUBLIC_DEMO_ROOT || '';
 const relPath = localizePath(path, lang).slice(import.meta.env.BASE_URL.replace(/\/$/, '').length) || '/';
@@ -68,8 +72,8 @@ const orgSchema = {
     <link rel="alternate" hreflang="ar" href={altAr} />
     <link rel="alternate" hreflang="x-default" href={altDe} />
     {(noindex || demo) && <meta name="robots" content="noindex, nofollow" />}
-    <meta name="theme-color" content={theme === 'green' ? '#23622f' : '#6b1f2f'} />
-    <link rel="icon" href={withBase(theme === 'green' ? '/favicon-green.svg' : '/favicon.svg')} type="image/svg+xml" />
+    <meta name="theme-color" content={themeColor} />
+    <link rel="icon" href={withBase(favicon)} type="image/svg+xml" />
     <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
     <link rel="sitemap" href={withBase('/sitemap-index.xml')} />
 
@@ -103,6 +107,14 @@ const orgSchema = {
             ))}
           </span>
         )}
+      </div>
+    )}
+    {notice && (
+      <div class:list={['px-4 py-2.5 text-center text-[0.95rem] font-semibold', notice.tone === 'brand' ? 'bg-wine text-white' : 'bg-gold-pale text-wine-ink']} role="status">
+        <span class="container-x inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <span>{lang === 'ar' && notice.text_ar ? notice.text_ar : notice.text_de}</span>
+          {notice.link && <a href={notice.link.startsWith('/') ? localizePath(notice.link, lang) : notice.link} class="underline underline-offset-4">{lang === 'ar' ? 'المزيد' : 'Mehr erfahren'}</a>}
+        </span>
       </div>
     )}
     <Header lang={lang} />

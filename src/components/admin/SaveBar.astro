@@ -1,0 +1,21 @@
+---
+/**
+ * Sticky save bar for edit forms (use inside <form data-track>). Optional delete button posts
+ * `action=delete` to the same form; `deleteForm` lets it target a separate form id instead.
+ */
+import AIcon from './AIcon.astro';
+import type { T } from '../../admin/i18n';
+interface Props { t: T; canDelete?: boolean; deleteForm?: string; saveLabel?: string; secondary?: { name: string; value: string; label: string } }
+const { t, canDelete = false, deleteForm, saveLabel, secondary } = Astro.props;
+---
+<div class="a-savebar">
+  <div class="flex items-center gap-3">
+    <span class="a-dirty"><span class="a-dot"></span>{t('common.unsaved')}</span>
+    {canDelete && <button type="submit" name="action" value="delete" form={deleteForm} formnovalidate class="a-btn a-btn-sm a-btn-danger" data-confirm={t('common.confirmDelete')}><AIcon name="trash" size={14} />{t('common.delete')}</button>}
+  </div>
+  <div class="flex items-center gap-2">
+    <slot />
+    {secondary && <button type="submit" name={secondary.name} value={secondary.value} class="a-btn">{secondary.label}</button>}
+    <button type="submit" name="action" value="save" class="a-btn a-btn-primary"><AIcon name="check" size={15} />{saveLabel ?? t('common.save')}</button>
+  </div>
+</div>

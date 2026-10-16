@@ -1,4 +1,5 @@
 ---
+import { getPrayerSettings, getSite } from '../lib/content';
 import { Picture } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
@@ -7,13 +8,13 @@ import Icon from '../components/Icon.astro';
 import Faq from '../components/Faq.astro';
 import Ornament from '../components/Ornament.astro';
 import Wave from '../components/Wave.astro';
-import site from '../content/settings/site.json';
-import prayer from '../content/settings/prayer.json';
 import { localizePath, type Lang } from '../i18n/ui';
 import heroImg from '../assets/photos/gebetsraum-2.jpg';
 import gate from '../assets/photos/eingang-tor.jpg';
 import courtyard from '../assets/photos/innenhof.jpg';
 import lecture from '../assets/photos/gemeinde-vortrag.jpg';
+const site = getSite();
+const prayer = getPrayerSettings();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -195,7 +196,7 @@ const c = ar
   <!-- TOURS -->
   <section id="fuehrungen" class="container-x mt-20 grid scroll-mt-28 gap-10 md:mt-28 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
     <div class="relative order-last lg:order-first">
-      <Picture src={lecture} alt={ar ? 'لقاء وحوار في قاعة الصلاة (الوجوه مموّهة)' : 'Gespräch und Vortrag im Gebetsraum (Gesichter unkenntlich gemacht)'} widths={[480, 800, 1200]} sizes="(min-width: 1024px) 45vw, 100vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-[1.5rem] object-cover shadow-lift" />
+      <Picture src={lecture} alt={ar ? 'لقاء وحوار في قاعة الصلاة (الوجوه مموّهة)' : 'Gespräch und Vortrag im Gebetsraum (Gesichter unkenntlich gemacht)'} widths={[480, 800, 1200]} sizes="(min-width: 1024px) 45vw, 100vw" formats={['webp']} class="aspect-[4/3] w-full rounded-[1.5rem] object-cover shadow-lift" />
     </div>
     <div>
       <SectionHeading eyebrow={c.toursEyebrow} title={c.toursTitle} intro={c.toursIntro} />
@@ -236,7 +237,7 @@ const c = ar
             ))}
           </ul>
           <figure class="card overflow-hidden">
-            <Picture src={gate} alt={ar ? 'البوابة الخضراء «3b» في الفناء الخلفي – مدخل المسجد' : 'Grünes Tor „3b“ im Hinterhof – Eingang zur Moschee'} widths={[480, 800]} sizes="(min-width: 1024px) 35vw, 100vw" formats={['avif', 'webp']} class="aspect-[16/9] w-full object-cover" />
+            <Picture src={gate} alt={ar ? 'البوابة الخضراء «3b» في الفناء الخلفي – مدخل المسجد' : 'Grünes Tor „3b“ im Hinterhof – Eingang zur Moschee'} widths={[480, 800]} sizes="(min-width: 1024px) 35vw, 100vw" formats={['webp']} class="aspect-[16/9] w-full object-cover" />
             <figcaption class="flex items-center gap-2 px-5 py-3.5 text-sm text-ink-soft"><Icon name="info" size={16} class="shrink-0 text-gold" />{c.gateCaption}</figcaption>
           </figure>
         </div>
@@ -335,7 +336,7 @@ const c = ar
     <div>
       <SectionHeading eyebrow={c.faqEyebrow} title={c.faqTitle} />
       <div class="card mt-8 overflow-hidden">
-        <Picture src={courtyard} alt="" widths={[480, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['avif', 'webp']} class="aspect-[16/10] w-full object-cover" />
+        <Picture src={courtyard} alt="" widths={[480, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['webp']} class="aspect-[16/10] w-full object-cover" />
         <div class="p-6">
           <p class="text-lg font-semibold text-ink">{c.ctaTitle}</p>
           <p class="mt-1 text-ink-soft">{c.ctaText}</p>

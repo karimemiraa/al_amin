@@ -1,9 +1,10 @@
 import type { APIRoute } from 'astro';
-import { getRange, publishedYears } from '../lib/prayer';
+import { getRange, getPublishedYears } from '../lib/prayer';
 
 // Static JSON with every day of the published years plus one provisional year,
 // fetched by the prayer widget when its inline window does not cover "today".
 export const GET: APIRoute = () => {
+  const publishedYears = getPublishedYears();
   const first = publishedYears[0];
   const last = publishedYears.at(-1)! + 1;
   const days = (Date.UTC(last + 1, 0, 1) - Date.UTC(first, 0, 1)) / 86_400_000;

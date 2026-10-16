@@ -1,0 +1,89 @@
+---
+export const prerender = false;
+import QRCode from 'qrcode';
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import { adminT } from '../../admin/i18n';
+import { adminLang, clientIp } from '../../admin/util';
+import { enableTotp, markMfa, markLogin, audit, twoFactorRequired, ownerEmails } from '../../lib/server/auth';
+import { encrypt, decrypt, newTotpSecret, otpauthUri, verifyTotp } from '../../lib/server/crypto';
+import { alertOwners } from '../../lib/server/mail';
+
+const { user, session } = Astro.locals;
+if (!user || !session) return Astro.redirect('/admin/login', 302);
+if (user.totpEnabled && Astro.request.method === 'GET') return Astro.redirect('/admin/konto', 302);
+
+const lang = adminLang(Astro);
+const t = adminT(lang);
+const COOKIE = 'igh_totp_setup';
+let error = '';
+let codes: string[] | null = null;
+
+// The pending secret lives encrypted in a short-lived cookie until it is confirmed.
+let secret = '';
+const pending = Astro.cookies.get(COOKIE)?.value;
+const parsed = pending ? decrypt(pending)?.split('|') : null;
+if (parsed && Number(parsed[0]) === user.id && Number(parsed[2]) > Date.now()) secret = parsed[1];
+
+if (Astro.request.method === 'POST' && secret && !user.totpEnabled) {
+  const fd = await Astro.request.formData();
+  const step = verifyTotp(secret, String(fd.get('code') ?? ''));
+  if (step !== null) {
+    codes = enableTotp(user.id, secret, step);
+    Astro.cookies.delete(COOKIE, { path: '/admin' });
+    markMfa(session.id);
+    markLogin(user.id);
+    audit(user, 'security.2faEnabled', user.email, { ip: clientIp(Astro) }, true);
+    void alertOwners(ownerEmails(), '2FA aktiviert', `${user.name} (${user.email}) hat die Zwei-Faktor-Anmeldung aktiviert.`);
+  } else {
+    error = t('auth.2faInvalid');
+  }
+}
+
+if (!secret && !codes) {
+  secret = newTotpSecret();
+  Astro.cookies.set(COOKIE, encrypt(`${user.id}|${secret}|${Date.now() + 15 * 60 * 1000}`), { path: '/admin', httpOnly: true, sameSite: 'strict', secure: Astro.url.protocol === 'https:', maxAge: 900 });
+}
+const qr = codes ? '' : await QRCode.toString(otpauthUri(secret, user.email), { type: 'svg', margin: 0, errorCorrectionLevel: 'M', color: { dark: '#2a2420', light: '#00000000' } });
+const grouped = secret.match(/.{1,4}/g)?.join(' ') ?? '';
+---
+<AuthLayout title={t('enroll.title')} lang={lang}>
+  {codes ? (
+    <div>
+      <span class="grid size-12 place-items-center rounded-2xl bg-[#e4f1e3] text-[#2f6d39]"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM9 12l2 2 4-4" /></svg></span>
+      <h1 class="mt-4 font-display text-[1.6rem] font-semibold">{t('enroll.codesTitle')}</h1>
+      <p class="mt-2 a-muted">{t('enroll.codesText')}</p>
+      <ol class="mt-5 grid grid-cols-2 gap-2 rounded-2xl border border-line bg-card p-4 font-mono text-[15px] tracking-wider" dir="ltr">
+        {codes.map((c) => <li class="rounded-lg bg-paper px-3 py-1.5 text-center">{c}</li>)}
+      </ol>
+      <div class="mt-5 flex gap-2">
+        <button type="button" class="a-btn" onclick="window.print()">{t('enroll.print')}</button>
+        <a href="/admin" class="a-btn a-btn-primary flex-1">{t('enroll.codesDone')}</a>
+      </div>
+    </div>
+  ) : (
+    <div>
+      <h1 class="font-display text-[1.6rem] font-semibold leading-tight">{t('enroll.title')}</h1>
+      <p class="mt-2 a-muted">{user.role === 'owner' || !twoFactorRequired(user) ? t('enroll.why') : t('enroll.whyEditor')}</p>
+      <ol class="mt-6 grid gap-5">
+        <li class="flex gap-3"><span class="grid size-7 shrink-0 place-items-center rounded-full bg-wine text-[13px] font-bold text-white">1</span><span><b class="block">{t('enroll.step1')}</b><span class="text-[13px] a-muted">{t('enroll.step1Text')}</span></span></li>
+        <li class="flex gap-3"><span class="grid size-7 shrink-0 place-items-center rounded-full bg-wine text-[13px] font-bold text-white">2</span>
+          <span class="flex-1"><b class="block">{t('enroll.step2')}</b><span class="text-[13px] a-muted">{t('enroll.step2Text')}</span>
+            <span class="mt-3 flex items-center gap-4 rounded-2xl border border-line bg-white p-3">
+              <span class="size-36 shrink-0 [&>svg]:size-full" set:html={qr} />
+              <details class="text-[12px]"><summary class="cursor-pointer font-semibold text-wine">{t('enroll.manual')}</summary><code class="mt-2 block break-all font-mono text-[13px] tracking-wider" dir="ltr">{grouped}</code></details>
+            </span>
+          </span>
+        </li>
+        <li class="flex gap-3"><span class="grid size-7 shrink-0 place-items-center rounded-full bg-wine text-[13px] font-bold text-white">3</span>
+          <span class="flex-1"><b class="block">{t('enroll.step3')}</b><span class="text-[13px] a-muted">{t('enroll.step3Text')}</span>
+            {error && <span class="mt-2 block text-[13px] font-semibold text-[#8a2a2a]" role="alert">{error}</span>}
+            <form method="post" class="mt-3 flex gap-2">
+              <input class="a-input a-code-input !h-12 flex-1 !text-xl" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required dir="ltr" placeholder="000000" autofocus />
+              <button class="a-btn a-btn-primary !h-12">{t('enroll.submit')}</button>
+            </form>
+          </span>
+        </li>
+      </ol>
+    </div>
+  )}
+</AuthLayout>

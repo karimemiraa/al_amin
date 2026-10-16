@@ -1,11 +1,13 @@
 import QRCode from 'qrcode';
-import site from '../content/settings/site.json';
+import { getSite } from './content';
 
 /**
  * EPC QR code ("GiroCode") payload per EPC069-12 v3.0, version 002 (BIC optional), UTF-8.
  * Lines are LF-separated and the payload must not end with a separator.
  */
-export function epcPayload(amount?: number, reference = site.bank.reference) {
+export function epcPayload(amount?: number, reference?: string) {
+  const site = getSite();
+  reference ??= site.bank.reference;
   const lines = [
     'BCD',
     '002',

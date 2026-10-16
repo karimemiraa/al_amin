@@ -1,0 +1,62 @@
+---
+export const prerender = false;
+import AuthLayout from '../../../layouts/AuthLayout.astro';
+import { adminT } from '../../../admin/i18n';
+import { adminLang, safeNext, clearSessionCookie, clientIp } from '../../../admin/util';
+import { verifySecondFactor, markMfa, markLogin, audit, destroySessionById } from '../../../lib/server/auth';
+
+const { user, session } = Astro.locals;
+if (!user || !session) return Astro.redirect('/admin/login', 302);
+const next = safeNext(Astro.url.searchParams.get('next'));
+if (session.mfaOk) return Astro.redirect(next, 302);
+if (!user.totpEnabled) return Astro.redirect('/admin/2fa-einrichten', 302);
+
+const lang = adminLang(Astro);
+const t = adminT(lang);
+let error = '';
+
+// Max. 5 wrong codes per pending session, then the password must be entered again.
+const g = globalThis as unknown as { __ighMfaFails?: Map<string, number> };
+g.__ighMfaFails ??= new Map();
+
+if (Astro.request.method === 'POST') {
+  const fd = await Astro.request.formData();
+  const method = verifySecondFactor(user.id, String(fd.get('code') ?? ''));
+  if (method) {
+    g.__ighMfaFails.delete(session.id);
+    markMfa(session.id);
+    markLogin(user.id);
+    audit(user, method === 'recovery' ? 'login.recoveryCode' : 'login', user.email, { ip: clientIp(Astro) }, method === 'recovery');
+    return Astro.redirect(next, 303);
+  }
+  const fails = (g.__ighMfaFails.get(session.id) ?? 0) + 1;
+  g.__ighMfaFails.set(session.id, fails);
+  if (fails >= 5) {
+    g.__ighMfaFails.delete(session.id);
+    destroySessionById(session.id);
+    clearSessionCookie(Astro);
+    audit(user, 'login.2faFailed', user.email, { ip: clientIp(Astro) }, true);
+    return Astro.redirect('/admin/login', 303);
+  }
+  error = t('auth.2faInvalid');
+}
+---
+<AuthLayout title={t('auth.2faTitle')} lang={lang}>
+  <span class="grid size-12 place-items-center rounded-2xl bg-rose-soft text-wine"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2" /></svg></span>
+  <h1 class="mt-4 font-display text-[1.7rem] font-semibold">{t('auth.2faTitle')}</h1>
+  <p class="mt-1 a-muted">{t('auth.2faText')}</p>
+  {error && <p class="mt-5 rounded-xl border border-[#e8b4b0] bg-[#fdf0ef] px-4 py-3 text-[13.5px] font-semibold text-[#8a2a2a]" role="alert">{error}</p>}
+  <form method="post" class="mt-6 grid gap-4">
+    <label class="a-field"><span class="sr-only">{t('auth.2faCode')}</span><input class="a-input a-code-input !h-14" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}|[A-Za-z0-9-]{10,11}" maxlength="11" required autofocus dir="ltr" placeholder="000000" data-code /></label>
+    <button class="a-btn a-btn-primary !h-11 w-full">{t('auth.2faVerify')}</button>
+  </form>
+  <details class="mt-5 text-[13px]">
+    <summary class="cursor-pointer font-semibold text-wine">{t('auth.2faRecovery')}</summary>
+    <form method="post" class="mt-3 flex gap-2"><input class="a-input" name="code" placeholder="XXXXX-XXXXX" dir="ltr" autocomplete="off" /><button class="a-btn">{t('auth.2faVerify')}</button></form>
+  </details>
+  <form method="post" action="/admin/logout" class="mt-6"><button class="text-[13px] font-semibold a-muted hover:text-wine">← {t('auth.otherAccount')}</button></form>
+  <script>
+    const input = document.querySelector<HTMLInputElement>('[data-code]');
+    input?.addEventListener('input', () => { if (/^\d{6}$/.test(input.value.replace(/\s/g, ''))) input.form?.requestSubmit(); });
+  </script>
+</AuthLayout>

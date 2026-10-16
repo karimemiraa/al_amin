@@ -1,6 +1,6 @@
 ---
+import { getCampaign, getEntries, getProgram, getPublicAnnouncements, getSite } from '../lib/content';
 import { Picture } from 'astro:assets';
-import { getCollection } from 'astro:content';
 import { marked } from 'marked';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CampaignProgress from '../components/CampaignProgress.astro';
@@ -11,14 +11,14 @@ import Ornament from '../components/Ornament.astro';
 import Wave from '../components/Wave.astro';
 import Icon from '../components/Icon.astro';
 import VideoEmbed from '../components/VideoEmbed.astro';
-import campaign from '../content/settings/campaign.json';
-import site from '../content/settings/site.json';
 import { localizePath, formatEuro, formatNumber, formatDate, pick, useTranslations, type Lang } from '../i18n/ui';
 import building from '../assets/photos/neues-gebaeude.jpg';
 import hall from '../assets/photos/gebetsraum.jpg';
 import courtyard from '../assets/photos/brunnen.jpg';
 import community from '../assets/photos/gemeinde-vortrag.jpg';
 import gate from '../assets/photos/eingang-tor.jpg';
+const site = getSite();
+const campaign = getCampaign();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;
@@ -26,12 +26,12 @@ const t = useTranslations(lang);
 const L = (p: string) => localizePath(p, lang);
 const ar = lang === 'ar';
 
-const news = (await getCollection('announcements', (e) => e.data.published))
+const news = getPublicAnnouncements()
   .sort((a, b) => Number(b.data.pinned) - Number(a.data.pinned) || b.data.date.getTime() - a.data.date.getTime())
   .slice(0, 3);
-const videos = (await getCollection('videos')).sort((a, b) => Number(b.data.featured) - Number(a.data.featured) || b.data.date.getTime() - a.data.date.getTime());
+const videos = getEntries('videos').sort((a, b) => Number(b.data.featured) - Number(a.data.featured) || b.data.date.getTime() - a.data.date.getTime());
 const video = videos[0];
-const program = (await getCollection('program', (e) => e.data.active)).sort((a, b) => ((a.data.weekday + 1) % 7) - ((b.data.weekday + 1) % 7));
+const program = getProgram().sort((a, b) => ((a.data.weekday + 1) % 7) - ((b.data.weekday + 1) % 7));
 const afterLabel = (after: string) => (after === 'time' ? '' : `${t('common.after')} ${t(`prayer.${after}` as 'prayer.asr')}`);
 
 const c = ar
@@ -147,7 +147,7 @@ const sqmOptions = [1, 2, 5, 10];
 <BaseLayout lang={lang} title={c.title} description={c.description}>
   <!-- HERO -->
   <section class="relative isolate overflow-hidden bg-wine-ink text-white">
-    <Picture src={building} alt={ar ? 'المبنى الجديد المراد شراؤه' : 'Das neue Gebäude, das wir erwerben möchten'} widths={[640, 960, 1400, 2000, 2400]} sizes="100vw" formats={['avif', 'webp']} class="absolute inset-0 -z-10 h-full w-full object-cover object-[60%_center]" loading="eager" fetchpriority="high" />
+    <Picture src={building} alt={ar ? 'المبنى الجديد المراد شراؤه' : 'Das neue Gebäude, das wir erwerben möchten'} widths={[640, 960, 1400, 2000, 2400]} sizes="100vw" formats={['webp']} class="absolute inset-0 -z-10 h-full w-full object-cover object-[60%_center]" loading="eager" fetchpriority="high" />
     <div class="absolute inset-0 -z-10 bg-gradient-to-r from-wine-ink/95 via-wine-ink/70 to-wine-ink/10 rtl:bg-gradient-to-l"></div>
     <div class="absolute inset-0 -z-10 bg-gradient-to-t from-wine-ink/80 via-transparent to-transparent"></div>
 
@@ -223,8 +223,8 @@ const sqmOptions = [1, 2, 5, 10];
         <div>
           <SectionHeading eyebrow={c.visionEyebrow} title={c.visionTitle} intro={c.visionIntro} />
           <div class="mt-8 grid grid-cols-2 gap-3">
-            <Picture src={hall} alt={ar ? 'قاعة الصلاة الحالية' : 'Der jetzige Gebetsraum'} widths={[400, 700]} sizes="(min-width: 1024px) 20vw, 45vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-2xl object-cover shadow-soft" />
-            <Picture src={community} alt={ar ? 'المصلون في المسجد الحالي' : 'Gemeinde im jetzigen Gebetsraum'} widths={[400, 700]} sizes="(min-width: 1024px) 20vw, 45vw" formats={['avif', 'webp']} class="aspect-[4/3] w-full rounded-2xl object-cover shadow-soft" />
+            <Picture src={hall} alt={ar ? 'قاعة الصلاة الحالية' : 'Der jetzige Gebetsraum'} widths={[400, 700]} sizes="(min-width: 1024px) 20vw, 45vw" formats={['webp']} class="aspect-[4/3] w-full rounded-2xl object-cover shadow-soft" />
+            <Picture src={community} alt={ar ? 'المصلون في المسجد الحالي' : 'Gemeinde im jetzigen Gebetsraum'} widths={[400, 700]} sizes="(min-width: 1024px) 20vw, 45vw" formats={['webp']} class="aspect-[4/3] w-full rounded-2xl object-cover shadow-soft" />
           </div>
         </div>
         <ul class="grid gap-4 sm:grid-cols-2">
@@ -300,7 +300,7 @@ const sqmOptions = [1, 2, 5, 10];
   <!-- ABOUT + VISIT -->
   <section class="container-x mt-28 grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
     <div class="card grid overflow-hidden md:grid-cols-2">
-      <Picture src={courtyard} alt={ar ? 'فناء المسجد الحالي مع النافورة' : 'Innenhof der jetzigen Moschee mit Brunnen'} widths={[500, 800]} sizes="(min-width: 768px) 30vw, 100vw" formats={['avif', 'webp']} class="h-full min-h-64 w-full object-cover" />
+      <Picture src={courtyard} alt={ar ? 'فناء المسجد الحالي مع النافورة' : 'Innenhof der jetzigen Moschee mit Brunnen'} widths={[500, 800]} sizes="(min-width: 768px) 30vw, 100vw" formats={['webp']} class="h-full min-h-64 w-full object-cover" />
       <div class="p-7 md:p-9">
         <p class="eyebrow">{c.aboutEyebrow}</p>
         <h2 class="mt-3 text-2xl font-semibold leading-snug md:text-3xl">{c.aboutTitle}</h2>
@@ -309,7 +309,7 @@ const sqmOptions = [1, 2, 5, 10];
       </div>
     </div>
     <div class="card relative overflow-hidden">
-      <Picture src={gate} alt={ar ? 'مدخل المسجد في Grabbestraße 3b' : 'Eingang der Moschee, Grabbestraße 3b'} widths={[500, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['avif', 'webp']} class="h-48 w-full object-cover" />
+      <Picture src={gate} alt={ar ? 'مدخل المسجد في Grabbestraße 3b' : 'Eingang der Moschee, Grabbestraße 3b'} widths={[500, 800]} sizes="(min-width: 1024px) 30vw, 100vw" formats={['webp']} class="h-48 w-full object-cover" />
       <div class="p-7">
         <h2 class="text-2xl font-semibold">{c.visitTitle}</h2>
         <p class="mt-3 flex gap-2 text-ink-soft"><Icon name="pin" size={18} class="mt-1 shrink-0 text-gold" /><span>{site.street}, {site.zip} {site.city}<br /><span class="text-sm">{ar ? site.directionsAr : site.directionsDe}</span></span></p>

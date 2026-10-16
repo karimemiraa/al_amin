@@ -1,16 +1,24 @@
-import prayerSettings from '../content/settings/prayer.json';
+import { getPrayerSettings, getUploadedPrayerTables, contentVersion } from './content';
 
 export const PRAYERS = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
 export type PrayerKey = (typeof PRAYERS)[number];
 export type DayTimes = Record<PrayerKey, string>;
 export type ResolvedDay = { date: string; times: DayTimes; iqama: Partial<Record<PrayerKey, string>>; provisional: boolean };
 
-// Yearly tables published by the mosque (src/data/prayer-times/<year>.json).
-const tables = import.meta.glob<Record<string, DayTimes>>('../data/prayer-times/*.json', { eager: true, import: 'default' });
-const byYear = new Map<number, Record<string, DayTimes>>(
-  Object.entries(tables).map(([path, data]) => [Number(path.match(/(\d{4})\.json$/)![1]), data]),
-);
-const years = [...byYear.keys()].sort();
+// Yearly tables published by the mosque: bundled JSON (src/data/prayer-times/<year>.json),
+// overridden/extended by tables uploaded in the admin.
+const bundled = import.meta.glob<Record<string, DayTimes>>('../data/prayer-times/*.json', { eager: true, import: 'default' });
+let cache: { version: number; byYear: Map<number, Record<string, DayTimes>>; years: number[] } | null = null;
+
+function tables() {
+  if (cache && cache.version === contentVersion()) return cache;
+  const byYear = new Map<number, Record<string, DayTimes>>(
+    Object.entries(bundled).map(([path, data]) => [Number(path.match(/(\d{4})\.json$/)![1]), data]),
+  );
+  for (const [year, data] of getUploadedPrayerTables()) byYear.set(year, data as Record<string, DayTimes>);
+  cache = { version: contentVersion(), byYear, years: [...byYear.keys()].sort() };
+  return cache;
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const isoDate = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
@@ -40,6 +48,7 @@ const toTime = (min: number) => `${pad(Math.floor((((min % 1440) + 1440) % 1440)
  */
 export function getDay(y: number, m: number, d: number): ResolvedDay {
   const date = isoDate(y, m, d);
+  const { byYear, years } = tables();
   const exact = byYear.get(y)?.[date];
   let times: DayTimes;
   let provisional = false;
@@ -53,7 +62,7 @@ export function getDay(y: number, m: number, d: number): ResolvedDay {
     const shift = (isSummerTime(y, m, d) ? 60 : 0) - (isSummerTime(srcYear, m, srcDay) ? 60 : 0);
     times = Object.fromEntries(PRAYERS.map((p) => [p, toTime(toMin(src[p]) + shift)])) as DayTimes;
   }
-  const offsets = prayerSettings.iqamaOffsets as Record<string, number>;
+  const offsets = getPrayerSettings().iqamaOffsets as Record<string, number>;
   const iqama = Object.fromEntries(
     Object.entries(offsets).map(([p, off]) => [p, toTime(toMin(times[p as PrayerKey]) + off)]),
   ) as Partial<Record<PrayerKey, string>>;
@@ -82,6 +91,6 @@ export function getMonth(y: number, m: number): ResolvedDay[] {
   return getRange([y, m, 1], new Date(Date.UTC(y, m, 0)).getUTCDate());
 }
 
-export const publishedYears = years;
-export const jumuah = prayerSettings.jumuah;
-export const iqamaOffsets = prayerSettings.iqamaOffsets;
+export const getPublishedYears = () => tables().years;
+export const getJumuah = () => getPrayerSettings().jumuah;
+export const getIqamaOffsets = () => getPrayerSettings().iqamaOffsets;

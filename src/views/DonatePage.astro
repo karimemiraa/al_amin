@@ -1,4 +1,5 @@
 ---
+import { getCampaign, getSite } from '../lib/content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import DonationForm from '../components/DonationForm.astro';
 import BankTransfer from '../components/BankTransfer.astro';
@@ -7,9 +8,9 @@ import SectionHeading from '../components/SectionHeading.astro';
 import Icon from '../components/Icon.astro';
 import Faq from '../components/Faq.astro';
 import Wave from '../components/Wave.astro';
-import site from '../content/settings/site.json';
-import campaign from '../content/settings/campaign.json';
 import { localizePath, formatDate, useTranslations, type Lang } from '../i18n/ui';
+const site = getSite();
+const campaign = getCampaign();
 
 interface Props { lang: Lang }
 const { lang } = Astro.props;

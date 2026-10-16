@@ -1,0 +1,12 @@
+---
+interface Props { title: string; intro?: string; back?: { href: string; label: string } }
+const { title, intro, back } = Astro.props;
+---
+<div class="a-head">
+  <div class="min-w-0">
+    {back && <a href={back.href} class="mb-1 inline-flex items-center gap-1 text-[12.5px] font-semibold text-wine no-underline"><span class="flip-rtl inline-block">←</span> {back.label}</a>}
+    <h1>{title}</h1>
+    {intro && <p>{intro}</p>}
+  </div>
+  {Astro.slots.has('default') && <div class="a-head-actions"><slot /></div>}
+</div>

@@ -1,0 +1,59 @@
+---
+import '../styles/admin.css';
+import { Picture } from 'astro:assets';
+import mark from '../assets/brand/mark.svg?raw';
+import building from '../assets/photos/neues-gebaeude.jpg';
+import { adminT, type AdminLang } from '../admin/i18n';
+import { getActiveTheme } from '../lib/content';
+
+interface Props { title: string; lang: AdminLang }
+const { title, lang } = Astro.props;
+const t = adminT(lang);
+const theme = getActiveTheme();
+const markSvg = mark.replace('<svg', '<svg aria-hidden="true" class="h-9 w-auto"');
+const other = lang === 'ar' ? 'de' : 'ar';
+---
+<!doctype html>
+<html lang={lang} dir={lang === 'ar' ? 'rtl' : 'ltr'} data-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} · {t('app.name')}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body class="a-body">
+    <div class="a-auth">
+      <div class="a-auth-art bg-wine-pattern">
+        <div class="absolute inset-0"><Picture src={building} alt="" widths={[800, 1200]} sizes="50vw" formats={['webp']} class="h-full w-full object-cover opacity-20 mix-blend-luminosity" loading="eager" /></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-wine-ink via-wine-ink/60 to-transparent"></div>
+        <a href="/" class="relative flex items-center gap-3 text-white no-underline">
+          <span class="text-gold-soft" set:html={markSvg} />
+          <span class="leading-tight"><b class="block font-display text-lg font-semibold">Mohammad Al-Amien</b><small class="text-[11px] uppercase tracking-[0.16em] text-gold-soft rtl:tracking-normal">{t('app.name')}</small></span>
+        </a>
+        <div class="relative max-w-md">
+          <p class="arabic-verse !text-[1.5rem] !text-gold-soft" lang="ar">إِنَّمَا يَعْمُرُ مَسَاجِدَ اللَّهِ مَنْ آمَنَ بِاللَّهِ وَالْيَوْمِ الْآخِرِ</p>
+          <p class="mt-2 text-sm text-white/70">At-Tawba 9:18</p>
+        </div>
+      </div>
+      <div class="a-auth-panel">
+        <div class="a-auth-card">
+          <slot />
+          <div class="mt-8 flex items-center justify-between text-[12px] a-muted">
+            <span class="inline-flex items-center gap-1.5"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3" /></svg>{t('auth.secure')}</span>
+            <a href={`?lang=${other}`} class="font-semibold text-wine" data-lang-switch={other}>{other === 'ar' ? 'العربية' : 'Deutsch'}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      document.querySelectorAll<HTMLAnchorElement>('[data-lang-switch]').forEach((a) =>
+        a.addEventListener('click', (e) => {
+          e.preventDefault();
+          document.cookie = `igh_admin_lang=${a.dataset.langSwitch}; path=/admin; max-age=31536000; samesite=strict`;
+          location.reload();
+        }),
+      );
+    </script>
+  </body>
+</html>
