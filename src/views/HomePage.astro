@@ -1,7 +1,7 @@
 ---
 import { getCampaign, getEntries, getProgram, getPublicAnnouncements, getSite } from '../lib/content';
 import { Picture } from 'astro:assets';
-import { marked } from 'marked';
+import { renderMarkdownInline } from '../lib/markdown';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CampaignProgress from '../components/CampaignProgress.astro';
 import PrayerToday from '../components/PrayerToday.astro';
@@ -282,7 +282,7 @@ const sqmOptions = [1, 2, 5, 10];
               <time datetime={n.data.date.toISOString()}>{formatDate(n.data.date, lang)}</time>
             </p>
             <h3 class="mt-2 text-xl font-semibold">{pick(n.data, 'title', lang)}</h3>
-            <div class="prose-igh mt-2 line-clamp-3" set:html={marked.parseInline(pick(n.data, 'text', lang))} />
+            <div class="prose-igh mt-2 line-clamp-3" set:html={renderMarkdownInline(pick(n.data, 'text', lang))} />
           </li>
         ))}
       </ul>

@@ -149,7 +149,7 @@ const dateValue = a.date instanceof Date && !Number.isNaN(a.date.getTime()) ? a.
   </form>
 
   <script>
-    import { marked } from 'marked';
+    import { renderMarkdown } from '../../../lib/markdown';
     const form = document.querySelector<HTMLFormElement>('#ann-form')!;
     const get = (n: string) => (form.elements.namedItem(n) as HTMLInputElement | null)?.value ?? '';
     const render = () => {
@@ -162,7 +162,7 @@ const dateValue = a.date instanceof Date && !Number.isNaN(a.date.getTime()) ? a.
         const own = get(el.dataset.pvMd!);
         const src = own || get(el.dataset.fallback ?? '');
         if (el.dataset.fallback) el.dir = own ? 'rtl' : 'ltr';
-        el.innerHTML = src ? (marked.parse(src.replace(/</g, '&lt;')) as string) : '<p class="a-muted">…</p>';
+        el.innerHTML = src ? renderMarkdown(src) : '<p class="a-muted">…</p>';
       });
       const d = get('date');
       const pv = form.querySelector('[data-pv-date]');

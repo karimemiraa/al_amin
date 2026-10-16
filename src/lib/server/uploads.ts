@@ -17,7 +17,7 @@ export async function saveImage(file: File, maxWidth = 1600): Promise<string> {
   if (!ALLOWED.includes(file.type)) throw new UploadError('type');
   if (file.size > MAX_BYTES) throw new UploadError('size');
   const input = Buffer.from(await file.arrayBuffer());
-  const output = await sharp(input, { failOn: 'error' }).rotate().resize({ width: maxWidth, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
+  const output = await sharp(input, { failOn: 'error', limitInputPixels: 70_000_000 }).rotate().resize({ width: maxWidth, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
   const now = new Date();
   const dir = path.join(UPLOAD_DIR, String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'));
   fs.mkdirSync(dir, { recursive: true });

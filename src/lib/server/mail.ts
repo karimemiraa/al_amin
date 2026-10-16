@@ -30,6 +30,7 @@ export async function sendMail(opts: { to: string | string[]; subject: string; t
     host: c.host,
     port: c.port,
     secure: c.port === 465,
+    requireTLS: c.port !== 465 && !!c.user, // never send the password over an unencrypted connection
     auth: c.user ? { user: c.user, pass: c.pass } : undefined,
   });
   await transport.sendMail({ from: c.from, to: opts.to, subject: opts.subject, text: opts.text, replyTo: opts.replyTo });

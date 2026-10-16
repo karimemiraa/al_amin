@@ -49,4 +49,5 @@ docs/                PRD, Recherche, Deployment, Admin-Anleitung, offene Punkte
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): Server einrichten und deployen
 - [docs/ADMIN-ANLEITUNG.md](docs/ADMIN-ANLEITUNG.md): Inhalte pflegen in der Verwaltung (für Ehrenamtliche)
 - [docs/PRD-ADMIN.md](docs/PRD-ADMIN.md): Konzept der Verwaltung
+- [docs/SECURITY.md](docs/SECURITY.md): Sicherheitsprüfung und Ergebnisse
 - [docs/research/](docs/research/): Analyse der alten Website, Benchmark, Recht & Spenden

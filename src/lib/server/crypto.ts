@@ -43,6 +43,10 @@ let masterKey: Buffer | null = null;
 function getMasterKey(): Buffer {
   if (masterKey) return masterKey;
   let secret = process.env.APP_SECRET;
+  if (!secret && import.meta.env.PROD && !process.env.STATIC_BUILD) {
+    // A generated key would sit in the same volume (and backups) as the data it protects.
+    throw new Error('APP_SECRET is not set. Add it to .env (openssl rand -base64 32) and restart.');
+  }
   if (!secret) {
     const file = path.join(DATA_DIR, '.app-secret');
     if (!fs.existsSync(file)) {

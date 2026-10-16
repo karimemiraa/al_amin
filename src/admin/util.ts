@@ -10,10 +10,12 @@ type Ctx = { request: Request; url: URL; cookies: AstroCookies; locals: App.Loca
 export const LANG_COOKIE = 'igh_admin_lang';
 const FLASH_COOKIE = 'igh_flash';
 
+/**
+ * Client IP. Astro only trusts X-Forwarded-For when the Host was validated against
+ * security.allowedDomains (i.e. the request came through Caddy), so it can't be spoofed.
+ */
 export function clientIp(ctx: Pick<Ctx, 'request' | 'clientAddress'>) {
-  const fwd = ctx.request.headers.get('x-forwarded-for');
-  if (fwd) return fwd.split(',')[0].trim();
-  try { return ctx.clientAddress; } catch { return 'unknown'; }
+  try { return ctx.clientAddress || 'unknown'; } catch { return 'unknown'; }
 }
 
 export function adminLang(ctx: Pick<Ctx, 'locals' | 'cookies' | 'request'>): AdminLang {

@@ -4,6 +4,7 @@ import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
 import { getSecret } from '../../../lib/server/secrets';
 import { can } from '../../../lib/server/auth';
+import { rateLimited } from '../../../lib/server/ratelimit';
 
 export const prerender = false;
 
@@ -21,6 +22,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
   if (!locals.user || !can(locals.user, 'content')) return json({ error: 'forbidden' }, 403);
   const apiKey = getSecret('anthropic_api_key');
   if (!apiKey) return json({ error: 'not_configured' }, 400);
+  // Each call costs money: max. 60 translations per hour per person.
+  if (rateLimited('translate', String(locals.user.id), 60, 60 * 60_000)) return json({ error: 'rate' }, 429);
 
   const body = (await request.json().catch(() => ({}))) as { title?: unknown; text?: unknown };
   const title = String(body.title ?? '').slice(0, 300);

@@ -1,7 +1,7 @@
 ---
 import { getPublicAnnouncements, getSite } from '../lib/content';
 import { Picture } from 'astro:assets';
-import { marked } from 'marked';
+import { renderMarkdown } from '../lib/markdown';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import CampaignProgress from '../components/CampaignProgress.astro';
@@ -86,7 +86,7 @@ const posts = entries.map((e) => {
     event: d.eventDate ? formatEvent(d.eventDate) : '',
     title: pick(d, 'title', lang),
     titleFallback: ar && !d.title_ar?.trim(),
-    html: marked.parse(pick(d, 'text', lang), { async: false }) as string,
+    html: renderMarkdown(pick(d, 'text', lang)),
     fallback,
     image: d.image,
   };

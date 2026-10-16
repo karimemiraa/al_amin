@@ -2,8 +2,9 @@
 export const prerender = false;
 import AuthLayout from '../../../layouts/AuthLayout.astro';
 import { adminT } from '../../../admin/i18n';
-import { adminLang, safeNext, clearSessionCookie, clientIp } from '../../../admin/util';
-import { verifySecondFactor, markMfa, markLogin, audit, destroySessionById } from '../../../lib/server/auth';
+import { adminLang, safeNext, clearSessionCookie, setSessionCookie, clientIp } from '../../../admin/util';
+import { verifySecondFactor, markLogin, audit, destroySessionById, isLocked, ownerEmails, createSession } from '../../../lib/server/auth';
+import { alertOwners } from '../../../lib/server/mail';
 
 const { user, session } = Astro.locals;
 if (!user || !session) return Astro.redirect('/admin/login', 302);
@@ -21,17 +22,21 @@ g.__ighMfaFails ??= new Map();
 
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
-  const method = verifySecondFactor(user.id, String(fd.get('code') ?? ''));
+  const method = verifySecondFactor(user.id, String(fd.get('code') ?? ''), clientIp(Astro));
   if (method) {
     g.__ighMfaFails.delete(session.id);
-    markMfa(session.id);
+    // Fresh token once fully signed in (the pre-2FA token is discarded).
+    destroySessionById(session.id);
+    setSessionCookie(Astro, createSession(user.id, true, clientIp(Astro), Astro.request.headers.get('user-agent')));
     markLogin(user.id);
-    audit(user, method === 'recovery' ? 'login.recoveryCode' : 'login', user.email, { ip: clientIp(Astro) }, method === 'recovery');
+    audit(user, method === 'recovery' ? 'login.recoveryCode' : 'login', user.email, { ip: clientIp(Astro) }, true); // sensitive: IPs only for owners
     return Astro.redirect(next, 303);
   }
   const fails = (g.__ighMfaFails.get(session.id) ?? 0) + 1;
   g.__ighMfaFails.set(session.id, fails);
-  if (fails >= 5) {
+  const locked = isLocked(user.id);
+  if (locked) void alertOwners(ownerEmails(), '2FA-Sperre', `Das Konto ${user.email} wurde nach vielen falschen 2FA-Codes vorübergehend gesperrt (IP ${clientIp(Astro)}). Falls das nicht die Person selbst war, ist ihr Passwort vermutlich bekannt – bitte ändern lassen.`);
+  if (fails >= 5 || locked) {
     g.__ighMfaFails.delete(session.id);
     destroySessionById(session.id);
     clearSessionCookie(Astro);

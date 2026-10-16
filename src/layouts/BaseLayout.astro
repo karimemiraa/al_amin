@@ -1,4 +1,5 @@
 ---
+import { jsonForScript } from '../lib/markdown';
 import { getSite, getActiveTheme, getActiveNotice } from '../lib/content';
 import '../styles/global.css';
 import { getImage } from 'astro:assets';
@@ -88,7 +89,7 @@ const orgSchema = {
     <meta property="og:locale" content={lang === 'ar' ? 'ar_AR' : 'de_DE'} />
     <meta name="twitter:card" content="summary_large_image" />
 
-    <script type="application/ld+json" set:html={JSON.stringify([orgSchema, ...schema])} />
+    <script type="application/ld+json" set:html={jsonForScript([orgSchema, ...schema])} />
 
     {plausibleDomain && <script is:inline defer data-domain={plausibleDomain} src={plausibleSrc}></script>}
   </head>

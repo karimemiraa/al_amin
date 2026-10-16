@@ -3,7 +3,7 @@ export const prerender = false;
 import AuthLayout from '../../layouts/AuthLayout.astro';
 import { adminT } from '../../admin/i18n';
 import { adminLang, safeNext, clientIp, currentUser } from '../../admin/util';
-import { checkPassword, verifySecondFactor, grantSudo, hasSudo, audit, ipBlocked } from '../../lib/server/auth';
+import { checkPassword, verifySecondFactor, grantSudo, hasSudo, audit, ipBlocked, isLocked, recordPasswordFailure } from '../../lib/server/auth';
 
 const { user, session } = currentUser(Astro);
 const next = safeNext(Astro.url.searchParams.get('next'));
@@ -15,14 +15,18 @@ let error = '';
 if (Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
   const ip = clientIp(Astro);
-  const ok = !ipBlocked(ip) && checkPassword(user.id, String(fd.get('password') ?? '')) && (!user.totpEnabled || verifySecondFactor(user.id, String(fd.get('code') ?? '')) !== null);
+  // Wrong passwords count like failed logins, wrong codes like failed 2FA (both lock the account).
+  const blocked = ipBlocked(ip) || isLocked(user.id);
+  const passwordOk = !blocked && checkPassword(user.id, String(fd.get('password') ?? ''));
+  if (!blocked && !passwordOk) recordPasswordFailure(user.id, ip);
+  const ok = passwordOk && (!user.totpEnabled || verifySecondFactor(user.id, String(fd.get('code') ?? ''), ip) !== null);
   if (ok) {
     grantSudo(session.id);
     audit(user, 'security.confirmed', next, { ip }, true);
     return Astro.redirect(next, 303);
   }
   audit(user, 'security.confirmFailed', next, { ip }, true);
-  error = t('sudo.invalid');
+  error = blocked || isLocked(user.id) ? t('auth.locked') : t('sudo.invalid');
 }
 ---
 <AuthLayout title={t('sudo.title')} lang={lang}>

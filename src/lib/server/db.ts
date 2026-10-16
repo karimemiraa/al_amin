@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS users (
   totp_secret TEXT,
   totp_enabled INTEGER NOT NULL DEFAULT 0,
   totp_last_step INTEGER NOT NULL DEFAULT 0,
+  mfa_failed INTEGER NOT NULL DEFAULT 0,
   recovery_codes TEXT NOT NULL DEFAULT '[]',
   active INTEGER NOT NULL DEFAULT 1,
   failed_logins INTEGER NOT NULL DEFAULT 0,
@@ -119,8 +120,15 @@ export function getDb(): DatabaseSync {
   db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
+  migrate(db);
   seed(db);
   return db;
+}
+
+/** Additive schema changes for databases created by an earlier version. */
+function migrate(d: DatabaseSync) {
+  const cols = (d.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('mfa_failed')) d.exec('ALTER TABLE users ADD COLUMN mfa_failed INTEGER NOT NULL DEFAULT 0');
 }
 
 function seed(d: DatabaseSync) {

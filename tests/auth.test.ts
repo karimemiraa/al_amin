@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   createUser, attemptLogin, createSession, getSession, destroySession, enableTotp, verifySecondFactor, createToken,
-  consumeToken, peekToken, can, getUser, passwordProblem, twoFactorRequired, updateUser,
+  consumeToken, peekToken, can, getUser, passwordProblem, twoFactorRequired, updateUser, isLocked,
 } from '../src/lib/server/auth';
 import { totpCode, newTotpSecret, currentStep } from '../src/lib/server/crypto';
 import { saveSetting, getSetting } from '../src/lib/content';
@@ -86,5 +86,22 @@ describe('tokens and permissions', () => {
     expect(passwordProblem('karim-2026-langes', 'karim@x.de')).toBe('pw.email');
     expect(passwordProblem('aaaaaaaaaaaa')).toBe('pw.common');
     expect(passwordProblem('Ein langer sicherer Satz')).toBeNull();
+  });
+});
+
+describe('2FA brute-force protection', () => {
+  it('locks the account after 10 wrong codes, even across fresh password logins', () => {
+    const id = createUser({ email: 'mfa@test.de', name: 'Mfa', role: 'editor', password: 'Mfa Passwort 2026!' });
+    const secret = newTotpSecret();
+    enableTotp(id, secret, 0);
+    for (let round = 0; round < 2; round++) {
+      // A correct password must not reset the 2FA failure counter.
+      expect(attemptLogin('mfa@test.de', 'Mfa Passwort 2026!', `10.1.${round}.1`).ok).toBe(true);
+      for (let i = 0; i < 5; i++) expect(verifySecondFactor(id, '000000', `10.1.${round}.1`)).toBeNull();
+    }
+    expect(isLocked(id)).toBe(true);
+    expect(attemptLogin('mfa@test.de', 'Mfa Passwort 2026!', '10.1.9.1')).toEqual({ ok: false, reason: 'locked' });
+    // While locked, even the right code is refused.
+    expect(verifySecondFactor(id, totpCode(secret, currentStep()))).toBeNull();
   });
 });

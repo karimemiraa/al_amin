@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { mailConfig, sendMail } from '../../lib/server/mail';
+import { rateLimited } from '../../lib/server/ratelimit';
 
 export const prerender = false;
 
@@ -25,7 +26,7 @@ const oneLine = (v: FormDataEntryValue | null, max: number) =>
  * Receives the contact form (form-encoded POST, works without JavaScript), sends it by e-mail
  * and redirects back to /kontakt (or /ar/kontakt) with ?gesendet=1 or ?fehler=…
  */
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, clientAddress }) => {
   let lang: 'de' | 'ar' = 'de';
   // Relative Location header: works behind any reverse proxy without trusting the Host header.
   const back = (query: string) => redirect(`${lang === 'ar' ? '/ar' : ''}/kontakt?${query}#formular`, 303);
@@ -37,6 +38,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     return back('fehler=1');
   }
   lang = form.get('lang') === 'ar' ? 'ar' : 'de';
+
+  // Max. 5 messages per 10 minutes from one connection (protects the mosque's inbox).
+  if (rateLimited('contact', clientAddress, 5, 10 * 60_000)) return back('fehler=1');
 
   // Spam protection: honeypot filled or form submitted implausibly fast → pretend success.
   if (String(form.get('website') ?? '').trim() !== '') return back('gesendet=1');

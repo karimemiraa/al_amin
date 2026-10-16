@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import Stripe from 'stripe';
 import { getSecret } from '../../lib/server/secrets';
 
+import { rateLimited } from '../../lib/server/ratelimit';
+
 export const prerender = false;
 
 const FUNDS = {
@@ -19,10 +21,13 @@ function siteUrl(request: Request) {
 }
 
 /** Accepts the donation form (form-encoded) and redirects to Stripe Checkout. */
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, clientAddress }) => {
   const base = siteUrl(request);
   let lang: 'de' | 'ar' = 'de';
   const back = (query: string) => redirect(`${base}${lang === 'ar' ? '/ar' : ''}/spenden?${query}#spenden-form`, 303);
+
+  // Each attempt creates a Stripe session: max. 20 per 10 minutes from one connection.
+  if (rateLimited('checkout', clientAddress, 20, 10 * 60_000)) return back('fehler=stripe');
 
   try {
     const form = await request.formData();

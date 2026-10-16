@@ -24,7 +24,7 @@ const LOCK_MS = 15 * 60 * 1000;
 
 type UserRow = {
   id: number; email: string; name: string; role: Role; lang: string; password_hash: string | null;
-  totp_secret: string | null; totp_enabled: number; totp_last_step: number; recovery_codes: string;
+  totp_secret: string | null; totp_enabled: number; totp_last_step: number; mfa_failed: number; recovery_codes: string;
   active: number; failed_logins: number; locked_until: string | null; last_login_at: string | null; created_at: string;
 };
 
@@ -95,7 +95,45 @@ export function ipBlocked(ip: string) {
   ipAttempts.set(ip, recent);
   return recent.length >= IP_LIMIT;
 }
-const noteIpFailure = (ip: string) => ipAttempts.set(ip, [...(ipAttempts.get(ip) ?? []), Date.now()]);
+export const noteIpFailure = (ip: string) => ipAttempts.set(ip, [...(ipAttempts.get(ip) ?? []), Date.now()]);
+
+export function isLocked(userId: number) {
+  const r = row(userId);
+  return !!r?.locked_until && new Date(r.locked_until).getTime() > Date.now();
+}
+
+/** Wrong password (login or re-confirmation): lock the account for 15 min after 5 in a row. */
+function notePasswordFailure(r: UserRow, ip: string) {
+  noteIpFailure(ip);
+  const failed = r.failed_logins + 1;
+  const lock = failed >= MAX_FAILED ? new Date(Date.now() + LOCK_MS).toISOString() : null;
+  getDb().prepare('UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?').run(lock ? 0 : failed, lock, r.id);
+  if (lock) audit(toUser(r), 'login.locked', r.email, { ip }, true);
+  return !!lock;
+}
+
+/** Wrong password while already signed in (re-confirmation page). Returns true if now locked. */
+export function recordPasswordFailure(userId: number, ip: string) {
+  const r = row(userId);
+  return r ? notePasswordFailure(r, ip) : false;
+}
+
+/**
+ * Wrong 2FA code. Counted per account and only reset by a correct code (not by a correct
+ * password), so guessing codes across many fresh logins is not possible: after 10 wrong codes
+ * the account is locked for 15 min, then for twice as long after every 5 more (max. 24 h).
+ */
+function noteSecondFactorFailure(r: UserRow, ip?: string) {
+  if (ip) noteIpFailure(ip);
+  const n = (r.mfa_failed ?? 0) + 1;
+  let lock: string | null = null;
+  if (n >= 10 && (n - 10) % 5 === 0) {
+    const ms = Math.min(24 * 60 * 60 * 1000, LOCK_MS * 2 ** ((n - 10) / 5));
+    lock = new Date(Date.now() + ms).toISOString();
+    audit(toUser(r), 'login.2faLocked', r.email, { ip, failures: n }, true);
+  }
+  getDb().prepare('UPDATE users SET mfa_failed = ?, locked_until = COALESCE(?, locked_until) WHERE id = ?').run(n, lock, r.id);
+}
 
 export type LoginResult = { ok: true; user: User } | { ok: false; reason: 'invalid' | 'locked' | 'rate' | 'inactive' };
 
@@ -105,14 +143,7 @@ export function attemptLogin(email: string, password: string, ip: string): Login
   const passwordOk = verifyPassword(password, r?.password_hash); // runs even for unknown e-mails
   if (!r) { noteIpFailure(ip); return { ok: false, reason: 'invalid' }; }
   if (r.locked_until && new Date(r.locked_until).getTime() > Date.now()) return { ok: false, reason: 'locked' };
-  if (!passwordOk) {
-    noteIpFailure(ip);
-    const failed = r.failed_logins + 1;
-    const lock = failed >= MAX_FAILED ? new Date(Date.now() + LOCK_MS).toISOString() : null;
-    getDb().prepare('UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?').run(lock ? 0 : failed, lock, r.id);
-    if (lock) audit(toUser(r), 'login.locked', r.email, { ip }, true);
-    return { ok: false, reason: lock ? 'locked' : 'invalid' };
-  }
+  if (!passwordOk) return { ok: false, reason: notePasswordFailure(r, ip) ? 'locked' : 'invalid' };
   if (!r.active) return { ok: false, reason: 'inactive' };
   getDb().prepare('UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?').run(r.id);
   return { ok: true, user: toUser(r) };
@@ -191,10 +222,19 @@ export function regenerateRecoveryCodes(userId: number) {
 export const recoveryCodesLeft = (userId: number) => (JSON.parse(row(userId)?.recovery_codes ?? '[]') as string[]).length;
 
 /** Verifies a TOTP code (no replay) or consumes a recovery code. */
-export function verifySecondFactor(userId: number, code: string): 'totp' | 'recovery' | null {
+export function verifySecondFactor(userId: number, code: string, ip?: string): 'totp' | 'recovery' | null {
   const r = row(userId);
   if (!r?.totp_enabled || !r.totp_secret) return null;
-  const secret = decrypt(r.totp_secret);
+  if (r.locked_until && new Date(r.locked_until).getTime() > Date.now()) return null;
+  const result = checkSecondFactor(r, code);
+  if (result) getDb().prepare('UPDATE users SET mfa_failed = 0 WHERE id = ?').run(userId);
+  else noteSecondFactorFailure(r, ip);
+  return result;
+}
+
+function checkSecondFactor(r: UserRow, code: string): 'totp' | 'recovery' | null {
+  const userId = r.id;
+  const secret = r.totp_secret ? decrypt(r.totp_secret) : null;
   if (secret) {
     const step = verifyTotp(secret, code);
     if (step !== null && step > r.totp_last_step) {
@@ -251,4 +291,22 @@ export function listAudit(limit = 50, offset = 0, onlySensitive = false) {
   return getDb()
     .prepare(`SELECT * FROM audit ${onlySensitive ? 'WHERE sensitive = 1' : ''} ORDER BY id DESC LIMIT ? OFFSET ?`)
     .all(limit, offset) as AuditRow[];
+}
+
+// --- First-owner setup -----------------------------------------------------------------------
+/**
+ * In production the setup page needs a one-time link, so whoever finds /admin/setup first can't
+ * claim the site. The token comes from SETUP_TOKEN or is generated per process and printed to the
+ * server log (docker compose logs web). Returns null in development (no token needed).
+ */
+export function setupToken(): string | null {
+  if (import.meta.env.DEV) return null;
+  if (process.env.SETUP_TOKEN) return process.env.SETUP_TOKEN;
+  const g = globalThis as unknown as { __ighSetupToken?: string };
+  if (!g.__ighSetupToken) {
+    g.__ighSetupToken = randomToken(18);
+    const base = (process.env.PUBLIC_SITE_URL ?? '').replace(/\/$/, '');
+    console.warn(`[setup] Noch kein Konto. Einrichtung öffnen: ${base}/admin/setup?token=${g.__ighSetupToken}`);
+  }
+  return g.__ighSetupToken;
 }

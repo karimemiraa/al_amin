@@ -1,4 +1,5 @@
 ---
+import { jsonForScript } from '../lib/markdown';
 import Icon from './Icon.astro';
 import { berlinToday, getRange, getJumuah, type PrayerKey } from '../lib/prayer';
 import { localizePath, useTranslations, type Lang } from '../i18n/ui';
@@ -54,8 +55,8 @@ const labels: Record<string, string> = { ...Object.fromEntries(rows.map((r) => [
     <p class="mx-3 mt-2 hidden text-xs text-ink-mute" data-provisional>{t('prayer.provisional')}</p>
     <a href={localizePath('/gebetszeiten', lang)} class="mx-3 mb-2 mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-wine hover:underline">{t('prayer.all')} <Icon name="arrow" size={16} /></a>
   </div>
-  <script type="application/json" data-prayer-data set:html={JSON.stringify(inline)} />
-  <script type="application/json" data-prayer-labels set:html={JSON.stringify(labels)} />
+  <script type="application/json" data-prayer-data set:html={jsonForScript(inline)} />
+  <script type="application/json" data-prayer-labels set:html={jsonForScript(labels)} />
 </div>
 
 <script>

@@ -3,7 +3,8 @@ export const prerender = false;
 import AuthLayout from '../../layouts/AuthLayout.astro';
 import { adminT } from '../../admin/i18n';
 import { adminLang, setSessionCookie, str, isEmail, clientIp } from '../../admin/util';
-import { userCount, createUser, createSession, passwordProblem, audit, getUser } from '../../lib/server/auth';
+import { userCount, createUser, createSession, passwordProblem, audit, getUser, setupToken } from '../../lib/server/auth';
+import { safeEqual } from '../../lib/server/crypto';
 
 if (userCount() > 0) return Astro.redirect('/admin/login', 302);
 const lang = adminLang(Astro);
@@ -11,7 +12,13 @@ const t = adminT(lang);
 const errors: Record<string, string> = {};
 const values = { name: '', email: '' };
 
-if (Astro.request.method === 'POST') {
+// Production: only with the one-time link from the server log.
+const expected = setupToken();
+const given = Astro.url.searchParams.get('token') ?? '';
+const tokenOk = expected === null || safeEqual(given, expected);
+if (!tokenOk) Astro.response.status = 403;
+
+if (tokenOk && Astro.request.method === 'POST') {
   const fd = await Astro.request.formData();
   values.name = str(fd, 'name', 80);
   values.email = str(fd, 'email', 120).toLowerCase();
@@ -30,6 +37,13 @@ if (Astro.request.method === 'POST') {
 }
 ---
 <AuthLayout title={t('setup.title')} lang={lang}>
+  {!tokenOk ? (
+    <>
+      <h1 class="font-display text-[1.7rem] font-semibold leading-tight">{t('setup.title')}</h1>
+      <p class="mt-3 a-muted">{t('setup.needToken')}</p>
+      <pre class="mt-4 overflow-x-auto rounded-xl bg-paper-2 px-4 py-3 text-[13px]" dir="ltr">docker compose logs web | grep setup</pre>
+    </>
+  ) : (<>
   <h1 class="font-display text-[1.7rem] font-semibold leading-tight">{t('setup.title')}</h1>
   <p class="mt-2 a-muted">{t('setup.text')}</p>
   <form method="post" class="mt-7 grid gap-4">
@@ -39,4 +53,5 @@ if (Astro.request.method === 'POST') {
     <label class="a-field"><span class="a-label">{t('pw.repeat')}</span><input class="a-input" type="password" name="repeat" required autocomplete="new-password" aria-invalid={errors.repeat ? 'true' : undefined} />{errors.repeat && <span class="a-error-text">{errors.repeat}</span>}</label>
     <button class="a-btn a-btn-primary mt-2 !h-11 w-full">{t('setup.submit')}</button>
   </form>
+  </>)}
 </AuthLayout>

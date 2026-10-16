@@ -167,6 +167,8 @@ if (Astro.request.method === 'POST') {
     if (next.from && (!isEmail(fromAddr) || /[\r\n]/.test(next.from))) errors.from = t('mail.fromError');
     if (next.to && !next.to.split(', ').every(isEmail)) errors.to = t('mail.toError');
     if (pass.length >= 500) errors.smtp_pass = t('mail.passError');
+    // A new server or user needs the password again – the stored one must never go to another server.
+    else if (!pass && getSecret('smtp_pass') && (next.host !== mail.host || next.user !== mail.user)) errors.smtp_pass = t('mail.passAgain');
     if (!Object.keys(errors).length) {
       const fields = (Object.keys(next) as (keyof MailSettings)[]).filter((k) => next[k] !== mail[k]);
       const masked: Record<string, string> = {};

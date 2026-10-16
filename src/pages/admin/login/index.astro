@@ -26,10 +26,11 @@ if (Astro.request.method === 'POST') {
     setSessionCookie(Astro, createSession(user.id, !needsCode && !mustEnroll, ip, Astro.request.headers.get('user-agent')));
     if (needsCode) return Astro.redirect(`/admin/login/2fa?next=${encodeURIComponent(next)}`, 303);
     markLogin(user.id);
-    audit(user, 'login', user.email, { ip });
+    audit(user, 'login', user.email, { ip }, true); // sensitive: IPs only for owners
     return Astro.redirect(mustEnroll ? '/admin/2fa-einrichten' : next, 303);
   }
-  error = t(`auth.${result.reason}`);
+  // 'locked' is only possible for existing accounts – show the same text so e-mails can't be probed.
+  error = t(`auth.${result.reason === 'locked' ? 'invalid' : result.reason}`);
 }
 ---
 <AuthLayout title={t('auth.title')} lang={lang}>
