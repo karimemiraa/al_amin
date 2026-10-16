@@ -147,7 +147,7 @@ const i18n = {
           {(['goal', 'raised'] as const).map((k) => (
             <label class="a-field">
               <span class="a-label">{labels[k]}</span>
-              <span class="relative block">
+              <span class="relative block" dir="ltr">
                 <input class="a-input a-input-lg !pe-10 tabular-nums" name={k} value={values[k]} inputmode="decimal" dir="ltr" autocomplete="off" required aria-invalid={errors[k] ? 'true' : undefined} data-num={k} />
                 <span class="pointer-events-none absolute inset-y-0 end-3 grid place-items-center text-[13px] a-muted">€</span>
               </span>
@@ -180,7 +180,7 @@ const i18n = {
           {(['pricePerSqm', 'totalSqm', 'outdoorSqm', 'floors', 'sqmPerFloor'] as const).map((k) => (
             <label class:list={['a-field', k === 'pricePerSqm' && 'col-span-2 md:col-span-1']}>
               <span class="a-label">{labels[k]}</span>
-              <span class="relative block">
+              <span class="relative block" dir="ltr">
                 <input class="a-input !pe-12 tabular-nums" name={k} value={values[k]} inputmode="numeric" dir="ltr" autocomplete="off" aria-invalid={errors[k] ? 'true' : undefined} data-num={k} />
                 {fields[k].unit && <span class="pointer-events-none absolute inset-y-0 end-3 grid place-items-center text-[12px] a-muted" dir="ltr">{fields[k].unit}</span>}
               </span>
@@ -197,7 +197,7 @@ const i18n = {
           {(['distanceToCurrentKm', 'minutesToTransit'] as const).map((k) => (
             <label class="a-field">
               <span class="a-label">{labels[k]}</span>
-              <span class="relative block">
+              <span class="relative block" dir="ltr">
                 <input class="a-input !pe-12 tabular-nums" name={k} value={values[k]} inputmode="decimal" dir="ltr" autocomplete="off" aria-invalid={errors[k] ? 'true' : undefined} data-num={k} />
                 <span class="pointer-events-none absolute inset-y-0 end-3 grid place-items-center text-[12px] a-muted">{fields[k].unit}</span>
               </span>

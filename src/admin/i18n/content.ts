@@ -127,8 +127,8 @@ const de: Record<string, string> = {
   'prayer.csv': 'CSV-Datei',
   'prayer.csvPaste': 'oder Inhalt hier einfügen',
   'prayer.upload': 'Prüfen & veröffentlichen',
-  'prayer.format': 'Spalten: date, fajr, sunrise, dhuhr, asr, maghrib, isha · Datum JJJJ-MM-TT · Zeiten HH:MM · getrennt mit ; oder , · Kopfzeile optional',
-  'prayer.pdfHint': 'Nur das PDF der Moschee vorhanden? Die technische Betreuung kann es mit scripts/parse-prayer-table.py umwandeln.',
+  'prayer.format': 'Eine Zeile pro Tag in dieser Spaltenfolge, getrennt mit Semikolon oder Komma. Die Kopfzeile ist optional.',
+  'prayer.pdfHint': 'Nur das PDF der Moschee vorhanden? Die technische Betreuung kann es mit diesem Skript umwandeln:',
   'prayer.replaceConfirm': 'Für dieses Jahr gibt es schon einen Kalender. Er wird ersetzt.',
   'prayer.errTitle': 'Der Kalender wurde nicht gespeichert. Bitte korrigieren:',
   'prayer.err.empty': 'Die Datei ist leer.',
@@ -205,6 +205,7 @@ const de: Record<string, string> = {
   'audit.video.delete': '{user} hat das Video „{target}“ gelöscht',
   'audit.prayer.update': '{user} hat Iqama, Freitagsgebet bzw. Hinweis geändert',
   'audit.prayer.table': '{user} hat den Gebetskalender {target} hochgeladen',
+  'audit.prayer.tableRemoved': '{user} hat den hochgeladenen Gebetskalender {target} entfernt',
   'audit.campaign.update': '{user} hat die Kampagne geändert ({target})',
 };
 
@@ -269,7 +270,7 @@ const ar: Record<string, string> = {
   'media.addTitle': 'إضافة فيديو',
   'media.addText': 'الصق رابط يوتيوب – يُؤخذ العنوان واسم المتحدث تلقائياً.',
   'media.url': 'رابط يوتيوب',
-  'media.urlHint': 'يعمل مع watch?v=… و youtu.be/… و /live/… و /shorts/… و embed/…',
+  'media.urlHint': 'يعمل مع كل أشكال روابط يوتيوب: العادية والمختصرة والبث المباشر و Shorts.',
   'media.urlInvalid': 'هذا ليس رابط يوتيوب صالحاً.',
   'media.fetching': 'جارٍ جلب البيانات من يوتيوب …',
   'media.fetched': 'أُخذت البيانات من يوتيوب – يرجى المراجعة.',
@@ -331,8 +332,8 @@ const ar: Record<string, string> = {
   'prayer.csv': 'ملف CSV',
   'prayer.csvPaste': 'أو الصق المحتوى هنا',
   'prayer.upload': 'تحقق وانشر',
-  'prayer.format': 'الأعمدة: date, fajr, sunrise, dhuhr, asr, maghrib, isha · التاريخ YYYY-MM-DD · الأوقات HH:MM · الفاصل ; أو , · سطر العناوين اختياري',
-  'prayer.pdfHint': 'لديك ملف PDF من المسجد فقط؟ يمكن للمسؤول التقني تحويله باستخدام scripts/parse-prayer-table.py.',
+  'prayer.format': 'سطر لكل يوم بهذا الترتيب للأعمدة، مفصولة بفاصلة منقوطة أو فاصلة. سطر العناوين اختياري.',
+  'prayer.pdfHint': 'لديك ملف PDF من المسجد فقط؟ يمكن للمسؤول التقني تحويله بهذا البرنامج:',
   'prayer.replaceConfirm': 'يوجد تقويم لهذا العام بالفعل وسيتم استبداله.',
   'prayer.errTitle': 'لم يُحفظ التقويم. يرجى تصحيح ما يلي:',
   'prayer.err.empty': 'الملف فارغ.',
@@ -407,6 +408,7 @@ const ar: Record<string, string> = {
   'audit.video.delete': 'حذف {user} الفيديو «{target}»',
   'audit.prayer.update': 'غيّر {user} الإقامة أو صلاة الجمعة أو التنبيه',
   'audit.prayer.table': 'رفع {user} تقويم الصلاة لعام {target}',
+  'audit.prayer.tableRemoved': 'حذف {user} تقويم الصلاة المرفوع لعام {target}',
   'audit.campaign.update': 'عدّل {user} بيانات الحملة ({target})',
 };
 

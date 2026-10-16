@@ -79,7 +79,7 @@ const wdName = (wd: number) => new Intl.DateTimeFormat(ar ? 'ar' : 'de-DE', { we
 const isTimeMode = l.after === 'time';
 ---
 <AdminLayout title={isNew ? t('prog.new') : t('prog.edit')} active="program">
-  <PageHead title={isNew ? t('prog.new') : l.title_de || t('prog.edit')} back={{ href: '/admin/programm', label: t('prog.title') }}>
+  <PageHead title={isNew ? t('prog.new') : (ar && l.title_ar) || l.title_de || t('prog.edit')} back={{ href: '/admin/programm', label: t('prog.title') }}>
     {!isNew && !existing?.data.active && <span class="a-chip a-chip-draft"><AIcon name="pause" size={11} />{t('prog.paused')}</span>}
   </PageHead>
 

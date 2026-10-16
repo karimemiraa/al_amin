@@ -15,6 +15,8 @@ if (denied) return denied;
 const { user } = currentUser(Astro);
 const t = adminT(user.lang);
 const ar = user.lang === 'ar';
+// Titles keep their own direction (correct truncation) but line up with the UI side.
+const align = `text-align:${ar ? 'right' : 'left'}`;
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
 
 const form = { url: '', title_de: '', title_ar: '', speaker: '', series: 'khutbah' as Video['series'], language: 'ar' as Video['language'], date: today, featured: false };
@@ -97,7 +99,7 @@ const previewId = youtubeId(form.url);
           <span class="a-label">{t('media.url')}</span>
           <input class="a-input a-input-lg" name="url" value={form.url} required maxlength="500" dir="ltr" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/watch?v=…" aria-invalid={errors.url ? 'true' : undefined} data-url />
           <span class="a-hint" data-url-status>{t('media.urlHint')}</span>
-          {errors.url && <span class="a-error-text">{errors.url}{duplicateOf && <> · <a href={`/admin/mediathek/${duplicateOf}`} class="text-wine">{t('common.edit')}</a></>}</span>}
+          {errors.url && <span class="a-error-text" data-url-error>{errors.url}{duplicateOf && <> · <a href={`/admin/mediathek/${duplicateOf}`} class="text-wine">{t('common.edit')}</a></>}</span>}
         </label>
         <div class="a-bilingual">
           <label class="a-field">
@@ -155,9 +157,9 @@ const previewId = youtubeId(form.url);
                 <span class="a-lang-tag">{v.data.language === 'de-ar' ? 'DE · AR' : v.data.language.toUpperCase()}</span>
                 <span class="a-muted">{fmt(v.data.date)}</span>
               </span>
-              <span class="a-row-title mt-1 block text-[13.5px] text-ink group-hover:text-wine"><bdi lang="de">{v.data.title_de}</bdi></span>
+              <span class="a-row-title mt-1 block text-[13.5px] text-ink group-hover:text-wine" dir="auto" style={align}>{ar && v.data.title_ar ? v.data.title_ar : v.data.title_de}</span>
               {v.data.title_ar
-                ? <span class="block truncate text-[12.5px] a-muted"><bdi lang="ar">{v.data.title_ar}</bdi></span>
+                ? <span class="block truncate text-[12.5px] a-muted" dir="auto" style={align}>{ar ? v.data.title_de : v.data.title_ar}</span>
                 : <span class="block text-[12px] font-semibold text-[#8a5a1a]">{t('media.missingAr')}</span>}
             </span>
           </a>
@@ -212,7 +214,11 @@ const previewId = youtubeId(form.url);
         setStatus(i18n.fail, 'error');
       }
     };
-    url.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(lookup, 350); });
+    url.addEventListener('input', () => {
+      form.querySelector('[data-url-error]')?.remove();
+      clearTimeout(timer);
+      timer = setTimeout(lookup, 350);
+    });
     url.addEventListener('paste', () => { clearTimeout(timer); timer = setTimeout(lookup, 50); });
     title.addEventListener('input', () => (title.dataset.auto = 'false'));
     speaker.addEventListener('input', () => (speaker.dataset.auto = 'false'));

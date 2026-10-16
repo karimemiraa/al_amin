@@ -201,6 +201,11 @@ export function getUploadedPrayerTables(): Map<number, Record<string, Record<str
   return new Map(rows.map((r) => [r.year, JSON.parse(r.data)]));
 }
 
+export function deletePrayerTable(year: number) {
+  getDb().prepare('DELETE FROM prayer_tables WHERE year = ?').run(year);
+  bumpVersion();
+}
+
 export function savePrayerTable(year: number, data: Record<string, Record<string, string>>) {
   getDb()
     .prepare(`INSERT INTO prayer_tables (year, data) VALUES (?, ?) ON CONFLICT(year) DO UPDATE SET data = excluded.data, updated_at = datetime('now')`)

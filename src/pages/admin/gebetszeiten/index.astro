@@ -7,7 +7,7 @@ import BiField from '../../../components/admin/BiField.astro';
 import SaveBar from '../../../components/admin/SaveBar.astro';
 import { adminT } from '../../../admin/i18n';
 import { currentUser, guardArea, setFlash, str, isTime } from '../../../admin/util';
-import { getPrayerSettings, saveSetting, savePrayerTable, getUploadedPrayerTables, type PrayerSettings } from '../../../lib/content';
+import { getPrayerSettings, saveSetting, savePrayerTable, deletePrayerTable, getUploadedPrayerTables, type PrayerSettings } from '../../../lib/content';
 import { getDay, berlinToday, getPublishedYears } from '../../../lib/prayer';
 import { audit } from '../../../lib/server/auth';
 import { parsePrayerCsv, MAX_CSV_BYTES, type CsvError } from '../../../components/admin/content/prayer-csv';
@@ -16,6 +16,8 @@ const denied = guardArea(Astro, 'content');
 if (denied) return denied;
 const { user } = currentUser(Astro);
 const t = adminT(user.lang);
+const deT = adminT('de');
+const arT = adminT('ar');
 
 const IQAMA = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
 /** "14.00", "9:30", "1400" → "14:00" / "09:30"; anything else is returned trimmed for the error message. */
@@ -81,6 +83,16 @@ if (Astro.request.method === 'POST') {
       }
       Astro.locals.flash = { type: 'error', key: 'flash.error' }; // shown on this re-render
     }
+  }
+
+  if (formName === 'removeTable') {
+    const year = Number(str(fd, 'year', 4));
+    if (getUploadedPrayerTables().has(year)) {
+      deletePrayerTable(year);
+      audit(user, 'prayer.tableRemoved', String(year));
+      setFlash(Astro, { type: 'ok', key: 'flash.deleted' });
+    }
+    return Astro.redirect('/admin/gebetszeiten#kalender', 303);
   }
 
   if (formName === 'table') {
@@ -155,7 +167,7 @@ const todayLabel = new Intl.DateTimeFormat(user.lang === 'ar' ? 'ar-u-nu-latn' :
           {jumuahRows.map((j, i) => (
             <li class="grid gap-2 rounded-xl border border-line bg-paper/50 p-2.5 sm:grid-cols-[84px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start" data-ju-row>
               <label class="a-field"><span class="a-label text-[11.5px]">{t('prayer.jumuahTime')}</span><input class="a-input tabular-nums" name="ju_time" value={j.time} required maxlength="5" inputmode="numeric" placeholder="14:00" dir="ltr" aria-invalid={errors[`ju_${i}`] ? 'true' : undefined} />{errors[`ju_${i}`] && <span class="a-error-text">{errors[`ju_${i}`]}</span>}</label>
-              <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">DE</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_de" value={j.noteDe} maxlength="200" dir="ltr" lang="de" placeholder={t('prayer.jumuahNotePh')} /></label>
+              <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">DE</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_de" value={j.noteDe} maxlength="200" dir="ltr" lang="de" placeholder={deT('prayer.jumuahNotePh')} /></label>
               <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">AR</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_ar" value={j.noteAr} maxlength="200" dir="rtl" lang="ar" /></label>
               <button type="submit" name="action" value={`ju:remove:${i}`} formnovalidate class="a-btn a-btn-sm a-btn-ghost a-btn-danger justify-self-end sm:mt-[22px]" data-ju-remove title={t('prayer.remove')}><AIcon name="trash" size={14} /><span class="sm:sr-only">{t('prayer.remove')}</span></button>
             </li>
@@ -166,7 +178,7 @@ const todayLabel = new Intl.DateTimeFormat(user.lang === 'ar' ? 'ar-u-nu-latn' :
         <template data-ju-template>
           <li class="grid gap-2 rounded-xl border border-line bg-paper/50 p-2.5 sm:grid-cols-[84px_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start" data-ju-row>
             <label class="a-field"><span class="a-label text-[11.5px]">{t('prayer.jumuahTime')}</span><input class="a-input tabular-nums" name="ju_time" value="" required maxlength="5" inputmode="numeric" placeholder="14:00" dir="ltr" /></label>
-            <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">DE</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_de" value="" maxlength="200" dir="ltr" lang="de" placeholder={t('prayer.jumuahNotePh')} /></label>
+            <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">DE</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_de" value="" maxlength="200" dir="ltr" lang="de" placeholder={deT('prayer.jumuahNotePh')} /></label>
             <label class="a-field"><span class="a-label text-[11.5px]"><span class="a-lang-tag">AR</span>{t('prayer.jumuahNote')}</span><input class="a-input" name="ju_note_ar" value="" maxlength="200" dir="rtl" lang="ar" /></label>
             <button type="submit" name="action" value="ju:remove:0" formnovalidate class="a-btn a-btn-sm a-btn-ghost a-btn-danger justify-self-end sm:mt-[22px]" data-ju-remove title={t('prayer.remove')}><AIcon name="trash" size={14} /><span class="sm:sr-only">{t('prayer.remove')}</span></button>
           </li>
@@ -174,7 +186,7 @@ const todayLabel = new Intl.DateTimeFormat(user.lang === 'ar' ? 'ar-u-nu-latn' :
       </section>
 
       <section class="a-card">
-        <BiField t={t} name="notice" label={t('prayer.notice')} hint={t('prayer.noticeText')} de={noticeDe} ar={noticeAr} multiline rows={2} maxlength={400} placeholderDe={t('prayer.noticePh')} />
+        <BiField t={t} name="notice" label={t('prayer.notice')} hint={t('prayer.noticeText')} de={noticeDe} ar={noticeAr} multiline rows={2} maxlength={400} placeholderDe={deT('prayer.noticePh')} placeholderAr={arT('prayer.noticePh')} />
       </section>
 
       <SaveBar t={t} />
@@ -190,7 +202,14 @@ const todayLabel = new Intl.DateTimeFormat(user.lang === 'ar' ? 'ar-u-nu-latn' :
         <span class="a-label mb-1.5">{t('prayer.years')}</span>
         <ul class="flex flex-wrap gap-1.5">
           {years.map((y) => (
-            <li class="a-chip a-chip-live"><AIcon name="check" size={11} /><span dir="ltr">{y}</span> · {uploaded.has(y) ? t('prayer.uploaded') : t('prayer.bundled')}</li>
+            <li class="a-chip a-chip-live"><AIcon name="check" size={11} /><span dir="ltr">{y}</span> · {uploaded.has(y) ? t('prayer.uploaded') : t('prayer.bundled')}
+              {uploaded.has(y) && (
+                <form method="post" class="inline">
+                  <input type="hidden" name="form" value="removeTable" /><input type="hidden" name="year" value={y} />
+                  <button class="ms-1 opacity-60 hover:opacity-100" title={t('common.delete')} aria-label={`${t('common.delete')} ${y}`} data-confirm={t('common.confirmDelete')}><AIcon name="x" size={11} /></button>
+                </form>
+              )}
+            </li>
           ))}
           <li class="a-chip a-chip-warn border border-dashed border-[#e0b46a]"><AIcon name="clock" size={11} /><span dir="ltr">{provisionalYear}</span> · {t('prayer.provisional')}</li>
         </ul>
@@ -223,9 +242,12 @@ const todayLabel = new Intl.DateTimeFormat(user.lang === 'ar' ? 'ar-u-nu-latn' :
           <summary class="cursor-pointer font-semibold text-wine">{t('prayer.csvPaste')}</summary>
           <textarea class="a-textarea mt-2 !min-h-[110px] font-mono !text-[12px]" name="csv_text" rows="5" dir="ltr" spellcheck="false" placeholder="date;fajr;sunrise;dhuhr;asr;maghrib;isha&#10;2027-01-01;06:25;08:24;12:29;14:06;16:25;18:11">{csvText}</textarea>
         </details>
-        <p class="a-hint" dir="auto">{t('prayer.format')}</p>
+        <div class="grid min-w-0 gap-1">
+          <p class="a-hint">{t('prayer.format')}</p>
+          <code dir="ltr" class="block max-w-full overflow-x-auto whitespace-pre rounded-lg bg-paper px-2.5 py-1.5 text-start font-mono text-[11.5px] text-ink-soft">date;fajr;sunrise;dhuhr;asr;maghrib;isha{'\n'}2027-01-01;06:25;08:24;12:29;14:06;16:25;18:11</code>
+        </div>
         <button class="a-btn a-btn-primary justify-self-start"><AIcon name="check" size={15} />{t('prayer.upload')}</button>
-        <p class="flex gap-1.5 border-t border-paper-2 pt-3 text-[12px] a-muted"><AIcon name="info" size={14} class="mt-0.5" /><span>{t('prayer.pdfHint')}</span></p>
+        <p class="flex gap-1.5 border-t border-paper-2 pt-3 text-[12px] a-muted"><AIcon name="info" size={14} class="mt-0.5" /><span>{t('prayer.pdfHint')} <code dir="ltr" class="font-mono text-[11px]">scripts/parse-prayer-table.py</code></span></p>
       </form>
     </section>
   </div>
