@@ -11,7 +11,7 @@ const next = safeNext(Astro.url.searchParams.get('next'));
 if (Astro.locals.user && Astro.locals.session?.mfaOk) return Astro.redirect(next, 302);
 
 let error = '';
-const info = Astro.url.searchParams.get('abgemeldet') ? t('auth.loggedOut') : '';
+const info = Astro.url.searchParams.get('abgemeldet') ? t('auth.loggedOut') : Astro.url.searchParams.get('passwort') === 'neu' ? t('reset.done') : '';
 let email = '';
 
 if (Astro.request.method === 'POST') {

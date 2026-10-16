@@ -99,7 +99,8 @@ export function detailLines(json: string | null, hidden: string): { key: string;
   const scalar = (k: string, v: unknown): string => {
     if (v === null || v === undefined || v === '') return '—';
     if (typeof v === 'boolean') return v ? '✓' : '✗';
-    if (typeof v === 'object') return Array.isArray(v) ? v.map((x) => scalar(k, x)).join(', ') : hidden;
+    if (Array.isArray(v)) return v.length ? v.map((x) => scalar(k, x)).join(', ') : '—';
+    if (typeof v === 'object') return hidden;
     const s = String(v).slice(0, 200);
     if (MASKED.test(s) && s.length <= 48) return s; // already masked (maskSecret)
     if (SECRET_KEY.test(k) || SECRET_VALUE.test(s)) return hidden;

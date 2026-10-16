@@ -104,7 +104,7 @@ if (Astro.request.method === 'POST') {
     const s = listSessions(target.id).find((x) => sessionRef(x.id) === ref);
     if (!s || s.id === session.id) return fail('flash.error', target.id);
     destroySessionById(s.id);
-    audit(user, 'user.sessionsRevoked', target.name, { sessions: 1, device: (s.userAgent ?? '').slice(0, 80), ip }, true);
+    audit(user, isSelf ? 'account.sessionsRevoked' : 'user.sessionsRevoked', isSelf ? user.email : target.name, { sessions: 1, device: (s.userAgent ?? '').slice(0, 80), ip }, true);
     if (!isSelf) alert('Gerät abgemeldet', `${by} hat ein Gerät von ${target.name} (${target.email}) abgemeldet.`);
     return ok('users.flash.revoked', target.name, target.id);
   } else if (isSelf) {

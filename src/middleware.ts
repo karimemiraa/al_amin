@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import { contentVersion } from './lib/content';
+import { startBackupScheduler } from './lib/server/backup';
 
 /**
  * 1. Admin: loads the session, enforces login + 2FA, sets no-store headers.
@@ -24,6 +25,7 @@ function remember(key: string, entry: Cached) {
 
 export const onRequest = defineMiddleware(async (ctx, next) => {
   if (ctx.isPrerendered) return next();
+  startBackupScheduler(); // once per process: first backup 2 min after start, then every 24 h
   const { pathname } = ctx.url;
 
   // --- Admin ---------------------------------------------------------------------------
